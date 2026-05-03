@@ -1,0 +1,23 @@
+# Development overrides for synthtek
+# Merge with base: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  synthtek:
+    # Hot-reload: mount source code
+    volumes:
+      - ./src:/app/src
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
+      - ./bin:/app/bin
+
+    # Debug logging
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+
+    # No resource limits in dev
+    deploy:
+      resources:
+        limits: {}
+        reservations: {}

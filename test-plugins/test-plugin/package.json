@@ -1,0 +1,9 @@
+{
+  "name": "test-plugin",
+  "version": "1.0.0",
+  "type": "module",
+  "synthtek": {
+    "type": "plugin",
+    "main": "dist/index.js"
+  }
+}

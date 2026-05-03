@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          PREV_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            CHANGELOG=$(git log --pretty=format:"* %s (%h)" "$PREV_TAG".."$TAG")
+          else
+            CHANGELOG=$(git log --pretty=format:"* %s (%h)")
+          fi
+          echo "CHANGELOG<<EOF" >> "$GITHUB_ENV"
+          echo "$CHANGELOG" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: |
+            ## Changes
+            ${CHANGELOG}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to npm
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
+          npm publish --access public
+        if: env.NPM_TOKEN != ''
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
