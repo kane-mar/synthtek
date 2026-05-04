@@ -29,9 +29,9 @@ Thumbs.db
 # Test coverage
 coverage/
 
-# Logs
+# Log files (keep directory for Docker bind mounts)
 *.log
-logs/
+!logs/.gitkeep
 
 # Temporary
 tmp/
