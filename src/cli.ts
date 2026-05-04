@@ -18,6 +18,7 @@ import {
   registerLogsCommand,
   registerRestartCommand,
   registerStopCommand,
+  registerWebuiCommand,
 } from './cli/commands/index.js';
 
 const program = new Command();
@@ -42,6 +43,7 @@ registerInitCommand(program);
 registerLogsCommand(program);
 registerRestartCommand(program);
 registerStopCommand(program);
+registerWebuiCommand(program);
 
 // ── Run ─────────────────────────────────────────────────────────────────────
 

@@ -46,6 +46,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "import('fs').then(fs => process.exit(fs.existsSync('/app/dist/src/cli.js') ? 0 : 1))" || exit 1
 
-# Default: show help
+# Default: start WebUI server on port 8080
 ENTRYPOINT ["node", "dist/src/cli.js"]
-CMD ["--help"]
+CMD ["webui"]

@@ -11,6 +11,10 @@ services:
     container_name: synthtek
     restart: unless-stopped
 
+    # Port mapping (WebUI)
+    ports:
+      - "8080:8080"
+
     # Volume mounts
     volumes:
       - ./config:/data/config

@@ -15,3 +15,4 @@ export { registerInitCommand } from './init-command.js';
 export { registerLogsCommand } from './logs-command.js';
 export { registerRestartCommand } from './restart-command.js';
 export { registerStopCommand } from './stop-command.js';
+export { registerWebuiCommand } from './webui-command.js';
