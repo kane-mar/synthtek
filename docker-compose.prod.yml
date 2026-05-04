@@ -14,15 +14,8 @@ services:
       start_period: 10s
       retries: 5
 
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: "1.0"
-        reservations:
-          memory: 128M
-          cpus: "0.25"
+    # Resource limits — removed deploy.resources (requires CPU CFS scheduler).
+    # Use host-level cgroup or systemd limits instead.
 
     # Log rotation
     logging:

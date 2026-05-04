@@ -35,15 +35,9 @@ services:
       start_period: 10s
       retries: 3
 
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: "1.0"
-        reservations:
-          memory: 128M
-          cpus: "0.25"
+    # Resource limits — removed deploy.resources block because it requires
+    # CPU CFS scheduler support which is unavailable on many systems
+    # (WSL2, VMs, minimal kernels). Use host-level limits instead.
 
     # Non-root user (matches Dockerfile)
     user: "1000:1000"
