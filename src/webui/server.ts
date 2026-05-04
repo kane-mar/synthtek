@@ -5,10 +5,11 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebUIBackend } from './backend.js';
+import { ProviderManager, type CreateProviderRequest, type UpdateProviderRequest } from './provider-manager.js';
 import type { WebUIConfig } from './types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -62,107 +63,358 @@ function parseBody(req: IncomingMessage): Promise<string> {
   });
 }
 
-// ── Frontend HTML (embedded to avoid external assets) ───────────────────────
+// ── Frontend HTML ───────────────────────────────────────────────────────────
 
-const FRONTEND_HTML = `<!DOCTYPE html>
+const FRONTEND_HTML: string = buildFrontend();
+
+function buildFrontend(): string {
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Synthtek WebUI</title>
+<title>Synthtek</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  :root { --bg: #0d1117; --surface: #161b22; --border: #30363d; --text: #c9d1d9; --accent: #58a6ff; --user-bg: #1f6feb; --ai-bg: #21262d; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
-  header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface); }
-  header h1 { font-size: 16px; color: var(--accent); }
-  #status { font-size: 12px; color: #8b949e; }
-  #chat { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-  .message { max-width: 75%; padding: 10px 14px; border-radius: 12px; line-height: 1.5; font-size: 14px; word-wrap: break-word; white-space: pre-wrap; }
-  .user { align-self: flex-end; background: var(--user-bg); color: #fff; border-bottom-right-radius: 4px; }
-  .assistant { align-self: flex-start; background: var(--ai-bg); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
-  .system { align-self: center; font-size: 12px; color: #8b949e; font-style: italic; }
-  #input-area { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; background: var(--surface); }
-  #message-input { flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 14px; outline: none; resize: none; }
-  #message-input:focus { border-color: var(--accent); }
-  #send-btn { padding: 10px 20px; border-radius: 8px; border: none; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; white-space: nowrap; }
-  #send-btn:hover { opacity: 0.9; }
-  #send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#c9d1d9;--text-dim:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--sidebar-w:240px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden}
+
+/* Sidebar */
+#sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+#sidebar .logo{padding:20px;border-bottom:1px solid var(--border);font-size:18px;font-weight:700;color:var(--accent)}
+#sidebar nav{flex:1;padding:12px 0}
+#sidebar nav a{display:flex;align-items:center;gap:12px;padding:10px 20px;color:var(--text-dim);text-decoration:none;font-size:14px;border-left:3px solid transparent;transition:.15s}
+#sidebar nav a:hover{color:var(--text);background:rgba(88,166,255,.06)}
+#sidebar nav a.active{color:var(--accent);border-left-color:var(--accent);background:rgba(88,166,255,.1)}
+#sidebar nav a .icon{width:20px;text-align:center;font-size:16px}
+#sidebar .status-bar{padding:16px 20px;border-top:1px solid var(--border);font-size:12px;color:var(--text-dim)}
+#sidebar .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+
+/* Main */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#topbar{height:48px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;font-size:15px;font-weight:600;color:var(--text)}
+#content{flex:1;overflow-y:auto;padding:24px}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
+.card h3{font-size:15px;font-weight:600;margin-bottom:12px;color:var(--text)}
+
+/* Grid */
+.grid-3{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.stat-card{text-align:center;padding:24px 16px}
+.stat-card .value{font-size:28px;font-weight:700;color:var(--accent)}
+.stat-card .label{font-size:13px;color:var(--text-dim);margin-top:4px}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;padding:10px 12px;border-bottom:2px solid var(--border);color:var(--text-dim);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.5px}
+td{padding:10px 12px;border-bottom:1px solid var(--border)}
+tr:hover td{background:rgba(88,166,255,.04)}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{opacity:.9}
+.btn-danger{background:var(--red);color:#fff}.btn-danger:hover{opacity:.85}
+.btn-ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--text-dim)}
+
+/* Badges */
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600}
+.badge-active{background:rgba(63,185,80,.15);color:var(--green)}
+.badge-inactive{background:rgba(139,148,158,.15);color:var(--text-dim)}
+.badge-error{background:rgba(248,81,73,.15);color:var(--red)}
+
+/* Forms */
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:13px;color:var(--text-dim);margin-bottom:6px;font-weight:600}
+.form-input{width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;outline:none}
+.form-input:focus{border-color:var(--accent)}
+select.form-input{appearance:auto}
+
+/* Chat */
+#chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:75%;padding:10px 14px;border-radius:12px;line-height:1.5;font-size:14px;word-wrap:break-word;white-space:pre-wrap}
+.msg-user{align-self:flex-end;background:#1f6feb;color:#fff;border-bottom-right-radius:4px}
+.msg-assistant{align-self:flex-start;background:var(--ai-bg,#21262d);border:1px solid var(--border);border-bottom-left-radius:4px}
+#chat-input-bar{padding:16px 20px;border-top:1px solid var(--border);display:flex;gap:10px;background:var(--surface)}
+
+/* Modal */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;width:500px;max-width:90vw;max-height:80vh;overflow-y:auto}
+.modal h3{margin-bottom:16px;font-size:16px}
+
+/* Empty state */
+.empty{text-align:center;padding:60px 20px;color:var(--text-dim)}
+.empty .icon{font-size:40px;margin-bottom:12px}
+
+/* Page header */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.page-header h2{font-size:20px;font-weight:700}
 </style>
 </head>
 <body>
-<header><h1>Synthtek WebUI</h1><span id="status">Connecting...</span></header>
-<div id="chat"></div>
-<div id="input-area">
-  <textarea id="message-input" rows="1" placeholder="Type a message..."></textarea>
-  <button id="send-btn">Send</button>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <div class="logo">&#x1F680; Synthtek</div>
+  <nav>
+    <a href="#" data-page="dashboard" class="active"><span class="icon">&#x1F4CA;</span> Dashboard</a>
+    <a href="#" data-page="chat"><span class="icon">&#x1F5E8;</span> Chat</a>
+    <a href="#" data-page="agents"><span class="icon">&#x2699;&#xFE0F;</span> Agents</a>
+    <a href="#" data-page="channels"><span class="icon">&#x1F3F0;</span> Channels</a>
+    <a href="#" data-page="tools"><span class="icon">&#x1F527;</span> Tools</a>
+    <a href="#" data-page="users"><span class="icon">&#x1F465;&#x200D;&#x1F4BB;</span> Users</a>
+    <a href="#" data-page="cron"><span class="icon">&#x23F0;</span> Cron Jobs</a>
+    <a href="#" data-page="config"><span class="icon">&#x2699;&#xFE0F;</span> System Config</a>
+  </nav>
+  <div class="status-bar">
+    <span class="status-dot" id="status-dot"></span><span id="status-text">Connecting...</span>
+  </div>
 </div>
+
+<!-- Main -->
+<div id="main">
+  <div id="topbar"><span id="page-title">Dashboard</span></div>
+  <div id="content"></div>
+</div>
+
 <script>
-const chat = document.getElementById('chat');
-const input = document.getElementById('message-input');
-const sendBtn = document.getElementById('send-btn');
-const statusEl = document.getElementById('status');
+// ── State ────────────────────────────────────────────────────────────────
+const API = '/api';
+let currentPage = 'dashboard';
 let sessionId = null;
 
-async function init() {
-  try {
-    const res = await fetch('/api/health');
-    if (res.ok) { statusEl.textContent = 'Connected'; }
-    else { statusEl.textContent = 'Server error'; return; }
-  } catch(e) { statusEl.textContent = 'Disconnected'; return; }
+// ── Navigation ───────────────────────────────────────────────────────────
+document.querySelectorAll('#sidebar nav a').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    navigate(a.dataset.page);
+  });
+});
 
-  // Create or reuse session
-  const sessRes = await fetch('/api/sessions', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({userId:'web'}) });
-  if (sessRes.ok) { sessionId = (await sessRes.json()).id; }
+function navigate(page) {
+  currentPage = page;
+  document.querySelectorAll('#sidebar nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
+  const titles = {dashboard:'Dashboard',chat:'Chat',agents:'Agents',channels:'Channels',tools:'Tools',users:'Users',cron:'Cron Jobs',config:'System Config'};
+  document.getElementById('page-title').textContent = titles[page] || page;
+  renderPage(page);
+}
 
-  // Load history
-  if (sessionId) {
-    const msgRes = await fetch('/api/messages?sessionId=' + sessionId);
-    if (msgRes.ok) {
-      for (const m of await msgRes.json()) appendMessage(m.role, m.content);
-    }
+// ── Pages ────────────────────────────────────────────────────────────────
+async function renderPage(page) {
+  const c = document.getElementById('content');
+  switch(page) {
+    case 'dashboard': await renderDashboard(c); break;
+    case 'chat': renderChat(c); break;
+    case 'agents': renderComingSoon(c, 'Agents', 'Manage and configure AI agents'); break;
+    case 'channels': renderComingSoon(c, 'Channels', 'Configure Telegram, Discord, Slack integrations'); break;
+    case 'tools': renderComingSoon(c, 'Tools', 'Browse and manage available tools'); break;
+    case 'users': renderComingSoon(c, 'Users', 'Manage user accounts and permissions'); break;
+    case 'cron': renderCronJobs(c); break;
+    case 'config': await renderConfig(c); break;
   }
 }
 
-function appendMessage(role, content) {
-  const div = document.createElement('div');
-  div.className = 'message ' + role;
-  div.textContent = content;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+// ── Dashboard ────────────────────────────────────────────────────────────
+async function renderDashboard(el) {
+  let stats = {activeSessions:0,totalMessages:0,uptime:0};
+  try { const r=await fetch(API+'/stats'); if(r.ok) stats=await r.json(); } catch{}
+
+  el.innerHTML = '<div class="grid-3">' +
+    statCard('Active Sessions', stats.activeSessions) +
+    statCard('Total Messages', stats.totalMessages) +
+    statCard('Uptime (min)', Math.round((stats.uptime||0)/60000)) +
+  '</div>' +
+  '<div class="card"><h3>Quick Actions</h3><div style="display:flex;gap:8px;margin-top:12px">' +
+    '<button class="btn btn-primary" onclick="navigate(\'chat\')">Open Chat</button>' +
+    '<button class="btn btn-ghost" onclick="navigate(\'config\')">System Config</button>' +
+  '</div></div>';
 }
 
-async function sendMessage() {
-  const text = input.value.trim();
-  if (!text || !sessionId) return;
-  appendMessage('user', text);
-  input.value = ''; sendBtn.disabled = true;
+function statCard(label, value) {
+  return '<div class="card stat-card"><div class="value">'+value+'</div><div class="label">'+label+'</div></div>';
+}
 
+// ── Chat ─────────────────────────────────────────────────────────────────
+function renderChat(el) {
+  el.innerHTML = '<div style="display:flex;flex-direction:column;height:100%">' +
+    '<div id="chat-messages"></div>' +
+    '<div id="chat-input-bar"><textarea class="form-input" id="msg-input" rows="1" placeholder="Type a message..."></textarea><button class="btn btn-primary" id="send-btn">Send</button></div>' +
+  '</div>';
+
+  const msgs = document.getElementById('chat-messages');
+  const input = document.getElementById('msg-input');
+  const sendBtn = document.getElementById('send-btn');
+
+  // Load or create session
+  (async () => {
+    try {
+      let sessions = await fetch(API+'/sessions').then(r=>r.json());
+      if(sessions.length>0) sessionId=sessions[0].id;
+      else { const s=await fetch(API+'/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:'web'})}).then(r=>r.json()); sessionId=s.id; }
+      let history = await fetch(API+'/messages?sessionId='+sessionId).then(r=>r.json());
+      for(const m of history) appendMsg(msgs, m.role, m.content);
+    } catch(e){}
+  })();
+
+  sendBtn.onclick = doSend;
+  input.onkeydown = e => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doSend();}};
+  input.oninput = () => { input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,150)+'px'; };
+
+  async function doSend() {
+    const text=input.value.trim(); if(!text||!sessionId) return;
+    appendMsg(msgs,'user',text); input.value=''; sendBtn.disabled=true;
+    try { await fetch(API+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId,role:'user',content:text})}); } catch{}
+    // Check if any provider is configured
+    let providers=[]; try{providers=await fetch(API+'/providers').then(r=>r.json());}catch{}
+    const active = providers.filter(p=>p.status==='active');
+    appendMsg(msgs,'assistant', active.length>0 ? '(Agent processing...)' : 'No LLM provider configured. Go to System Config to add one.');
+    sendBtn.disabled=false; input.focus();
+  }
+
+  function appendMsg(container, role, content) {
+    const d=document.createElement('div'); d.className='msg msg-'+role; d.textContent=content; container.appendChild(d); container.scrollTop=container.scrollHeight;
+  }
+}
+
+// ── Coming Soon ──────────────────────────────────────────────────────────
+function renderComingSoon(el, title, desc) {
+  el.innerHTML = '<div class="empty"><div class="icon">&#x1F3A8;</div><h2>'+title+'</h2><p style="margin-top:8px">'+desc+'</p></div>';
+}
+
+// ── Cron Jobs ────────────────────────────────────────────────────────────
+function renderCronJobs(el) {
+  el.innerHTML = '<div class="empty"><div class="icon">&#x23F0;</div><h2>Cron Jobs</h2><p style="margin-top:8px">No scheduled jobs configured yet.</p></div>';
+}
+
+// ── System Config ────────────────────────────────────────────────────────
+async function renderConfig(el) {
+  let providers = [];
+  try { providers = await fetch(API+'/providers').then(r=>r.json()); } catch{}
+
+  el.innerHTML = '<div class="page-header"><h2>LLM Providers</h2><button class="btn btn-primary" id="add-provider-btn">+ Add Provider</button></div>' +
+    (providers.length ? renderProviderTable(providers) : '<div class="empty"><p>No providers configured yet.</p></div>');
+
+  document.getElementById('add-provider-btn').onclick = () => showProviderModal();
+}
+
+function renderProviderTable(providers) {
+  const typeIcons = {openai:'&#x1F929;',anthropic:'&#x1F436;',openrouter:'&#x1F30F;',ollama:'&#x1F40B;','lm-studio':'&#x1F578;',llamacpp:'&#x1F9E0;',custom:'&#x2699;&#xFE0F;'};
+  return '<div class="card"><table><thead><tr><th>Provider</th><th>Type</th><th>Model</th><th>Status</th><th style="width:140px">Actions</th></tr></thead><tbody>' +
+    providers.map(p => '<tr><td>'+esc(p.name)+'</td><td>'+(typeIcons[p.type]||'')+ ' '+esc(p.type)+'</td><td>'+esc(p.defaultModel||'-')+'</td><td><span class="badge badge-'+p.status+'">'+p.status+'</span></td><td style="white-space:nowrap"><button class="btn btn-ghost" onclick="editProvider(\''+p.id+'\')">Edit</button> <button class="btn btn-danger" onclick="deleteProvider(\''+p.id+'\')" style="margin-left:4px">Delete</button></td></tr>').join('') +
+    '</tbody></table></div>';
+}
+
+function esc(s){return s?s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):'';}
+
+// ── Provider Modal ───────────────────────────────────────────────────────
+async function showProviderModal(editId) {
+  let presets = {}; try{presets=await fetch(API+'/providers/presets').then(r=>r.json());}catch{}
+  const existing = editId ? await (fetch(API+'/providers/'+editId).then(r=>r.json())) : null;
+
+  const types = Object.keys(presets);
+  const typeOpts = types.map(t => '<option value="'+t+'" '+(existing&&existing.type===t?'selected':'')+'>'+t+'</option>').join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = '<div class="modal">' +
+    '<h3>'+(existing?'Edit':'Add')+' LLM Provider</h3>' +
+    '<form id="provider-form">' +
+      formGroup('Name','text','prov-name',existing?.name||'') +
+      formGroup('Type','select','prov-type','',typeOpts) +
+      formGroup('Base URL','text','prov-url',existing?.baseUrl||(presets[types[0]]?.baseUrl||'')) +
+      formGroup('API Key','password','prov-key',existing?.apiKey||'') +
+      formGroup('Models (comma-separated)','text','prov-models',(existing?.models||[]).join(', ')) +
+      formGroup('Default Model','text','prov-default',(existing?.defaultModel||'')) +
+      formGroup('Temperature','number','prov-temp',existing?.temperature??0.7,{step:'0.1',min:'0',max:'2'}) +
+      formGroup('Max Tokens','number','prov-maxtokens',existing?.maxTokens??4096) +
+      formGroup('Timeout (ms)','number','prov-timeout',existing?.timeoutMs??60000) +
+    '</form>' +
+    '<div style="display:flex;gap:8px;margin-top:20px">' +
+      '<button class="btn btn-primary" id="save-provider">Save</button>' +
+      '<button class="btn btn-ghost" id="cancel-provider">Cancel</button>' +
+    '</div></div>';
+
+  document.body.appendChild(overlay);
+
+  // Update URL when type changes
+  const typeSel = overlay.querySelector('#prov-type');
+  typeSel.onchange = () => {
+    const preset = presets[typeSel.value];
+    if(preset) {
+      overlay.querySelector('#prov-url').value = preset.baseUrl || '';
+      if(!existing) {
+        overlay.querySelector('#prov-models').value = (preset.models||[]).join(', ');
+        overlay.querySelector('#prov-default').value = preset.defaultModel || '';
+      }
+    }
+  };
+
+  overlay.querySelector('#cancel-provider').onclick = () => overlay.remove();
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+
+  overlay.querySelector('#save-provider').onclick = async () => {
+    const data = {
+      name: overlay.querySelector('#prov-name').value.trim(),
+      type: overlay.querySelector('#prov-type').value,
+      baseUrl: overlay.querySelector('#prov-url').value.trim(),
+      apiKey: overlay.querySelector('#prov-key').value,
+      models: overlay.querySelector('#prov-models').value.split(',').map(s=>s.trim()).filter(Boolean),
+      defaultModel: overlay.querySelector('#prov-default').value.trim(),
+      temperature: parseFloat(overlay.querySelector('#prov-temp').value) || 0.7,
+      maxTokens: parseInt(overlay.querySelector('#prov-maxtokens').value) || 4096,
+      timeoutMs: parseInt(overlay.querySelector('#prov-timeout').value) || 60000,
+    };
+
+    const method = editId ? 'PUT' : 'POST';
+    const url = editId ? API+'/providers/'+editId : API+'/providers';
+    try {
+      await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+      overlay.remove();
+      renderConfig(document.getElementById('content'));
+    } catch(e) { alert('Failed to save provider'); }
+  };
+}
+
+function formGroup(label, type, id, value, extra={}) {
+  const attrs = 'id="'+id+'" class="form-input"'+(value?' value="'+esc(value)+'"':'')+Object.entries(extra).map(([k,v])=>k+'="'+v+'"').join('');
+  return '<div class="form-group"><label>'+label+'</label><'+type+' '+attrs+'></'+type+'></div>';
+}
+
+function editProvider(id) { showProviderModal(id); }
+
+async function deleteProvider(id) {
+  if(!confirm('Delete this provider?')) return;
+  await fetch(API+'/providers/'+id, {method:'DELETE'});
+  renderConfig(document.getElementById('content'));
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────
+(async () => {
   try {
-    await fetch('/api/messages', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ sessionId, role:'user', content:text }) });
-    // For now, echo back — real agent integration would stream response
-    appendMessage('assistant', '(Agent response pending — connect an LLM provider for replies)');
-  } catch(e) { appendMessage('system', 'Error sending message'); }
-  sendBtn.disabled = false; input.focus();
-}
-
-sendBtn.addEventListener('click', sendMessage);
-input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
-input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 150) + 'px'; });
-
-init();
+    const r = await fetch(API+'/health');
+    if(r.ok) { document.getElementById('status-dot').style.background='var(--green)'; document.getElementById('status-text').textContent='Connected'; }
+    else throw new Error();
+  } catch { document.getElementById('status-dot').style.background='var(--red)'; document.getElementById('status-text').textContent='Disconnected'; }
+  navigate('dashboard');
+})();
 </script>
 </body>
 </html>`;
+}
 
 // ── Server ──────────────────────────────────────────────────────────────────
 
 export class WebUIServer {
   private backend: WebUIBackend;
+  private providerManager: ProviderManager;
   private server: ReturnType<typeof createServer> | null = null;
 
   constructor(private config: WebUIConfig) {
     this.backend = new WebUIBackend(config);
+    const workspaceDir = process.env.SYNTHTEK_WORKSPACE || '/data';
+    // Ensure config dir exists
+    try { mkdirSync(join(workspaceDir, 'config'), { recursive: true }); } catch {}
+    this.providerManager = new ProviderManager(workspaceDir);
   }
 
   async start(): Promise<void> {
@@ -171,7 +423,7 @@ export class WebUIServer {
     const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       // CORS preflight
       if (req.method === 'OPTIONS') {
-        res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
+        res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
         return res.end();
       }
 
@@ -186,12 +438,55 @@ export class WebUIServer {
         }
 
         // Auth check for write operations
-        if ((req.method === 'POST' || req.method === 'DELETE') && this.config.apiKey) {
+        if ((req.method === 'POST' || req.method === 'DELETE' || req.method === 'PUT') && this.config.apiKey) {
           const authHeader = req.headers['authorization'];
           if (authHeader !== `Bearer ${this.config.apiKey}`) {
             return sendJson(res, 401, { error: 'Unauthorized' });
           }
         }
+
+        // ── Provider routes ────────────────────────────────────────────────
+
+        // GET /api/providers/presets
+        if (req.method === 'GET' && path === '/api/providers/presets') {
+          return sendJson(res, 200, this.providerManager.getPresets());
+        }
+
+        // GET /api/providers
+        if (req.method === 'GET' && path === '/api/providers') {
+          return sendJson(res, 200, this.providerManager.list());
+        }
+
+        // POST /api/providers
+        if (req.method === 'POST' && path === '/api/providers') {
+          const reqData = body as CreateProviderRequest;
+          if (!reqData.name || !reqData.type) return sendJson(res, 400, { error: 'name and type are required' });
+          const provider = this.providerManager.create(reqData);
+          return sendJson(res, 201, provider);
+        }
+
+        // GET /api/providers/:id
+        if (req.method === 'GET' && path.startsWith('/api/providers/') && path.split('/').length === 4) {
+          const id = path.split('/')[3];
+          const provider = this.providerManager.get(id);
+          return provider ? sendJson(res, 200, provider) : sendJson(res, 404, { error: 'Provider not found' });
+        }
+
+        // PUT /api/providers/:id
+        if (req.method === 'PUT' && path.startsWith('/api/providers/') && path.split('/').length === 4) {
+          const id = path.split('/')[3];
+          const reqData = body as UpdateProviderRequest;
+          const provider = this.providerManager.update(id, reqData);
+          return provider ? sendJson(res, 200, provider) : sendJson(res, 404, { error: 'Provider not found' });
+        }
+
+        // DELETE /api/providers/:id
+        if (req.method === 'DELETE' && path.startsWith('/api/providers/') && path.split('/').length === 4) {
+          const id = path.split('/')[3];
+          return sendJson(res, this.providerManager.delete(id) ? 200 : 404, {});
+        }
+
+        // ── Existing routes ────────────────────────────────────────────────
 
         // GET /api/messages?sessionId=xxx
         if (req.method === 'GET' && path === '/api/messages') {
