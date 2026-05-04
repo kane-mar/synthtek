@@ -23,12 +23,12 @@ services:
       - SYNTHTEK_WORKSPACE=/data
       - LOG_LEVEL=info
 
-    # Health check
+    # Health check (ESM-compatible)
     healthcheck:
-      test: ["CMD", "node", "-e", "require('fs').existsSync('/app/dist/cli.js') && process.exit(0)"]
+      test: ["CMD", "node", "-e", "import('fs').then(fs => process.exit(fs.existsSync('/app/dist/src/cli.js') ? 0 : 1))"]
       interval: 30s
-      timeout: 3s
-      start_period: 5s
+      timeout: 5s
+      start_period: 10s
       retries: 3
 
     # Resource limits

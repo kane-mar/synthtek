@@ -4,6 +4,12 @@ node_modules/
 # Build output
 dist/
 
+# Compiled artifacts in source tree (stale)
+src/**/*.js
+src/**/*.d.ts
+src/**/*.d.ts.map
+src/**/*.js.map
+
 # Environment
 .env
 .env.*

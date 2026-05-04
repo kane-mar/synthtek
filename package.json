@@ -2,16 +2,16 @@
   "name": "synthtek",
   "version": "1.0.0",
   "description": "A modular plugin-based AI agent framework",
-  "main": "dist/cli.js",
+  "main": "dist/src/cli.js",
   "type": "module",
   "bin": {
-    "synthtek": "dist/cli.js"
+    "synthtek": "dist/src/cli.js"
   },
   "scripts": {
     "build": "tsc",
-    "start": "node dist/cli.js",
+    "start": "node dist/src/cli.js",
     "dev": "node --enable-source-maps src/cli.ts",
-    "test": "node --test dist/tests/**/*.test.js",
+    "test": "npm run build && node --test dist/tests/**/*.test.js",
     "test:coverage": "node --test --experimental-test-coverage tests/**/*.test.ts",
     "lint": "eslint src/",
     "clean": "rm -rf dist"

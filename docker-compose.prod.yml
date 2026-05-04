@@ -6,11 +6,11 @@ services:
     # Restart policy (already set in base, explicit here for clarity)
     restart: unless-stopped
 
-    # Health check monitoring (already set in base, explicit here)
+    # Health check (ESM-compatible)
     healthcheck:
-      test: ["CMD", "node", "-e", "require('fs').existsSync('/app/dist/cli.js') && process.exit(0)"]
+      test: ["CMD", "node", "-e", "import('fs').then(fs => process.exit(fs.existsSync('/app/dist/src/cli.js') ? 0 : 1))"]
       interval: 30s
-      timeout: 3s
+      timeout: 5s
       start_period: 10s
       retries: 5
 
