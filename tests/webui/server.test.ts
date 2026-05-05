@@ -45,6 +45,73 @@ describe('WebUIServer', () => {
     } finally { await server.stop(); }
   });
 
+  it('frontend meets accessibility guidelines', async () => {
+    const cfg = freshConfig();
+    const server = new WebUIServer(cfg);
+    await server.start();
+    try {
+      const res = await fetch(`http://${cfg.host}:${cfg.port}/`);
+      const html = await res.text();
+
+      // C5: Skip-to-content link
+      assert.ok(html.includes('skip-link'), 'should have skip-to-content link');
+      assert.ok(html.includes('Skip to main content'), 'skip link should have accessible text');
+
+      // C5: Semantic <main> element
+      assert.ok(html.includes('<main'), 'should use semantic <main> element');
+
+      // C1: aria-live on chat messages container
+      assert.ok(html.includes('aria-live="polite"'), 'chat container should have aria-live');
+      assert.ok(html.includes('role="log"'), 'chat container should have role=log');
+
+      // C2: focus-visible states in CSS
+      assert.ok(html.includes('focus-visible'), 'should define :focus-visible styles');
+
+      // I1: aria-hidden on decorative icons
+      assert.ok(html.includes('aria-hidden="true"'), 'decorative icons should have aria-hidden');
+
+      // I2: form labels with for attribute (formGroup generates <label for="...">)
+      assert.ok(html.includes('<label for="'), 'form labels should use for attribute');
+
+      // I3: name and autocomplete on form inputs
+      assert.ok(html.includes('name="chat-message"'), 'chat input should have name attribute');
+      assert.ok(html.includes('autocomplete="off"'), 'chat input should disable autocomplete');
+
+      // I4: prefers-reduced-motion media query
+      assert.ok(html.includes('prefers-reduced-motion'), 'should honor reduced motion preference');
+
+      // I5: proper ellipsis character
+      assert.ok(html.includes('Connecting…'), 'should use proper ellipsis character');
+
+      // I6: color-scheme: dark
+      assert.ok(html.includes('color-scheme: dark'), 'should set color-scheme: dark');
+
+      // I7: theme-color meta tag
+      assert.ok(html.includes('theme-color'), 'should have theme-color meta tag');
+
+      // N2: dynamic viewport height for notch support
+      assert.ok(html.includes('100dvh'), 'should use dynamic viewport height');
+
+      // N1: touch-action on buttons
+      assert.ok(html.includes('touch-action:manipulation'), 'buttons should have touch-action');
+
+      // C3: hash-based routing
+      assert.ok(html.includes('hashchange'), 'should use hash-based routing');
+      assert.ok(html.includes('window.location.hash'), 'should sync URL hash with page state');
+
+      // C4: inline error messages (no alert())
+      assert.ok(html.includes('modal-error'), 'should have inline error container');
+      assert.ok(html.includes('role="alert"'), 'error container should have role=alert');
+
+      // N4: unsaved changes warning
+      assert.ok(html.includes('unsaved changes'), 'should warn about unsaved changes');
+
+      // N3: loading state on save button
+      assert.ok(html.includes('spinner'), 'should show spinner during save');
+      assert.ok(html.includes('Saving…'), 'should show saving text');
+    } finally { await server.stop(); }
+  });
+
   it('returns health check on /api/health', async () => {
     const cfg = freshConfig();
     const server = new WebUIServer(cfg);

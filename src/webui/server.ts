@@ -69,23 +69,29 @@ const FRONTEND_HTML: string = buildFrontend();
 
 function buildFrontend(): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="color-scheme: dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0d1117">
 <title>Synthtek</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#c9d1d9;--text-dim:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--sidebar-w:240px}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100dvh;display:flex;overflow:hidden}
+
+/* Skip link */
+.skip-link{position:absolute;top:-100%;left:16px;padding:8px 16px;background:var(--accent);color:#fff;border-radius:0 0 6px 6px;font-size:14px;font-weight:600;z-index:200;text-decoration:none}
+.skip-link:focus{top:0}
 
 /* Sidebar */
-#sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+#sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100dvh;overflow-y:auto}
 #sidebar .logo{padding:20px;border-bottom:1px solid var(--border);font-size:18px;font-weight:700;color:var(--accent)}
 #sidebar nav{flex:1;padding:12px 0}
-#sidebar nav a{display:flex;align-items:center;gap:12px;padding:10px 20px;color:var(--text-dim);text-decoration:none;font-size:14px;border-left:3px solid transparent;transition:.15s}
+#sidebar nav a{display:flex;align-items:center;gap:12px;padding:10px 20px;color:var(--text-dim);text-decoration:none;font-size:14px;border-left:3px solid transparent;transition:background 0.15s,color 0.15s,border-color 0.15s}
 #sidebar nav a:hover{color:var(--text);background:rgba(88,166,255,.06)}
 #sidebar nav a.active{color:var(--accent);border-left-color:var(--accent);background:rgba(88,166,255,.1)}
+#sidebar nav a:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:4px}
 #sidebar nav a .icon{width:20px;text-align:center;font-size:16px}
 #sidebar .status-bar{padding:16px 20px;border-top:1px solid var(--border);font-size:12px;color:var(--text-dim)}
 #sidebar .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
@@ -112,10 +118,12 @@ td{padding:10px 12px;border-bottom:1px solid var(--border)}
 tr:hover td{background:rgba(88,166,255,.04)}
 
 /* Buttons */
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:background 0.15s,opacity 0.15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{opacity:.9}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
 .btn-danger{background:var(--red);color:#fff}.btn-danger:hover{opacity:.85}
 .btn-ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--text-dim)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* Badges */
 .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600}
@@ -125,21 +133,25 @@ tr:hover td{background:rgba(88,166,255,.04)}
 
 /* Forms */
 .form-group{margin-bottom:16px}
-.form-group label{display:block;font-size:13px;color:var(--text-dim);margin-bottom:6px;font-weight:600}
-.form-input{width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;outline:none}
+.form-group label{display:block;font-size:13px;color:var(--text-dim);margin-bottom:6px;font-weight:600;cursor:pointer}
+.form-input{width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;outline:none;transition:border-color 0.15s}
 .form-input:focus{border-color:var(--accent)}
 select.form-input{appearance:auto}
 
+/* Inline error */
+.inline-error{color:var(--red);font-size:13px;margin-top:6px;display:none}
+.inline-error.visible{display:block}
+
 /* Chat */
 #chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
-.msg{max-width:75%;padding:10px 14px;border-radius:12px;line-height:1.5;font-size:14px;word-wrap:break-word;white-space:pre-wrap}
+.msg{max-width:75%;padding:10px 14px;border-radius:12px;line-height:1.5;font-size:14px;word-wrap:break-word;white-space:pre-wrap;overflow-wrap:break-word}
 .msg-user{align-self:flex-end;background:#1f6feb;color:#fff;border-bottom-right-radius:4px}
-.msg-assistant{align-self:flex-start;background:var(--ai-bg,#21262d);border:1px solid var(--border);border-bottom-left-radius:4px}
+.msg-assistant{align-self:flex-start;background:#21262d;border:1px solid var(--border);border-bottom-left-radius:4px}
 #chat-input-bar{padding:16px 20px;border-top:1px solid var(--border);display:flex;gap:10px;background:var(--surface)}
 
 /* Modal */
 .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;width:500px;max-width:90vw;max-height:80vh;overflow-y:auto}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;width:500px;max-width:90vw;max-height:80vh;overflow-y:auto;overscroll-behavior:contain}
 .modal h3{margin-bottom:16px;font-size:16px}
 
 /* Empty state */
@@ -149,55 +161,76 @@ select.form-input{appearance:auto}
 /* Page header */
 .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .page-header h2{font-size:20px;font-weight:700}
+
+/* Spinner */
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .5s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Reduced motion */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}
+}
 </style>
 </head>
 <body>
 
+<a class="skip-link" href="#content">Skip to main content</a>
+
 <!-- Sidebar -->
 <div id="sidebar">
   <div class="logo">&#x1F680; Synthtek</div>
-  <nav>
-    <a href="#" data-page="dashboard" class="active"><span class="icon">&#x1F4CA;</span> Dashboard</a>
-    <a href="#" data-page="chat"><span class="icon">&#x1F5E8;</span> Chat</a>
-    <a href="#" data-page="agents"><span class="icon">&#x2699;&#xFE0F;</span> Agents</a>
-    <a href="#" data-page="channels"><span class="icon">&#x1F3F0;</span> Channels</a>
-    <a href="#" data-page="tools"><span class="icon">&#x1F527;</span> Tools</a>
-    <a href="#" data-page="users"><span class="icon">&#x1F465;&#x200D;&#x1F4BB;</span> Users</a>
-    <a href="#" data-page="cron"><span class="icon">&#x23F0;</span> Cron Jobs</a>
-    <a href="#" data-page="config"><span class="icon">&#x2699;&#xFE0F;</span> System Config</a>
+  <nav aria-label="Main navigation">
+    <a href="#dashboard" data-page="dashboard" class="active"><span class="icon" aria-hidden="true">&#x1F4CA;</span> Dashboard</a>
+    <a href="#chat" data-page="chat"><span class="icon" aria-hidden="true">&#x1F5E8;</span> Chat</a>
+    <a href="#agents" data-page="agents"><span class="icon" aria-hidden="true">&#x2699;&#xFE0F;</span> Agents</a>
+    <a href="#channels" data-page="channels"><span class="icon" aria-hidden="true">&#x1F3F0;</span> Channels</a>
+    <a href="#tools" data-page="tools"><span class="icon" aria-hidden="true">&#x1F527;</span> Tools</a>
+    <a href="#users" data-page="users"><span class="icon" aria-hidden="true">&#x1F465;&#x200D;&#x1F4BB;</span> Users</a>
+    <a href="#cron" data-page="cron"><span class="icon" aria-hidden="true">&#x23F0;</span> Cron Jobs</a>
+    <a href="#config" data-page="config"><span class="icon" aria-hidden="true">&#x2699;&#xFE0F;</span> System Config</a>
   </nav>
   <div class="status-bar">
-    <span class="status-dot" id="status-dot"></span><span id="status-text">Connecting...</span>
+    <span class="status-dot" id="status-dot" role="status" aria-live="polite"></span><span id="status-text">Connecting…</span>
   </div>
 </div>
 
 <!-- Main -->
-<div id="main">
-  <div id="topbar"><span id="page-title">Dashboard</span></div>
+<main id="main">
+  <div id="topbar"><h1 id="page-title">Dashboard</h1></div>
   <div id="content"></div>
-</div>
+</main>
 
 <script>
 // ── State ────────────────────────────────────────────────────────────────
 const API = '/api';
 let currentPage = 'dashboard';
 let sessionId = null;
+let modalDirty = false;
 
-// ── Navigation ───────────────────────────────────────────────────────────
-document.querySelectorAll('#sidebar nav a').forEach(a => {
-  a.addEventListener('click', e => {
-    e.preventDefault();
-    navigate(a.dataset.page);
-  });
-});
+// ── Hash-based routing ───────────────────────────────────────────────────
+const VALID_PAGES = ['dashboard','chat','agents','channels','tools','users','cron','config'];
+
+function pageFromHash() {
+  const hash = window.location.hash.slice(1) || 'dashboard';
+  return VALID_PAGES.includes(hash) ? hash : 'dashboard';
+}
 
 function navigate(page) {
   currentPage = page;
+  window.location.hash = page;
   document.querySelectorAll('#sidebar nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
   const titles = {dashboard:'Dashboard',chat:'Chat',agents:'Agents',channels:'Channels',tools:'Tools',users:'Users',cron:'Cron Jobs',config:'System Config'};
   document.getElementById('page-title').textContent = titles[page] || page;
   renderPage(page);
 }
+
+window.addEventListener('hashchange', () => navigate(pageFromHash()));
+
+// Sidebar links use href="#page" so browser handles navigation;
+// just prevent double-firing by letting hashchange handle it.
+document.querySelectorAll('#sidebar nav a').forEach(a => {
+  a.addEventListener('click', e => e.preventDefault());
+});
 
 // ── Pages ────────────────────────────────────────────────────────────────
 async function renderPage(page) {
@@ -237,15 +270,18 @@ function statCard(label, value) {
 // ── Chat ─────────────────────────────────────────────────────────────────
 function renderChat(el) {
   el.innerHTML = '<div style="display:flex;flex-direction:column;height:100%">' +
-    '<div id="chat-messages"></div>' +
-    '<div id="chat-input-bar"><textarea class="form-input" id="msg-input" rows="1" placeholder="Type a message..."></textarea><button class="btn btn-primary" id="send-btn">Send</button></div>' +
+    '<div id="chat-messages" role="log" aria-live="polite" aria-relevant="additions"></div>' +
+    '<div id="chat-input-bar">' +
+      '<label for="msg-input" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Message</label>' +
+      '<textarea class="form-input" id="msg-input" rows="1" placeholder="Type a message…" name="chat-message" autocomplete="off"></textarea>' +
+      '<button class="btn btn-primary" id="send-btn">Send</button>' +
+    '</div>' +
   '</div>';
 
   const msgs = document.getElementById('chat-messages');
   const input = document.getElementById('msg-input');
   const sendBtn = document.getElementById('send-btn');
 
-  // Load or create session
   (async () => {
     try {
       let sessions = await fetch(API+'/sessions').then(r=>r.json());
@@ -264,10 +300,9 @@ function renderChat(el) {
     const text=input.value.trim(); if(!text||!sessionId) return;
     appendMsg(msgs,'user',text); input.value=''; sendBtn.disabled=true;
     try { await fetch(API+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId,role:'user',content:text})}); } catch{}
-    // Check if any provider is configured
     let providers=[]; try{providers=await fetch(API+'/providers').then(r=>r.json());}catch{}
     const active = providers.filter(p=>p.status==='active');
-    appendMsg(msgs,'assistant', active.length>0 ? '(Agent processing...)' : 'No LLM provider configured. Go to System Config to add one.');
+    appendMsg(msgs,'assistant', active.length>0 ? '(Agent processing…)' : 'No LLM provider configured. Go to System Config to add one.');
     sendBtn.disabled=false; input.focus();
   }
 
@@ -278,12 +313,12 @@ function renderChat(el) {
 
 // ── Coming Soon ──────────────────────────────────────────────────────────
 function renderComingSoon(el, title, desc) {
-  el.innerHTML = '<div class="empty"><div class="icon">&#x1F3A8;</div><h2>'+title+'</h2><p style="margin-top:8px">'+desc+'</p></div>';
+  el.innerHTML = '<div class="empty"><div class="icon" aria-hidden="true">&#x1F3A8;</div><h2>'+title+'</h2><p style="margin-top:8px">'+desc+'</p></div>';
 }
 
 // ── Cron Jobs ────────────────────────────────────────────────────────────
 function renderCronJobs(el) {
-  el.innerHTML = '<div class="empty"><div class="icon">&#x23F0;</div><h2>Cron Jobs</h2><p style="margin-top:8px">No scheduled jobs configured yet.</p></div>';
+  el.innerHTML = '<div class="empty"><div class="icon" aria-hidden="true">&#x23F0;</div><h2>Cron Jobs</h2><p style="margin-top:8px">No scheduled jobs configured yet.</p></div>';
 }
 
 // ── System Config ────────────────────────────────────────────────────────
@@ -300,7 +335,7 @@ async function renderConfig(el) {
 function renderProviderTable(providers) {
   const typeIcons = {openai:'&#x1F929;',anthropic:'&#x1F436;',openrouter:'&#x1F30F;',ollama:'&#x1F40B;','lm-studio':'&#x1F578;',llamacpp:'&#x1F9E0;',custom:'&#x2699;&#xFE0F;'};
   return '<div class="card"><table><thead><tr><th>Provider</th><th>Type</th><th>Model</th><th>Status</th><th style="width:140px">Actions</th></tr></thead><tbody>' +
-    providers.map(p => '<tr><td>'+esc(p.name)+'</td><td>'+(typeIcons[p.type]||'')+ ' '+esc(p.type)+'</td><td>'+esc(p.defaultModel||'-')+'</td><td><span class="badge badge-'+p.status+'">'+p.status+'</span></td><td style="white-space:nowrap"><button class="btn btn-ghost" onclick="editProvider(\''+p.id+'\')">Edit</button> <button class="btn btn-danger" onclick="deleteProvider(\''+p.id+'\')" style="margin-left:4px">Delete</button></td></tr>').join('') +
+    providers.map(p => '<tr><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name)+'</td><td>'+(typeIcons[p.type]||'')+ ' '+esc(p.type)+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.defaultModel||'-')+'</td><td><span class="badge badge-'+p.status+'">'+p.status+'</span></td><td style="white-space:nowrap"><button class="btn btn-ghost" onclick="editProvider(\''+p.id+'\')">Edit</button> <button class="btn btn-danger" onclick="deleteProvider(\''+p.id+'\')" style="margin-left:4px">Delete</button></td></tr>').join('') +
     '</tbody></table></div>';
 }
 
@@ -316,25 +351,32 @@ async function showProviderModal(editId) {
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
-  overlay.innerHTML = '<div class="modal">' +
-    '<h3>'+(existing?'Edit':'Add')+' LLM Provider</h3>' +
-    '<form id="provider-form">' +
-      formGroup('Name','text','prov-name',existing?.name||'') +
-      formGroup('Type','select','prov-type','',typeOpts) +
-      formGroup('Base URL','text','prov-url',existing?.baseUrl||(presets[types[0]]?.baseUrl||'')) +
-      formGroup('API Key','password','prov-key',existing?.apiKey||'') +
-      formGroup('Models (comma-separated)','text','prov-models',(existing?.models||[]).join(', ')) +
-      formGroup('Default Model','text','prov-default',(existing?.defaultModel||'')) +
-      formGroup('Temperature','number','prov-temp',existing?.temperature??0.7,{step:'0.1',min:'0',max:'2'}) +
-      formGroup('Max Tokens','number','prov-maxtokens',existing?.maxTokens??4096) +
-      formGroup('Timeout (ms)','number','prov-timeout',existing?.timeoutMs??60000) +
+  overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">' +
+    '<h3 id="modal-title">'+(existing?'Edit':'Add')+' LLM Provider</h3>' +
+    '<form id="provider-form" novalidate>' +
+      formGroup('Name','text','prov-name',existing?.name||'','provider-name','off') +
+      formGroup('Type','select','prov-type','',undefined,typeOpts) +
+      formGroup('Base URL','url','prov-url',existing?.baseUrl||(presets[types[0]]?.baseUrl||''),'provider-url','off') +
+      formGroup('API Key','password','prov-key',existing?.apiKey||'','provider-api-key','off') +
+      formGroup('Models (comma-separated)','text','prov-models',(existing?.models||[]).join(', '),'provider-models','off') +
+      formGroup('Default Model','text','prov-default',(existing?.defaultModel||''),'provider-default-model','off') +
+      formGroup('Temperature','number','prov-temp',existing?.temperature??0.7,'provider-temperature','off',{step:'0.1',min:'0',max:'2'}) +
+      formGroup('Max Tokens','number','prov-maxtokens',existing?.maxTokens??4096,'provider-max-tokens','off') +
+      formGroup('Timeout (ms)','number','prov-timeout',existing?.timeoutMs??60000,'provider-timeout','off') +
     '</form>' +
+    '<div id="modal-error" class="inline-error" role="alert"></div>' +
     '<div style="display:flex;gap:8px;margin-top:20px">' +
       '<button class="btn btn-primary" id="save-provider">Save</button>' +
       '<button class="btn btn-ghost" id="cancel-provider">Cancel</button>' +
     '</div></div>';
 
   document.body.appendChild(overlay);
+  modalDirty = false;
+
+  // Track dirty state
+  overlay.querySelectorAll('.form-input').forEach(input => {
+    input.addEventListener('input', () => { modalDirty = true; });
+  });
 
   // Update URL when type changes
   const typeSel = overlay.querySelector('#prov-type');
@@ -349,12 +391,44 @@ async function showProviderModal(editId) {
     }
   };
 
-  overlay.querySelector('#cancel-provider').onclick = () => overlay.remove();
-  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+  // Warn before closing with unsaved changes
+  overlay.querySelector('#cancel-provider').onclick = () => {
+    if(modalDirty && !confirm('You have unsaved changes. Discard them?')) return;
+    overlay.remove();
+    modalDirty = false;
+  };
 
-  overlay.querySelector('#save-provider').onclick = async () => {
+  overlay.onclick = e => {
+    if(e.target===overlay) {
+      if(modalDirty && !confirm('You have unsaved changes. Discard them?')) return;
+      overlay.remove();
+      modalDirty = false;
+    }
+  };
+
+  // Focus first input for accessibility
+  overlay.querySelector('#prov-name').focus();
+
+  overlay.querySelector('#save-provider').onclick = async (e) => {
+    const btn = e.target;
+    const errorEl = overlay.querySelector('#modal-error');
+
+    // Validate
+    const name = overlay.querySelector('#prov-name').value.trim();
+    if(!name) {
+      errorEl.textContent = 'Provider name is required.';
+      errorEl.classList.add('visible');
+      overlay.querySelector('#prov-name').focus();
+      return;
+    }
+
+    // Show loading state
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Saving…';
+
     const data = {
-      name: overlay.querySelector('#prov-name').value.trim(),
+      name: name,
       type: overlay.querySelector('#prov-type').value,
       baseUrl: overlay.querySelector('#prov-url').value.trim(),
       apiKey: overlay.querySelector('#prov-key').value,
@@ -368,22 +442,35 @@ async function showProviderModal(editId) {
     const method = editId ? 'PUT' : 'POST';
     const url = editId ? API+'/providers/'+editId : API+'/providers';
     try {
-      await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+      const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+      if(!res.ok) throw new Error('Request failed');
       overlay.remove();
+      modalDirty = false;
       renderConfig(document.getElementById('content'));
-    } catch(e) { alert('Failed to save provider'); }
+    } catch(err) {
+      errorEl.textContent = 'Failed to save provider. Please try again.';
+      errorEl.classList.add('visible');
+      btn.disabled = false;
+      btn.textContent = origText;
+    }
   };
 }
 
-function formGroup(label, type, id, value, extra={}) {
-  const attrs = 'id="'+id+'" class="form-input"'+(value?' value="'+esc(value)+'"':'')+Object.entries(extra).map(([k,v])=>k+'="'+v+'"').join('');
-  return '<div class="form-group"><label>'+label+'</label><'+type+' '+attrs+'></'+type+'></div>';
+function formGroup(label, type, id, value, nameAttr, autocomplete, extra) {
+  const isSelect = type === 'select';
+  const attrs = 'id="'+id+'" class="form-input" name="'+nameAttr+'" autocomplete="'+autocomplete+'"';
+  const extraAttrs = extra ? Object.entries(extra).map(([k,v])=>k+'="'+v+'"').join('') : '';
+
+  if(isSelect) {
+    return '<div class="form-group"><label for="'+id+'">'+label+'</label><select '+attrs+' '+extraAttrs+'>'+extra+'</select></div>';
+  }
+  return '<div class="form-group"><label for="'+id+'">'+label+'</label><'+type+' '+attrs+' value="'+esc(value)+'" '+extraAttrs+'></'+type+'></div>';
 }
 
 function editProvider(id) { showProviderModal(id); }
 
 async function deleteProvider(id) {
-  if(!confirm('Delete this provider?')) return;
+  if(!confirm('Delete this provider? This action cannot be undone.')) return;
   await fetch(API+'/providers/'+id, {method:'DELETE'});
   renderConfig(document.getElementById('content'));
 }
@@ -395,7 +482,7 @@ async function deleteProvider(id) {
     if(r.ok) { document.getElementById('status-dot').style.background='var(--green)'; document.getElementById('status-text').textContent='Connected'; }
     else throw new Error();
   } catch { document.getElementById('status-dot').style.background='var(--red)'; document.getElementById('status-text').textContent='Disconnected'; }
-  navigate('dashboard');
+  navigate(pageFromHash());
 })();
 </script>
 </body>
