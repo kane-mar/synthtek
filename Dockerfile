@@ -7,7 +7,7 @@ WORKDIR /app
 
 # Install ALL dependencies (including dev for build)
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install -g npm@latest && npm ci
 
 # Copy source and compile
 COPY tsconfig.json ./

@@ -12,6 +12,7 @@ import type {
   PageName,
   NotificationItem,
 } from './types.js';
+import { HashRouter } from './router.js';
 
 const VALID_PAGES: PageName[] = ['chat', 'dashboard', 'plugins', 'config', 'sessions', 'media'];
 const MAX_NOTIFICATIONS = 25;
@@ -24,24 +25,35 @@ function generateId(): string {
 
 export class FrontendApp {
   public readonly state: AppState;
+  private readonly router: HashRouter;
 
   constructor(theme: ThemeConfig) {
+    this.router = new HashRouter({
+      defaultPage: 'chat',
+      validPages: VALID_PAGES,
+    });
+
     this.state = {
-      currentPage: 'chat',
+      currentPage: this.router.currentPage,
       activeSessionId: null,
       theme,
       isAuthenticated: false,
       notifications: [],
     };
+
+    // Sync router page changes with app state
+    this.router.onPageChange((page) => {
+      this.state.currentPage = page;
+    });
+
+    (window as unknown as Record<string, unknown>).app = this;
   }
 
   // ── Navigation ─────────────────────────────────────────────────────────────
 
   navigate(page: PageName): void {
-    if (!VALID_PAGES.includes(page)) {
-      return;
-    }
-    this.state.currentPage = page;
+    this.router.navigate(page);
+    this.state.currentPage = this.router.currentPage;
   }
 
   // ── Authentication ─────────────────────────────────────────────────────────
@@ -156,12 +168,7 @@ export class FrontendApp {
   <header>
     <h1>synthtek</h1>
     <nav>
-      <a href="#chat" class="${this.state.currentPage === 'chat' ? 'active' : ''}">Chat</a>
-      <a href="#dashboard" class="${this.state.currentPage === 'dashboard' ? 'active' : ''}">Dashboard</a>
-      <a href="#plugins" class="${this.state.currentPage === 'plugins' ? 'active' : ''}">Plugins</a>
-      <a href="#config" class="${this.state.currentPage === 'config' ? 'active' : ''}">Config</a>
-      <a href="#sessions" class="${this.state.currentPage === 'sessions' ? 'active' : ''}">Sessions</a>
-      <a href="#media" class="${this.state.currentPage === 'media' ? 'active' : ''}">Media</a>
+      ${this.router.renderNavLinks()}
     </nav>
   </header>
   <main>

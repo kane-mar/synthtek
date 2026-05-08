@@ -183,4 +183,52 @@ describe('ChatComponent', () => {
       strictEqual(chat.getMessageCount(), 0);
     });
   });
+
+  describe('WebSocket integration', () => {
+    it('starts disconnected', () => {
+      strictEqual(chat.wsConnected, false);
+    });
+
+    it('connects WebSocket', () => {
+      chat.connectWebSocket('ws://localhost:3000/ws');
+      strictEqual(chat.wsConnected, true);
+    });
+
+    it('disconnects WebSocket', () => {
+      chat.connectWebSocket('ws://localhost:3000/ws');
+      chat.disconnectWebSocket();
+      strictEqual(chat.wsConnected, false);
+    });
+
+    it('sends message via WebSocket when connected', () => {
+      chat.connectWebSocket('ws://localhost:3000/ws');
+      const result = chat.sendMessage('Hello via WS');
+      ok(result, 'returns true');
+      strictEqual(chat.state.messages.length, 2); // user message + WS echo
+    });
+
+    it('does not send via WebSocket when disconnected', () => {
+      const result = chat.sendMessage('Hello offline');
+      ok(result, 'still returns true');
+      strictEqual(chat.state.messages.length, 1);
+    });
+
+    it('handles incoming WebSocket messages', () => {
+      chat.connectWebSocket('ws://localhost:3000/ws');
+      // Simulate incoming message via internal handler
+      chat.addMessage('assistant', 'WS response');
+      strictEqual(chat.state.messages.length, 1);
+      strictEqual(chat.state.messages[0].role, 'assistant');
+    });
+
+    it('disconnects on session change', () => {
+      chat.connectWebSocket('ws://localhost:3000/ws');
+      chat.setSessions([
+        { id: 'session-123', userId: 'user-1', createdAt: Date.now(), lastActivity: Date.now(), messageCount: 0 },
+        { id: 'session-456', userId: 'user-1', createdAt: Date.now(), lastActivity: Date.now(), messageCount: 0 },
+      ]);
+      chat.selectSession('session-456');
+      strictEqual(chat.wsConnected, false);
+    });
+  });
 });

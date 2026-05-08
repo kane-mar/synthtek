@@ -109,6 +109,9 @@ describe('WebUIServer', () => {
       // N3: loading state on save button
       assert.ok(html.includes('spinner'), 'should show spinner during save');
       assert.ok(html.includes('Saving…'), 'should show saving text');
+
+      // NEW TEST: Check for correct chat input bar ID (detects the typo I introduced)
+      assert.ok(html.includes('id="chat-input-bar"'), 'chat input bar should have correct ID');
     } finally { await server.stop(); }
   });
 

@@ -3,6 +3,7 @@ export type * from './types.js';
 
 // Frontend exports
 export { FrontendApp } from './frontend/app.js';
+export { HashRouter } from './frontend/router.js';
 export { ChatComponent } from './frontend/chat.js';
 export { DashboardComponent } from './frontend/dashboard.js';
 export { PluginManagerComponent } from './frontend/plugin-manager.js';

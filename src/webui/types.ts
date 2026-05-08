@@ -48,3 +48,21 @@ export interface WebSocketClient {
   sessionId: string;
   connected: boolean;
 }
+
+// ── WebSocket Message Protocol ────────────────────────────────────────────────
+
+export interface WebSocketMessage {
+  type: 'message' | 'stream_start' | 'stream_chunk' | 'stream_end' | 'error' | 'ping' | 'pong' | 'session_update';
+  sessionId?: string;
+  data?: unknown;
+}
+
+export interface WebSocketSendOptions {
+  url: string;
+  sessionId: string;
+  apiKey?: string;
+  pollingInterval?: number; // ms, 0 = no polling fallback
+}
+
+export type WebSocketEventHandler = (event: WebSocketMessage) => void;
+export type WebSocketStatusHandler = (connected: boolean, error?: string) => void;

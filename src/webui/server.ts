@@ -9,8 +9,10 @@ import { readFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebUIBackend } from './backend.js';
-import { ProviderManager, type CreateProviderRequest, type UpdateProviderRequest } from './provider-manager.js';
+import { ProviderManager, type CreateProviderRequest, type UpdateProviderRequest, type LLMProviderConfig } from './provider-manager.js';
 import type { WebUIConfig } from './types.js';
+import { getRegistry } from '../providers/registry.js';
+import type { ProviderConfig, ChatCompletionRequest } from '../providers/types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -182,6 +184,7 @@ select.form-input{appearance:auto}
   <nav aria-label="Main navigation">
     <a href="#dashboard" data-page="dashboard" class="active"><span class="icon" aria-hidden="true">&#x1F4CA;</span> Dashboard</a>
     <a href="#chat" data-page="chat"><span class="icon" aria-hidden="true">&#x1F5E8;</span> Chat</a>
+    <a href="#themes" data-page="themes"><span class="icon" aria-hidden="true">&#x1F300;</span> Themes</a>
     <a href="#agents" data-page="agents"><span class="icon" aria-hidden="true">&#x2699;&#xFE0F;</span> Agents</a>
     <a href="#channels" data-page="channels"><span class="icon" aria-hidden="true">&#x1F3F0;</span> Channels</a>
     <a href="#tools" data-page="tools"><span class="icon" aria-hidden="true">&#x1F527;</span> Tools</a>
@@ -208,7 +211,7 @@ let sessionId = null;
 let modalDirty = false;
 
 // ── Hash-based routing ───────────────────────────────────────────────────
-const VALID_PAGES = ['dashboard','chat','agents','channels','tools','users','cron','config'];
+const VALID_PAGES = ['dashboard','chat','themes','agents','channels','tools','users','cron','config'];
 
 function pageFromHash() {
   const hash = window.location.hash.slice(1) || 'dashboard';
@@ -226,10 +229,13 @@ function navigate(page) {
 
 window.addEventListener('hashchange', () => navigate(pageFromHash()));
 
-// Sidebar links use href="#page" so browser handles navigation;
-// just prevent double-firing by letting hashchange handle it.
+// Sidebar links use href="#page" — call navigate() directly
+// so we control the transition and avoid a brief flash from hashchange.
 document.querySelectorAll('#sidebar nav a').forEach(a => {
-  a.addEventListener('click', e => e.preventDefault());
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    navigate(a.dataset.page);
+  });
 });
 
 // ── Pages ────────────────────────────────────────────────────────────────
@@ -244,6 +250,7 @@ async function renderPage(page) {
     case 'users': renderComingSoon(c, 'Users', 'Manage user accounts and permissions'); break;
     case 'cron': renderCronJobs(c); break;
     case 'config': await renderConfig(c); break;
+    case 'themes': renderThemes(c); break;
   }
 }
 
@@ -289,7 +296,7 @@ function renderChat(el) {
       else { const s=await fetch(API+'/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:'web'})}).then(r=>r.json()); sessionId=s.id; }
       let history = await fetch(API+'/messages?sessionId='+sessionId).then(r=>r.json());
       for(const m of history) appendMsg(msgs, m.role, m.content);
-    } catch(e){}
+    } catch(e){ console.error(e); }
   })();
 
   sendBtn.onclick = doSend;
@@ -299,16 +306,71 @@ function renderChat(el) {
   async function doSend() {
     const text=input.value.trim(); if(!text||!sessionId) return;
     appendMsg(msgs,'user',text); input.value=''; sendBtn.disabled=true;
-    try { await fetch(API+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId,role:'user',content:text})}); } catch{}
-    let providers=[]; try{providers=await fetch(API+'/providers').then(r=>r.json());}catch{}
-    const active = providers.filter(p=>p.status==='active');
-    appendMsg(msgs,'assistant', active.length>0 ? '(Agent processing…)' : 'No LLM provider configured. Go to System Config to add one.');
-    sendBtn.disabled=false; input.focus();
+    
+    try { 
+      // 1. Save user message to session
+      await fetch(API+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId,role:'user',content:text})}); 
+
+      // 2. Get active providers
+      let providers=[]; try{providers=await fetch(API+'/providers').then(r=>r.json());}catch{}
+      const active = providers.find(p=>p.status==='active');
+      
+      if (!active) {
+        appendMsg(msgs,'assistant','No active LLM provider configured. Go to System Config to add one.');
+        sendBtn.disabled=false;
+        return;
+      }
+
+      // 3. Call Chat Completion
+      const response = await fetch(API+'/chat/completions', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          messages: [{role: 'user', content: text}],
+          providerId: active.id
+        })
+      }).then(r => r.json());
+
+      if (response.content) {
+        appendMsg(msgs, 'assistant', response.content);
+        // Also save assistant message to session
+        await fetch(API+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId,role:'assistant',content:response.content})});
+      } else {
+        throw new Error(response.error || 'Unknown error');
+      }
+
+    } catch (err) {
+      appendMsg(msgs, 'assistant', 'Error: ' + err.message);
+    } finally {
+      sendBtn.disabled=false; 
+      input.focus();
+    }
   }
 
   function appendMsg(container, role, content) {
     const d=document.createElement('div'); d.className='msg msg-'+role; d.textContent=content; container.appendChild(d); container.scrollTop=container.scrollHeight;
   }
+}
+
+// ── Themes ────────────────────────────────────────────────────────────────
+function renderThemes(el) {
+  const current = localStorage.getItem('theme') || 'dark';
+  el.innerHTML = '<div class="card"><h3>Appearance</h3>' +
+    '<p style="color:var(--text-dim);margin-bottom:16px;font-size:14px">Choose your theme preference.</p>' +
+    '<div style="display:flex;gap:12px">' +
+    '<button class="btn '+(current==='dark'?'btn-primary':'btn-ghost')+'" id="theme-dark">Dark</button>' +
+    '<button class="btn '+(current==='light'?'btn-primary':'btn-ghost')+'" id="theme-light">Light</button>' +
+    '</div></div>';
+  document.getElementById('theme-dark').onclick = () => {
+    localStorage.setItem('theme','dark');
+    document.documentElement.style.colorScheme='dark';
+    renderThemes(el);
+  };
+  document.getElementById('theme-light').onclick = () => {
+    localStorage.setItem('theme','light');
+    document.documentElement.style.colorScheme='light';
+    renderThemes(el);
+  };
 }
 
 // ── Coming Soon ──────────────────────────────────────────────────────────
@@ -491,6 +553,65 @@ async function deleteProvider(id) {
 
 // ── Server ──────────────────────────────────────────────────────────────────
 
+// Available themes for the WebUI
+interface Theme {
+  id: string;
+  name: string;
+  cssVariables: Record<string, string>;
+}
+
+const AVAILABLE_THEMES: Theme[] = [
+  {
+    id: 'dark',
+    name: 'Dark (GitHub)',
+    cssVariables: {
+      '--bg': '#0d1117', '--surface': '#161b22', '--border': '#30363d',
+      '--text': '#c9d1d9', '--text-dim': '#8b949e', '--accent': '#58a6ff',
+      '--green': '#3fb950', '--red': '#f85149', '--yellow': '#d29922',
+    },
+  },
+  {
+    id: 'light',
+    name: 'Light',
+    cssVariables: {
+      '--bg': '#ffffff', '--surface': '#f6f8fa', '--border': '#d0d7de',
+      '--text': '#1f2328', '--text-dim': '#656d76', '--accent': '#0969da',
+      '--green': '#1a7f37', '--red': '#cf222e', '--yellow': '#9a6700',
+    },
+  },
+  {
+    id: 'midnight',
+    name: 'Midnight',
+    cssVariables: {
+      '--bg': '#0a0e17', '--surface': '#111827', '--border': '#1e293b',
+      '--text': '#e2e8f0', '--text-dim': '#64748b', '--accent': '#818cf8',
+      '--green': '#34d399', '--red': '#f87171', '--yellow': '#fbbf24',
+    },
+  },
+  {
+    id: 'ocean',
+    name: 'Ocean',
+    cssVariables: {
+      '--bg': '#0c1821', '--surface': '#142334', '--border': '#1e3a5f',
+      '--text': '#c5d8e8', '--text-dim': '#5a8fa8', '--accent': '#00b4d8',
+      '--green': '#2ec4b6', '--red': '#e63946', '--yellow': '#f4a261',
+    },
+  },
+  {
+    id: 'nord',
+    name: 'Nord',
+    cssVariables: {
+      '--bg': '#2e3440', '--surface': '#3b4252', '--border': '#4c566a',
+      '--text': '#d8dee9', '--text-dim': '#7b88a1', '--accent': '#88c0d0',
+      '--green': '#a3be8c', '--red': '#bf616a', '--yellow': '#ebcb8b',
+    },
+  },
+];
+
+function getAvailableThemes(): Theme[] {
+  return AVAILABLE_THEMES;
+}
+
 export class WebUIServer {
   private backend: WebUIBackend;
   private providerManager: ProviderManager;
@@ -573,6 +694,20 @@ export class WebUIServer {
           return sendJson(res, this.providerManager.delete(id) ? 200 : 404, {});
         }
 
+        // ── Chat completion (calls actual LLM) ─────────────────────────────
+
+        // POST /api/chat/completions
+        if (req.method === 'POST' && path === '/api/chat/completions') {
+          return this.handleChatCompletion(req, res, body as ChatCompletionRequest & { providerId?: string });
+        }
+
+        // ── Themes ──────────────────────────────────────────────────────────
+
+        // GET /api/themes
+        if (req.method === 'GET' && path === '/api/themes') {
+          return sendJson(res, 200, getAvailableThemes());
+        }
+
         // ── Existing routes ────────────────────────────────────────────────
 
         // GET /api/messages?sessionId=xxx
@@ -594,7 +729,12 @@ export class WebUIServer {
 
       // Serve frontend for everything else
       if (path === '/' || path === '/index.html') {
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+        res.writeHead(200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        });
         return res.end(FRONTEND_HTML);
       }
 
@@ -613,6 +753,86 @@ export class WebUIServer {
     await this.backend.stop();
     if (this.server) {
       return new Promise((resolve) => this.server!.close(() => resolve(undefined)));
+    }
+  }
+
+  // ── Chat Completion Handler ──────────────────────────────────────────────
+
+  private async handleChatCompletion(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    chatReq: ChatCompletionRequest & { providerId?: string },
+  ): Promise<void> {
+    try {
+      // Find the provider to use
+      const providers = this.providerManager.list();
+      const activeProviders = providers.filter(p => p.status === 'active');
+
+      if (activeProviders.length === 0) {
+        return sendJson(res, 422, { error: 'No active LLM providers configured. Go to Settings to add one.' });
+      }
+
+      // Use specified provider or first active one
+      let provider: LLMProviderConfig | undefined;
+      if (chatReq.providerId) {
+        provider = activeProviders.find(p => p.id === chatReq.providerId);
+        if (!provider) {
+          return sendJson(res, 404, { error: 'Specified provider not found or inactive' });
+        }
+      } else {
+        provider = activeProviders[0];
+      }
+
+      // Create provider instance via registry
+      const registry = getRegistry();
+      const providerType = provider.type as import('../providers/types.js').ProviderType;
+      if (!registry.has(providerType)) {
+        return sendJson(res, 500, { error: `Provider type "${provider.type}" not supported` });
+      }
+
+      const providerConfig: ProviderConfig = {
+        provider: providerType,
+        apiKey: provider.apiKey || '',
+        baseUrl: provider.baseUrl,
+        model: chatReq.model || provider.defaultModel,
+        timeout: provider.timeoutMs,
+        headers: provider.headers,
+      };
+
+      const llmProvider = registry.create(providerType, providerConfig);
+
+      // Build messages from request
+      const messages = chatReq.messages || [];
+      const system = chatReq.system;
+
+      const completionReq: ChatCompletionRequest = {
+        model: providerConfig.model || '',
+        messages: system
+          ? [{ role: 'system', content: system }, ...messages]
+          : messages,
+        maxTokens: chatReq.maxTokens || provider.maxTokens,
+        temperature: chatReq.temperature ?? provider.temperature,
+        stream: false,
+      };
+
+      // Call the LLM
+      const response = await llmProvider.chat(completionReq);
+
+      // Store assistant message in session if sessionId provided
+      const sessionId = (chatReq as Record<string, unknown>).sessionId as string | undefined;
+      if (sessionId) {
+        this.backend.addMessage(sessionId, { role: 'assistant', content: response.content });
+      }
+
+      return sendJson(res, 200, {
+        content: response.content,
+        model: response.model,
+        usage: response.usage,
+        finishReason: response.finishReason,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return sendJson(res, 500, { error: `Chat completion failed: ${message}` });
     }
   }
 

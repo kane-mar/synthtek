@@ -7,6 +7,19 @@ import { ok, strictEqual } from 'node:assert';
 import { FrontendApp } from '../../src/webui/frontend/app.js';
 import type { ThemeConfig } from '../../src/webui/frontend/types.js';
 
+// Mock window for Node.js environment
+const mockWindow = {
+  history: {
+    pushState: () => {},
+  },
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  location: {
+    hash: '',
+  },
+};
+(globalThis as unknown as Window & typeof globalThis).window = mockWindow as never;
+
 const defaultTheme: ThemeConfig = {
   mode: 'light',
   primaryColor: '#3b82f6',
