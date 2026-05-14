@@ -178,6 +178,50 @@ describe('WebUIServer', () => {
     } finally { await server.stop(); }
   });
 
+  it('returns sanitized config on /api/config', async () => {
+    const cfg = freshConfig();
+    cfg.apiKey = 'secret-key-123';
+    const server = new WebUIServer(cfg);
+    await server.start();
+    try {
+      const res = await fetch(`http://${cfg.host}:${cfg.port}/api/config`);
+      assert.equal(res.status, 200);
+      const data = await res.json();
+      assert.equal(data.host, '127.0.0.1');
+      assert.equal(data.port, cfg.port);
+      assert.equal(data.maxSessions, 10);
+      assert.equal(data.sessionTimeout, 3600);
+      assert.equal(data.apiKeyConfigured, true);
+      assert.equal(data.apiKey, undefined); // must NOT leak the key
+    } finally { await server.stop(); }
+  });
+
+  it('shows apiKeyConfigured=false when no key set on /api/config', async () => {
+    const cfg = freshConfig();
+    cfg.apiKey = '';
+    const server = new WebUIServer(cfg);
+    await server.start();
+    try {
+      const res = await fetch(`http://${cfg.host}:${cfg.port}/api/config`);
+      assert.equal(res.status, 200);
+      const data = await res.json();
+      assert.equal(data.apiKeyConfigured, false);
+    } finally { await server.stop(); }
+  });
+
+  it('returns empty plugin list on /api/plugins when standalone', async () => {
+    const cfg = freshConfig();
+    const server = new WebUIServer(cfg);
+    await server.start();
+    try {
+      const res = await fetch(`http://${cfg.host}:${cfg.port}/api/plugins`);
+      assert.equal(res.status, 200);
+      const data = await res.json();
+      assert.ok(Array.isArray(data));
+      assert.equal(data.length, 0);
+    } finally { await server.stop(); }
+  });
+
   it('returns 404 for unknown API routes', async () => {
     const cfg = freshConfig();
     const server = new WebUIServer(cfg);
@@ -326,21 +370,24 @@ describe('WebUIServer', () => {
     } finally { await server.stop(); }
   });
 
-  it('enforces API key auth on provider write', async () => {
+  it('allows provider writes without auth header when no API key is set', async () => {
+    // When no API key is configured, the WebUI operates in open mode.
+    // The frontend does not send Authorization headers — this is fine
+    // when the server is configured without an API key (local/dev mode).
     const cfg = freshConfig();
-    cfg.apiKey = 'secret';
+    cfg.apiKey = '';  // no API key = open mode
     const server = new WebUIServer(cfg);
     await server.start();
     try {
-      // Without auth — should get 401
+      // Without auth header — should succeed in open mode
       const res = await fetch(`http://${cfg.host}:${cfg.port}/api/providers`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'x', type: 'openai', baseUrl: '', models: [], defaultModel: '' }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'NoAuth', type: 'openai', baseUrl: '', apiKey: '', models: [], defaultModel: '' }),
       });
-      assert.equal(res.status, 401);
+      assert.equal(res.status, 201);
 
-      // With auth — should succeed
+      // With auth header — should also succeed (any key works in open mode)
       const res2 = await fetch(`http://${cfg.host}:${cfg.port}/api/providers`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer secret' }, body: JSON.stringify({ name: 'Authed', type: 'openai', baseUrl: '', apiKey: '', models: [], defaultModel: '' }),
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer anything' }, body: JSON.stringify({ name: 'Authed', type: 'openai', baseUrl: '', apiKey: '', models: [], defaultModel: '' }),
       });
       assert.equal(res2.status, 201);
     } finally { await server.stop(); }

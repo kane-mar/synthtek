@@ -121,6 +121,29 @@ describe('WebUIBackend', () => {
     });
   });
 
+  describe('authentication in open mode (no API key)', () => {
+    let openBackend: WebUIBackend;
+
+    beforeEach(() => {
+      const openConfig: WebUIConfig = {
+        host: 'localhost',
+        port: 3000,
+        apiKey: '',  // no API key = open mode
+        maxSessions: 100,
+        sessionTimeout: 3600,
+      };
+      openBackend = new WebUIBackend(openConfig);
+    });
+
+    it('allows any key in open mode', () => {
+      ok(openBackend.authenticate('anything'), 'any key accepted');
+    });
+
+    it('allows empty key in open mode', () => {
+      ok(openBackend.authenticate(''), 'empty key accepted in open mode');
+    });
+  });
+
   describe('file upload handling', () => {
     it('handles file upload', () => {
       const session = backend.createSession('user123');

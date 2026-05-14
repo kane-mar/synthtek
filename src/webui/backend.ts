@@ -91,7 +91,11 @@ export class WebUIBackend {
   // ── Authentication ─────────────────────────────────────────────────────────
 
   authenticate(key: string): boolean {
-    return key === this.config.apiKey && key.length > 0;
+    // If no API key is configured, allow all requests (open mode)
+    if (!this.config.apiKey) {
+      return true;
+    }
+    return key === this.config.apiKey;
   }
 
   // ── File Upload Handling ───────────────────────────────────────────────────
@@ -180,6 +184,13 @@ export class WebUIBackend {
       return { status: 400, body: { error: 'Max sessions reached' } };
     }
 
+    // GET /api/messages?sessionId=xxx
+    if (method === 'GET' && path.startsWith('/api/messages')) {
+      const url = new URL(path, 'http://localhost');
+      const sessionId = url.searchParams.get('sessionId') ?? '';
+      return { status: 200, body: this.getMessages(sessionId) };
+    }
+
     // POST /api/messages
     if (method === 'POST' && path === '/api/messages') {
       const req = body as { sessionId?: string; role?: string; content?: string };
@@ -191,6 +202,11 @@ export class WebUIBackend {
         return { status: 201, body: message };
       }
       return { status: 404, body: { error: 'Session not found' } };
+    }
+
+    // GET /api/cron
+    if (method === 'GET' && path === '/api/cron') {
+      return { status: 200, body: [] };
     }
 
     // GET /api/health

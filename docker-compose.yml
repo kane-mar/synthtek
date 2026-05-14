@@ -1,43 +1,32 @@
-# Base compose file for synthtek
-# Merge with dev/prod overrides as needed:
-#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+# Synthtek - Docker Compose
+# Quick start: docker compose up -d
 
 services:
   synthtek:
     build:
       context: .
       dockerfile: Dockerfile
+    image: synthtek:latest
     container_name: synthtek
     restart: unless-stopped
-
-    # Port mapping (WebUI)
     ports:
       - "8080:8080"
-
-    # Volume mounts
-    volumes:
-      - ./config:/data/config
-      - ./data:/data
-      - ./logs:/data/logs
-
-    # Environment variables
     environment:
-      - NODE_ENV=production
+      # WebUI
+      - WEBUI_HOST=0.0.0.0
+      - WEBUI_PORT=8080
+      # Leave empty for open mode (no auth), or set a key for API protection
+      - WEBUI_API_KEY=
+      # LLM Provider (example: OpenAI)
+      - SYNTHTEK_PROVIDER_TYPE=openai
+      - SYNTHTEK_PROVIDER_API_KEY=
+      - SYNTHTEK_PROVIDER_BASE_URL=
+      - SYNTHTEK_PROVIDER_DEFAULT_MODEL=gpt-4o
+      # Workspace
       - SYNTHTEK_WORKSPACE=/data
-      - LOG_LEVEL=info
+    volumes:
+      # Persist data across restarts
+      - synthtek-data:/data
 
-    # Health check (ESM-compatible)
-    healthcheck:
-      test: ["CMD", "node", "-e", "import('fs').then(fs => process.exit(fs.existsSync('/app/dist/src/cli.js') ? 0 : 1))"]
-      interval: 30s
-      timeout: 5s
-      start_period: 10s
-      retries: 3
-
-    # Resource limits — removed deploy.resources block because it requires
-    # CPU CFS scheduler support which is unavailable on many systems
-    # (WSL2, VMs, minimal kernels). Use host-level limits instead.
-
-    # Non-root user (matches Dockerfile)
-    user: "1000:1000"
+volumes:
+  synthtek-data:

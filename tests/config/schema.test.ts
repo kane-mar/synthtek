@@ -34,11 +34,10 @@ describe('validateProviderConfig', () => {
     assert.ok(result.errors.some((e) => e.includes('provider is required')));
   });
 
-  test('rejects missing apiKey', () => {
-    const config = { provider: 'openai' } as ProviderConfig;
+  test('accepts missing apiKey (optional)', () => {
+    const config = { provider: 'openai', model: 'gpt-4' } as ProviderConfig;
     const result = validateProviderConfig(config);
-    assert.equal(result.valid, false);
-    assert.ok(result.errors.some((e) => e.includes('apiKey is required')));
+    assert.equal(result.valid, true);
   });
 
   test('rejects missing model for openai', () => {
@@ -374,7 +373,7 @@ describe('validateAgentConfig', () => {
     assert.ok(result.valid);
   });
 
-  test('rejects fallback provider with missing apiKey', () => {
+  test('accepts fallback provider with missing apiKey (optional)', () => {
     const config: AgentConfig = {
       name: 'test-agent',
       version: '1.0.0',
@@ -391,8 +390,7 @@ describe('validateAgentConfig', () => {
       },
     };
     const result = validateAgentConfig(config);
-    assert.equal(result.valid, false);
-    assert.ok(result.errors.some((e) => e.includes('fallback provider')));
+    assert.equal(result.valid, true);
   });
 });
 

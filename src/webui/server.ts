@@ -210,6 +210,39 @@ let currentPage = 'dashboard';
 let sessionId = null;
 let modalDirty = false;
 
+// ── Fetch helpers ────────────────────────────────────────────────────────
+async function fetchJSON(url, init) {
+  const r = await fetch(url, init);
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body.error || 'HTTP ' + r.status);
+  }
+  return r.json();
+}
+
+async function fetchJSONGet(url) {
+  const apiKey = typeof window !== 'undefined' && window.__synthtekApiKey;
+  const headers = apiKey ? { Authorization: 'Bearer ' + apiKey } : {};
+  return fetchJSON(url, { headers });
+}
+
+async function fetchJSONPost(url, body) {
+  const apiKey = typeof window !== 'undefined' && window.__synthtekApiKey;
+  const headers = { 'Content-Type': 'application/json' };
+  if (apiKey) headers.Authorization = 'Bearer ' + apiKey;
+  return fetchJSON(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+}
+
+async function fetchJSONDelete(url) {
+  const apiKey = typeof window !== 'undefined' && window.__synthtekApiKey;
+  const headers = apiKey ? { Authorization: 'Bearer ' + apiKey } : {};
+  return fetchJSON(url, { method: 'DELETE', headers });
+}
+
 // ── Hash-based routing ───────────────────────────────────────────────────
 const VALID_PAGES = ['dashboard','chat','themes','agents','channels','tools','users','cron','config'];
 
@@ -224,7 +257,11 @@ function navigate(page) {
   document.querySelectorAll('#sidebar nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
   const titles = {dashboard:'Dashboard',chat:'Chat',agents:'Agents',channels:'Channels',tools:'Tools',users:'Users',cron:'Cron Jobs',config:'System Config'};
   document.getElementById('page-title').textContent = titles[page] || page;
-  renderPage(page);
+  renderPage(page).catch(e => {
+    console.error('Navigation error:', e);
+    const c = document.getElementById('content');
+    c.innerHTML = '<div class="card" style="color:var(--red)"><h3>Error loading page</h3><p>'+esc(e.message||String(e))+'</p></div>';
+  });
 }
 
 window.addEventListener('hashchange', () => navigate(pageFromHash()));
@@ -248,7 +285,7 @@ async function renderPage(page) {
     case 'channels': renderComingSoon(c, 'Channels', 'Configure Telegram, Discord, Slack integrations'); break;
     case 'tools': renderComingSoon(c, 'Tools', 'Browse and manage available tools'); break;
     case 'users': renderComingSoon(c, 'Users', 'Manage user accounts and permissions'); break;
-    case 'cron': renderCronJobs(c); break;
+    case 'cron': await renderCronJobs(c); break;
     case 'config': await renderConfig(c); break;
     case 'themes': renderThemes(c); break;
   }
@@ -257,7 +294,7 @@ async function renderPage(page) {
 // ── Dashboard ────────────────────────────────────────────────────────────
 async function renderDashboard(el) {
   let stats = {activeSessions:0,totalMessages:0,uptime:0};
-  try { const r=await fetch(API+'/stats'); if(r.ok) stats=await r.json(); } catch{}
+  try { stats = await fetchJSONGet(API+'/stats'); } catch{}
 
   el.innerHTML = '<div class="grid-3">' +
     statCard('Active Sessions', stats.activeSessions) +
@@ -291,12 +328,13 @@ function renderChat(el) {
 
   (async () => {
     try {
-      let sessions = await fetch(API+'/sessions').then(r=>r.json());
-      if(sessions.length>0) sessionId=sessions[0].id;
-      else { const s=await fetch(API+'/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:'web'})}).then(r=>r.json()); sessionId=s.id; }
-      let history = await fetch(API+'/messages?sessionId='+sessionId).then(r=>r.json());
+      let sessions = await fetchJSONGet(API+'/sessions');
+      if(Array.isArray(sessions) && sessions.length>0) sessionId=sessions[0].id;
+      else { const s=await fetchJSONPost(API+'/sessions',{userId:'web'}); sessionId=s.id; }
+      if (!sessionId) { appendMsg(msgs,'assistant','Failed to create a chat session.'); return; }
+      let history = await fetchJSONGet(API+'/messages?sessionId='+sessionId);
       for(const m of history) appendMsg(msgs, m.role, m.content);
-    } catch(e){ console.error(e); }
+    } catch(e){ appendMsg(msgs,'assistant','Error loading chat: '+e.message); }
   })();
 
   sendBtn.onclick = doSend;
@@ -306,15 +344,15 @@ function renderChat(el) {
   async function doSend() {
     const text=input.value.trim(); if(!text||!sessionId) return;
     appendMsg(msgs,'user',text); input.value=''; sendBtn.disabled=true;
-    
-    try { 
+
+    try {
       // 1. Save user message to session
-      await fetch(API+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId,role:'user',content:text})}); 
+      await fetchJSONPost(API+'/messages',{sessionId,role:'user',content:text});
 
       // 2. Get active providers
-      let providers=[]; try{providers=await fetch(API+'/providers').then(r=>r.json());}catch{}
-      const active = providers.find(p=>p.status==='active');
-      
+      let providers=[]; try{providers=await fetchJSONGet(API+'/providers');}catch{}
+      const active = Array.isArray(providers) ? providers.find(p=>p.status==='active') : null;
+
       if (!active) {
         appendMsg(msgs,'assistant','No active LLM provider configured. Go to System Config to add one.');
         sendBtn.disabled=false;
@@ -322,19 +360,15 @@ function renderChat(el) {
       }
 
       // 3. Call Chat Completion
-      const response = await fetch(API+'/chat/completions', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          messages: [{role: 'user', content: text}],
-          providerId: active.id
-        })
-      }).then(r => r.json());
+      const response = await fetchJSONPost(API+'/chat/completions', {
+        messages: [{role: 'user', content: text}],
+        providerId: active.id
+      });
 
       if (response.content) {
         appendMsg(msgs, 'assistant', response.content);
         // Also save assistant message to session
-        await fetch(API+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId,role:'assistant',content:response.content})});
+        await fetchJSONPost(API+'/messages',{sessionId,role:'assistant',content:response.content}).catch(()=>{});
       } else {
         throw new Error(response.error || 'Unknown error');
       }
@@ -342,7 +376,7 @@ function renderChat(el) {
     } catch (err) {
       appendMsg(msgs, 'assistant', 'Error: ' + err.message);
     } finally {
-      sendBtn.disabled=false; 
+      sendBtn.disabled=false;
       input.focus();
     }
   }
@@ -379,17 +413,27 @@ function renderComingSoon(el, title, desc) {
 }
 
 // ── Cron Jobs ────────────────────────────────────────────────────────────
-function renderCronJobs(el) {
-  el.innerHTML = '<div class="empty"><div class="icon" aria-hidden="true">&#x23F0;</div><h2>Cron Jobs</h2><p style="margin-top:8px">No scheduled jobs configured yet.</p></div>';
+async function renderCronJobs(el) {
+  let jobs = [];
+  try { jobs = await fetchJSONGet(API+'/cron'); } catch{}
+
+  if (!Array.isArray(jobs) || !jobs.length) {
+    el.innerHTML = '<div class="empty"><div class="icon" aria-hidden="true">&#x23F0;</div><h2>Cron Jobs</h2><p style="margin-top:8px">No scheduled jobs configured yet.</p></div>';
+    return;
+  }
+
+  el.innerHTML = '<div class="card"><table><thead><tr><th>Job</th><th>Schedule</th><th>Status</th></tr></thead><tbody>' +
+    jobs.map(j => '<tr><td>'+esc(j.message)+'</td><td>'+esc(j.schedule)+'</td><td><span class="badge badge-active">active</span></td></tr>').join('') +
+    '</tbody></table></div>';
 }
 
 // ── System Config ────────────────────────────────────────────────────────
 async function renderConfig(el) {
   let providers = [];
-  try { providers = await fetch(API+'/providers').then(r=>r.json()); } catch{}
+  try { providers = await fetchJSONGet(API+'/providers'); } catch{}
 
   el.innerHTML = '<div class="page-header"><h2>LLM Providers</h2><button class="btn btn-primary" id="add-provider-btn">+ Add Provider</button></div>' +
-    (providers.length ? renderProviderTable(providers) : '<div class="empty"><p>No providers configured yet.</p></div>');
+    (Array.isArray(providers) && providers.length ? renderProviderTable(providers) : '<div class="empty"><p>No providers configured yet.</p></div>');
 
   document.getElementById('add-provider-btn').onclick = () => showProviderModal();
 }
@@ -405,8 +449,8 @@ function esc(s){return s?s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 
 // ── Provider Modal ───────────────────────────────────────────────────────
 async function showProviderModal(editId) {
-  let presets = {}; try{presets=await fetch(API+'/providers/presets').then(r=>r.json());}catch{}
-  const existing = editId ? await (fetch(API+'/providers/'+editId).then(r=>r.json())) : null;
+  let presets = {}; try{presets=await fetchJSONGet(API+'/providers/presets');}catch{}
+  const existing = editId ? await fetchJSONGet(API+'/providers/'+editId).catch(()=>null) : null;
 
   const types = Object.keys(presets);
   const typeOpts = types.map(t => '<option value="'+t+'" '+(existing&&existing.type===t?'selected':'')+'>'+t+'</option>').join('');
@@ -504,13 +548,12 @@ async function showProviderModal(editId) {
     const method = editId ? 'PUT' : 'POST';
     const url = editId ? API+'/providers/'+editId : API+'/providers';
     try {
-      const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
-      if(!res.ok) throw new Error('Request failed');
+      await fetchJSON(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
       overlay.remove();
       modalDirty = false;
       renderConfig(document.getElementById('content'));
     } catch(err) {
-      errorEl.textContent = 'Failed to save provider. Please try again.';
+      errorEl.textContent = 'Failed to save provider: ' + err.message;
       errorEl.classList.add('visible');
       btn.disabled = false;
       btn.textContent = origText;
@@ -533,7 +576,12 @@ function editProvider(id) { showProviderModal(id); }
 
 async function deleteProvider(id) {
   if(!confirm('Delete this provider? This action cannot be undone.')) return;
-  await fetch(API+'/providers/'+id, {method:'DELETE'});
+  try {
+    await fetchJSONDelete(API+'/providers/'+id);
+  } catch(e) {
+    alert('Failed to delete provider: ' + e.message);
+    return;
+  }
   renderConfig(document.getElementById('content'));
 }
 
@@ -640,17 +688,25 @@ export class WebUIServer {
 
       // API routes
       if (path.startsWith('/api/')) {
+        // Public endpoints that don't need auth
+        const publicEndpoints = ['/api/health', '/api/config', '/api/plugins'];
+        const isPublic = publicEndpoints.some(ep => path === ep || path.startsWith(ep + '?'));
+        if (!isPublic) {
+          // Allow same-origin WebUI requests (no auth header needed)
+          const origin = req.headers.origin || '';
+          const host = req.headers.host || '';
+          const isSameOrigin = origin && host && (origin === `http://${host}` || origin === `https://${host}`);
+          if (!isSameOrigin) {
+            const authHeader = req.headers.authorization || '';
+            if (!this.backend.authenticate(authHeader.replace('Bearer ', ''))) {
+              return sendJson(res, 401, { error: 'Unauthorized' });
+            }
+          }
+        }
+
         let body: unknown = {};
         if (req.method === 'POST' || req.method === 'PUT') {
           try { body = JSON.parse(await parseBody(req)); } catch { body = {}; }
-        }
-
-        // Auth check for write operations
-        if ((req.method === 'POST' || req.method === 'DELETE' || req.method === 'PUT') && this.config.apiKey) {
-          const authHeader = req.headers['authorization'];
-          if (authHeader !== `Bearer ${this.config.apiKey}`) {
-            return sendJson(res, 401, { error: 'Unauthorized' });
-          }
         }
 
         // ── Provider routes ────────────────────────────────────────────────
@@ -706,6 +762,26 @@ export class WebUIServer {
         // GET /api/themes
         if (req.method === 'GET' && path === '/api/themes') {
           return sendJson(res, 200, getAvailableThemes());
+        }
+
+        // ── Config ─────────────────────────────────────────────────────────
+
+        // GET /api/config — return sanitized WebUI config (no API key)
+        if (req.method === 'GET' && path === '/api/config') {
+          return sendJson(res, 200, {
+            host: this.config.host,
+            port: this.config.port,
+            maxSessions: this.config.maxSessions,
+            sessionTimeout: this.config.sessionTimeout,
+            apiKeyConfigured: this.config.apiKey !== '',
+          });
+        }
+
+        // ── Plugins ────────────────────────────────────────────────────────
+
+        // GET /api/plugins — return plugin states (empty when WebUI runs standalone)
+        if (req.method === 'GET' && path === '/api/plugins') {
+          return sendJson(res, 200, []);
         }
 
         // ── Existing routes ────────────────────────────────────────────────

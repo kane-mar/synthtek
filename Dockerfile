@@ -42,9 +42,9 @@ ENV SYNTHTEK_WORKSPACE=/data
 # CLI tool — no ports needed by default (channels may need them)
 EXPOSE 8080
 
-# Health check (ESM-compatible)
+# Health check — probes the WebUI health endpoint
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "import('fs').then(fs => process.exit(fs.existsSync('/app/dist/src/cli.js') ? 0 : 1))" || exit 1
+  CMD node -e "import('http').then(h => h.get('http://127.0.0.1:8080/api/health', r => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1)))" || exit 1
 
 # Default: start WebUI server on port 8080
 ENTRYPOINT ["node", "dist/src/cli.js"]

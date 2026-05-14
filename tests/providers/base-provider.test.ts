@@ -67,18 +67,12 @@ describe('Provider Config Validation', () => {
   });
 
   describe('API key validation', () => {
-    it('should require API key for OpenAI', () => {
-      assert.throws(
-        () => validateProviderConfig({ provider: 'openai', apiKey: '' }),
-        ProviderConfigError,
-      );
+    it('should allow empty API key for OpenAI (optional)', () => {
+      validateProviderConfig({ provider: 'openai', apiKey: '' });
     });
 
-    it('should require API key for Anthropic', () => {
-      assert.throws(
-        () => validateProviderConfig({ provider: 'anthropic', apiKey: '' }),
-        ProviderConfigError,
-      );
+    it('should allow empty API key for Anthropic (optional)', () => {
+      validateProviderConfig({ provider: 'anthropic', apiKey: '' });
     });
 
     it('should allow empty API key for Ollama', () => {

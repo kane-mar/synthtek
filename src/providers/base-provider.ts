@@ -28,9 +28,7 @@ export function validateProviderConfig(config: ProviderConfig): void {
     throw new ProviderConfigError('Provider name is required and must be a string');
   }
 
-  if (!config.apiKey && config.provider !== 'ollama' && config.provider !== 'lmstudio') {
-    throw new ProviderConfigError(`API key is required for provider "${config.provider}"`);
-  }
+  // apiKey is optional — provider will fail at runtime if needed but not provided
 
   if (config.timeout !== undefined) {
     if (!Number.isFinite(config.timeout) || config.timeout <= 0) {

@@ -132,9 +132,7 @@ export function validateProviderConfig(config: ProviderConfig): ValidationResult
     errors.push('provider is required');
   }
 
-  if (!config.apiKey && !['ollama', 'lmstudio', 'llamacpp', 'vllm'].includes(config.provider)) {
-    errors.push('apiKey is required');
-  }
+  // apiKey is optional — providers will fail at runtime if needed but not provided
 
   if (config.provider === 'openai' && !config.model) {
     errors.push('model is required for openai provider');
