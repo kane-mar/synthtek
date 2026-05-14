@@ -39,3 +39,4 @@ temp/
 
 # TypeScript cache
 *.tsbuildinfo
+@eaDir/
