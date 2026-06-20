@@ -11,7 +11,7 @@
     "build": "tsc",
     "start": "node dist/src/cli.js",
     "dev": "node --enable-source-maps src/cli.ts",
-    "test": "npm run build && node --test --test-concurrency=4 $(find dist/tests -name '*.test.js' ! -name '*playwright*' | sort)",
+    "test": "npm run build && node --test $(find dist/tests -name '*.test.js' ! -name '*playwright*' | sort)",
     "test:coverage": "npm run build && node --test --experimental-test-coverage --test-concurrency=4 --test-skip-pattern='/webui-e2e-playwright/' dist/tests/**/*.test.js",
     "test:e2e": "playwright test",
     "test:e2e:docker": "scripts/e2e-docker.sh",
