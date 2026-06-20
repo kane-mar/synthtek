@@ -6,145 +6,145 @@
  */
 
 import type {
-  WebSocketMessage,
-  WebSocketSendOptions,
-  WebSocketEventHandler,
-  WebSocketStatusHandler,
-} from '../types.js';
+	WebSocketEventHandler,
+	WebSocketMessage,
+	WebSocketSendOptions,
+	WebSocketStatusHandler,
+} from "../types.js";
 
 const DEFAULT_PING_INTERVAL = 30000; // ms
 
 export class WebSocketManager {
-  private readonly eventHandlers: WebSocketEventHandler[] = [];
-  private readonly statusHandlers: WebSocketStatusHandler[] = [];
+	private readonly eventHandlers: WebSocketEventHandler[] = [];
+	private readonly statusHandlers: WebSocketStatusHandler[] = [];
 
-  private options: WebSocketSendOptions | null = null;
-  private connected = false;
-  private pingTimer: ReturnType<typeof setInterval> | null = null;
-  private pollingTimer: ReturnType<typeof setInterval> | null = null;
+	private options: WebSocketSendOptions | null = null;
+	private connected = false;
+	private pingTimer: ReturnType<typeof setInterval> | null = null;
+	private pollingTimer: ReturnType<typeof setInterval> | null = null;
 
-  // ── Connection ─────────────────────────────────────────────────────────────
+	// ── Connection ─────────────────────────────────────────────────────────────
 
-  connect(options: WebSocketSendOptions): void {
-    this.options = options;
-    this.attemptConnection();
-  }
+	connect(options: WebSocketSendOptions): void {
+		this.options = options;
+		this.attemptConnection();
+	}
 
-  disconnect(): void {
-    this.clearTimers();
-    this.connected = false;
-    this.options = null;
-    this.notifyStatus(false, 'Disconnected');
-  }
+	disconnect(): void {
+		this.clearTimers();
+		this.connected = false;
+		this.options = null;
+		this.notifyStatus(false, "Disconnected");
+	}
 
-  get isConnected(): boolean {
-    return this.connected;
-  }
+	get isConnected(): boolean {
+		return this.connected;
+	}
 
-  // ── Event Handlers ─────────────────────────────────────────────────────────
+	// ── Event Handlers ─────────────────────────────────────────────────────────
 
-  onMessage(handler: WebSocketEventHandler): void {
-    this.eventHandlers.push(handler);
-  }
+	onMessage(handler: WebSocketEventHandler): void {
+		this.eventHandlers.push(handler);
+	}
 
-  onStatus(handler: WebSocketStatusHandler): void {
-    this.statusHandlers.push(handler);
-  }
+	onStatus(handler: WebSocketStatusHandler): void {
+		this.statusHandlers.push(handler);
+	}
 
-  // ── Sending ────────────────────────────────────────────────────────────────
+	// ── Sending ────────────────────────────────────────────────────────────────
 
-  send(type: WebSocketMessage['type'], data?: unknown): void {
-    if (!this.connected || !this.options) return;
+	send(type: WebSocketMessage["type"], data?: unknown): void {
+		if (!this.connected || !this.options) return;
 
-    const message: WebSocketMessage = {
-      type,
-      sessionId: this.options.sessionId,
-      data,
-    };
+		const message: WebSocketMessage = {
+			type,
+			sessionId: this.options.sessionId,
+			data,
+		};
 
-    this.emitMessage(message);
-  }
+		this.emitMessage(message);
+	}
 
-  sendMessage(content: string): void {
-    this.send('message', { role: 'user', content });
-  }
+	sendMessage(content: string): void {
+		this.send("message", { role: "user", content });
+	}
 
-  sendPing(): void {
-    this.send('ping');
-  }
+	sendPing(): void {
+		this.send("ping");
+	}
 
-  // ── Internal ───────────────────────────────────────────────────────────────
+	// ── Internal ───────────────────────────────────────────────────────────────
 
-  private attemptConnection(): void {
-    if (!this.options) return;
+	private attemptConnection(): void {
+		if (!this.options) return;
 
-    const { pollingInterval } = this.options;
+		const { pollingInterval } = this.options;
 
-    if (pollingInterval && pollingInterval > 0) {
-      this.startPolling(pollingInterval);
-    }
+		if (pollingInterval && pollingInterval > 0) {
+			this.startPolling(pollingInterval);
+		}
 
-    // Simulate connection success
-    this.connected = true;
-    this.startPingTimer();
-    this.notifyStatus(true);
-  }
+		// Simulate connection success
+		this.connected = true;
+		this.startPingTimer();
+		this.notifyStatus(true);
+	}
 
-  private startPolling(interval: number): void {
-    this.clearPollingTimer();
-    this.pollingTimer = setInterval(() => {
-      this.pollForMessages();
-    }, interval);
-  }
+	private startPolling(interval: number): void {
+		this.clearPollingTimer();
+		this.pollingTimer = setInterval(() => {
+			this.pollForMessages();
+		}, interval);
+	}
 
-  private pollForMessages(): void {
-    // In a real implementation, this would fetch from the server
-    // For now, it's a no-op that can be extended
-  }
+	private pollForMessages(): void {
+		// In a real implementation, this would fetch from the server
+		// For now, it's a no-op that can be extended
+	}
 
-  private startPingTimer(): void {
-    this.clearPingTimer();
-    this.pingTimer = setInterval(() => {
-      this.sendPing();
-    }, DEFAULT_PING_INTERVAL);
-  }
+	private startPingTimer(): void {
+		this.clearPingTimer();
+		this.pingTimer = setInterval(() => {
+			this.sendPing();
+		}, DEFAULT_PING_INTERVAL);
+	}
 
-  private clearTimers(): void {
-    this.clearPingTimer();
-    this.clearPollingTimer();
-  }
+	private clearTimers(): void {
+		this.clearPingTimer();
+		this.clearPollingTimer();
+	}
 
-  private clearPingTimer(): void {
-    if (this.pingTimer) {
-      clearInterval(this.pingTimer);
-      this.pingTimer = null;
-    }
-  }
+	private clearPingTimer(): void {
+		if (this.pingTimer) {
+			clearInterval(this.pingTimer);
+			this.pingTimer = null;
+		}
+	}
 
-  private clearPollingTimer(): void {
-    if (this.pollingTimer) {
-      clearInterval(this.pollingTimer);
-      this.pollingTimer = null;
-    }
-  }
+	private clearPollingTimer(): void {
+		if (this.pollingTimer) {
+			clearInterval(this.pollingTimer);
+			this.pollingTimer = null;
+		}
+	}
 
-  private emitMessage(message: WebSocketMessage): void {
-    for (const handler of this.eventHandlers) {
-      try {
-        handler(message);
-      } catch {
-        // Ignore handler errors
-      }
-    }
-  }
+	private emitMessage(message: WebSocketMessage): void {
+		for (const handler of this.eventHandlers) {
+			try {
+				handler(message);
+			} catch {
+				// Ignore handler errors
+			}
+		}
+	}
 
-  private notifyStatus(connected: boolean, error?: string): void {
-    for (const handler of this.statusHandlers) {
-      try {
-        handler(connected, error);
-      } catch {
-        // Ignore handler errors
-      }
-    }
-  }
+	private notifyStatus(connected: boolean, error?: string): void {
+		for (const handler of this.statusHandlers) {
+			try {
+				handler(connected, error);
+			} catch {
+				// Ignore handler errors
+			}
+		}
+	}
 }

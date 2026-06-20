@@ -6,503 +6,534 @@
  * stats, cron, providers, themes, chat, frontend, and CORS.
  */
 
-import { describe, it, before, after } from 'node:test';
-import { strictEqual, ok, deepStrictEqual } from 'node:assert';
-import { WebUIServer } from '../../src/webui/server.js';
-import type { WebUIConfig } from '../../src/webui/types.js';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { deepStrictEqual, ok, strictEqual } from "node:assert";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, before, describe, it } from "node:test";
+import { WebUIServer } from "../../src/webui/server.js";
+import type { WebUIConfig } from "../../src/webui/types.js";
 
 // Use a high port to avoid collisions
 const TEST_PORT = 4001;
 
 // Isolated workspace for e2e tests so provider persistence doesn't leak between tests
-const e2eWorkspace = mkdtempSync(join(tmpdir(), 'synthtek-e2e-'));
+const e2eWorkspace = mkdtempSync(join(tmpdir(), "synthtek-e2e-"));
 const originalWorkspace = process.env.SYNTHTEK_WORKSPACE;
 
 const config: WebUIConfig = {
-  host: '127.0.0.1',
-  port: TEST_PORT,
-  apiKey: 'e2e-secret-key',
-  maxSessions: 10,
-  sessionTimeout: 3600,
+	host: "127.0.0.1",
+	port: TEST_PORT,
+	apiKey: "e2e-secret-key",
+	maxSessions: 10,
+	sessionTimeout: 3600,
 };
 
 const BASE = `http://127.0.0.1:${TEST_PORT}`;
 
 const authHeaders = {
-  Authorization: 'Bearer e2e-secret-key',
-  'Content-Type': 'application/json',
+	Authorization: "Bearer e2e-secret-key",
+	"Content-Type": "application/json",
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function get(path: string, headers?: Record<string, string>) {
-  return fetch(`${BASE}${path}`, { headers });
+	return fetch(`${BASE}${path}`, { headers });
 }
 
-async function post(path: string, body: unknown, headers?: Record<string, string>) {
-  return fetch(`${BASE}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body: JSON.stringify(body),
-  });
+async function post(
+	path: string,
+	body: unknown,
+	headers?: Record<string, string>,
+) {
+	return fetch(`${BASE}${path}`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json", ...headers },
+		body: JSON.stringify(body),
+	});
 }
 
-async function put(path: string, body: unknown, headers?: Record<string, string>) {
-  return fetch(`${BASE}${path}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body: JSON.stringify(body),
-  });
+async function put(
+	path: string,
+	body: unknown,
+	headers?: Record<string, string>,
+) {
+	return fetch(`${BASE}${path}`, {
+		method: "PUT",
+		headers: { "Content-Type": "application/json", ...headers },
+		body: JSON.stringify(body),
+	});
 }
 
 async function del(path: string, headers?: Record<string, string>) {
-  return fetch(`${BASE}${path}`, { method: 'DELETE', headers });
+	return fetch(`${BASE}${path}`, { method: "DELETE", headers });
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe('WebUI end-to-end', () => {
-  let server: WebUIServer;
+describe("WebUI end-to-end", () => {
+	let server: WebUIServer;
 
-  before(async () => {
-    // Use isolated workspace for e2e tests
-    process.env.SYNTHTEK_WORKSPACE = e2eWorkspace;
-    server = new WebUIServer(config);
-    await server.start();
-  });
+	before(async () => {
+		// Use isolated workspace for e2e tests
+		process.env.SYNTHTEK_WORKSPACE = e2eWorkspace;
+		server = new WebUIServer(config);
+		await server.start();
+	});
 
-  after(async () => {
-    await server.stop();
-    // Restore original workspace
-    if (originalWorkspace !== undefined) {
-      process.env.SYNTHTEK_WORKSPACE = originalWorkspace;
-    } else {
-      delete process.env.SYNTHTEK_WORKSPACE;
-    }
-    // Clean up temp directory
-    try { rmSync(e2eWorkspace, { recursive: true, force: true }); } catch {}
-  });
+	after(async () => {
+		await server.stop();
+		// Restore original workspace
+		if (originalWorkspace !== undefined) {
+			process.env.SYNTHTEK_WORKSPACE = originalWorkspace;
+		} else {
+			delete process.env.SYNTHTEK_WORKSPACE;
+		}
+		// Clean up temp directory
+		try {
+			rmSync(e2eWorkspace, { recursive: true, force: true });
+		} catch {}
+	});
 
-  // ──────────────────────────────────────────────────────────────────────
-  // Health (public — no auth required)
-  // ──────────────────────────────────────────────────────────────────────
+	// ──────────────────────────────────────────────────────────────────────
+	// Health (public — no auth required)
+	// ──────────────────────────────────────────────────────────────────────
 
-  describe('GET /api/health (public)', () => {
-    it('returns 200 without auth', async () => {
-      const res = await get('/api/health');
-      strictEqual(res.status, 200);
-    });
+	describe("GET /api/health (public)", () => {
+		it("returns 200 without auth", async () => {
+			const res = await get("/api/health");
+			strictEqual(res.status, 200);
+		});
 
-    it('returns health object with expected fields', async () => {
-      const res = await get('/api/health');
-      const json = await res.json();
-      strictEqual(json.name, 'webui');
-      strictEqual(json.status, 'started');
-      strictEqual(json.connected, true);
-      ok(typeof json.uptime === 'number', 'has uptime');
-    });
-  });
+		it("returns health object with expected fields", async () => {
+			const res = await get("/api/health");
+			const json = await res.json();
+			strictEqual(json.name, "webui");
+			strictEqual(json.status, "started");
+			strictEqual(json.connected, true);
+			ok(typeof json.uptime === "number", "has uptime");
+		});
+	});
 
-  // ──────────────────────────────────────────────────────────────────────
-  // Frontend HTML (public)
-  // ──────────────────────────────────────────────────────────────────────
+	// ──────────────────────────────────────────────────────────────────────
+	// Frontend HTML (public)
+	// ──────────────────────────────────────────────────────────────────────
 
-  describe('GET / (frontend)', () => {
-    it('serves HTML without auth', async () => {
-      const res = await get('/');
-      strictEqual(res.status, 200);
-      const ct = res.headers.get('content-type');
-      ok(ct?.includes('text/html'), 'content-type is text/html');
-    });
+	describe("GET / (frontend)", () => {
+		it("serves HTML without auth", async () => {
+			const res = await get("/");
+			strictEqual(res.status, 200);
+			const ct = res.headers.get("content-type");
+			ok(ct?.includes("text/html"), "content-type is text/html");
+		});
 
-    it('includes no-cache headers', async () => {
-      const res = await get('/');
-      strictEqual(res.headers.get('cache-control'), 'no-cache, no-store, must-revalidate');
-      strictEqual(res.headers.get('pragma'), 'no-cache');
-      strictEqual(res.headers.get('expires'), '0');
-    });
+		it("includes no-cache headers", async () => {
+			const res = await get("/");
+			strictEqual(
+				res.headers.get("cache-control"),
+				"no-cache, no-store, must-revalidate",
+			);
+			strictEqual(res.headers.get("pragma"), "no-cache");
+			strictEqual(res.headers.get("expires"), "0");
+		});
 
-    it('GET /index.html also serves frontend', async () => {
-      const res = await get('/index.html');
-      strictEqual(res.status, 200);
-      const ct = res.headers.get('content-type');
-      ok(ct?.includes('text/html'), 'content-type is text/html');
-    });
-  });
+		it("GET /index.html also serves frontend", async () => {
+			const res = await get("/index.html");
+			strictEqual(res.status, 200);
+			const ct = res.headers.get("content-type");
+			ok(ct?.includes("text/html"), "content-type is text/html");
+		});
+	});
 
-  // ──────────────────────────────────────────────────────────────────────
-  // CORS preflight
-  // ──────────────────────────────────────────────────────────────────────
+	// ──────────────────────────────────────────────────────────────────────
+	// CORS preflight
+	// ──────────────────────────────────────────────────────────────────────
 
-  describe('OPTIONS (CORS preflight)', () => {
-    it('returns 204 with CORS headers', async () => {
-      const res = await fetch(`${BASE}/api/sessions`, { method: 'OPTIONS' });
-      strictEqual(res.status, 204);
-      strictEqual(res.headers.get('access-control-allow-origin'), '*');
-      ok(
-        res.headers.get('access-control-allow-methods')?.includes('GET'),
-        'allows GET',
-      );
-      ok(
-        res.headers.get('access-control-allow-methods')?.includes('POST'),
-        'allows POST',
-      );
-    });
-  });
+	describe("OPTIONS (CORS preflight)", () => {
+		it("returns 204 with CORS headers", async () => {
+			const res = await fetch(`${BASE}/api/sessions`, { method: "OPTIONS" });
+			strictEqual(res.status, 204);
+			strictEqual(res.headers.get("access-control-allow-origin"), "*");
+			ok(
+				res.headers.get("access-control-allow-methods")?.includes("GET"),
+				"allows GET",
+			);
+			ok(
+				res.headers.get("access-control-allow-methods")?.includes("POST"),
+				"allows POST",
+			);
+		});
+	});
 
-  // ──────────────────────────────────────────────────────────────────────
-  // Sessions CRUD
-  // ──────────────────────────────────────────────────────────────────────
+	// ──────────────────────────────────────────────────────────────────────
+	// Sessions CRUD
+	// ──────────────────────────────────────────────────────────────────────
 
-  describe('Sessions CRUD', () => {
-    let sessionId: string;
+	describe("Sessions CRUD", () => {
+		let sessionId: string;
 
-    it('POST /api/sessions creates a session', async () => {
-      const res = await post('/api/sessions', { userId: 'e2e-user' }, authHeaders);
-      strictEqual(res.status, 201);
-      const json = await res.json();
-      ok(json.id, 'has session id');
-      strictEqual(json.userId, 'e2e-user');
-      ok(json.createdAt, 'has createdAt');
-      ok(json.messages, 'has messages array');
-      sessionId = json.id;
-    });
+		it("POST /api/sessions creates a session", async () => {
+			const res = await post(
+				"/api/sessions",
+				{ userId: "e2e-user" },
+				authHeaders,
+			);
+			strictEqual(res.status, 201);
+			const json = await res.json();
+			ok(json.id, "has session id");
+			strictEqual(json.userId, "e2e-user");
+			ok(json.createdAt, "has createdAt");
+			ok(json.messages, "has messages array");
+			sessionId = json.id;
+		});
 
-    it('GET /api/sessions lists sessions', async () => {
-      const res = await get('/api/sessions', authHeaders);
-      strictEqual(res.status, 200);
-      const json = await res.json();
-      ok(Array.isArray(json), 'returns array');
-      ok(json.length >= 1, 'has at least one session');
-    });
+		it("GET /api/sessions lists sessions", async () => {
+			const res = await get("/api/sessions", authHeaders);
+			strictEqual(res.status, 200);
+			const json = await res.json();
+			ok(Array.isArray(json), "returns array");
+			ok(json.length >= 1, "has at least one session");
+		});
 
-    it('POST /api/messages adds a message to the session', async () => {
-      const res = await post(
-        '/api/messages',
-        { sessionId, role: 'user', content: 'Hello from e2e' },
-        authHeaders,
-      );
-      strictEqual(res.status, 201);
-      const json = await res.json();
-      ok(json.id, 'has message id');
-      strictEqual(json.role, 'user');
-      strictEqual(json.content, 'Hello from e2e');
-      strictEqual(json.sessionId, sessionId);
-    });
+		it("POST /api/messages adds a message to the session", async () => {
+			const res = await post(
+				"/api/messages",
+				{ sessionId, role: "user", content: "Hello from e2e" },
+				authHeaders,
+			);
+			strictEqual(res.status, 201);
+			const json = await res.json();
+			ok(json.id, "has message id");
+			strictEqual(json.role, "user");
+			strictEqual(json.content, "Hello from e2e");
+			strictEqual(json.sessionId, sessionId);
+		});
 
-    it('GET /api/messages?sessionId=xxx returns messages', async () => {
-      const res = await get(`/api/messages?sessionId=${sessionId}`, authHeaders);
-      strictEqual(res.status, 200);
-      const json = await res.json();
-      ok(Array.isArray(json), 'returns array');
-      ok(json.length >= 1, 'has at least one message');
-      strictEqual(json[0].content, 'Hello from e2e');
-    });
+		it("GET /api/messages?sessionId=xxx returns messages", async () => {
+			const res = await get(
+				`/api/messages?sessionId=${sessionId}`,
+				authHeaders,
+			);
+			strictEqual(res.status, 200);
+			const json = await res.json();
+			ok(Array.isArray(json), "returns array");
+			ok(json.length >= 1, "has at least one message");
+			strictEqual(json[0].content, "Hello from e2e");
+		});
 
-    it('GET /api/messages without sessionId returns empty array', async () => {
-      const res = await get('/api/messages', authHeaders);
-      strictEqual(res.status, 200);
-      const json = await res.json();
-      deepStrictEqual(json, []);
-    });
+		it("GET /api/messages without sessionId returns empty array", async () => {
+			const res = await get("/api/messages", authHeaders);
+			strictEqual(res.status, 200);
+			const json = await res.json();
+			deepStrictEqual(json, []);
+		});
 
-    it('DELETE /api/sessions/:id removes the session', async () => {
-      const res = await del(`/api/sessions/${sessionId}`, authHeaders);
-      strictEqual(res.status, 200);
-    });
+		it("DELETE /api/sessions/:id removes the session", async () => {
+			const res = await del(`/api/sessions/${sessionId}`, authHeaders);
+			strictEqual(res.status, 200);
+		});
 
-    it('DELETE /api/sessions/:id returns 404 for non-existent session', async () => {
-      const res = await del('/api/sessions/nonexistent-id', authHeaders);
-      strictEqual(res.status, 404);
-    });
+		it("DELETE /api/sessions/:id returns 404 for non-existent session", async () => {
+			const res = await del("/api/sessions/nonexistent-id", authHeaders);
+			strictEqual(res.status, 404);
+		});
 
-    it('POST /api/messages to deleted session returns 404', async () => {
-      const res = await post(
-        '/api/messages',
-        { sessionId, role: 'user', content: 'ghost' },
-        authHeaders,
-      );
-      strictEqual(res.status, 404);
-    });
-  });
+		it("POST /api/messages to deleted session returns 404", async () => {
+			const res = await post(
+				"/api/messages",
+				{ sessionId, role: "user", content: "ghost" },
+				authHeaders,
+			);
+			strictEqual(res.status, 404);
+		});
+	});
 
-  // ──────────────────────────────────────────────────────────────────────
-  // Max sessions limit
-  // ──────────────────────────────────────────────────────────────────────
+	// ──────────────────────────────────────────────────────────────────────
+	// Max sessions limit
+	// ──────────────────────────────────────────────────────────────────────
 
-  describe('Max sessions limit', () => {
-    it('rejects session creation when limit is reached', async () => {
-      // Create 10 sessions (the limit)
-      const ids: string[] = [];
-      for (let i = 0; i < 10; i++) {
-        const res = await post('/api/sessions', { userId: `limit-user-${i}` }, authHeaders);
-        strictEqual(res.status, 201, `session ${i} should be created`);
-        const json = await res.json();
-        ids.push(json.id);
-      }
+	describe("Max sessions limit", () => {
+		it("rejects session creation when limit is reached", async () => {
+			// Create 10 sessions (the limit)
+			const ids: string[] = [];
+			for (let i = 0; i < 10; i++) {
+				const res = await post(
+					"/api/sessions",
+					{ userId: `limit-user-${i}` },
+					authHeaders,
+				);
+				strictEqual(res.status, 201, `session ${i} should be created`);
+				const json = await res.json();
+				ids.push(json.id);
+			}
 
-      // 11th should fail
-      const res = await post('/api/sessions', { userId: 'overflow-user' }, authHeaders);
-      strictEqual(res.status, 400);
-      const json = await res.json();
-      ok(json.error?.includes('Max sessions'), 'error mentions max sessions');
+			// 11th should fail
+			const res = await post(
+				"/api/sessions",
+				{ userId: "overflow-user" },
+				authHeaders,
+			);
+			strictEqual(res.status, 400);
+			const json = await res.json();
+			ok(json.error?.includes("Max sessions"), "error mentions max sessions");
 
-      // Clean up
-      for (const id of ids) {
-        await del(`/api/sessions/${id}`, authHeaders);
-      }
-    });
-  });
+			// Clean up
+			for (const id of ids) {
+				await del(`/api/sessions/${id}`, authHeaders);
+			}
+		});
+	});
 
-  // ──────────────────────────────────────────────────────────────────────
-  // Stats
-  // ──────────────────────────────────────────────────────────────────────
+	// ──────────────────────────────────────────────────────────────────────
+	// Stats
+	// ──────────────────────────────────────────────────────────────────────
 
-  describe('GET /api/stats', () => {
-    it('returns stats object', async () => {
-      const res = await get('/api/stats', authHeaders);
-      strictEqual(res.status, 200);
-      const json = await res.json();
-      ok(typeof json.activeSessions === 'number', 'has activeSessions');
-      ok(typeof json.totalMessages === 'number', 'has totalMessages');
-      ok(typeof json.uptime === 'number', 'has uptime');
-    });
+	describe("GET /api/stats", () => {
+		it("returns stats object", async () => {
+			const res = await get("/api/stats", authHeaders);
+			strictEqual(res.status, 200);
+			const json = await res.json();
+			ok(typeof json.activeSessions === "number", "has activeSessions");
+			ok(typeof json.totalMessages === "number", "has totalMessages");
+			ok(typeof json.uptime === "number", "has uptime");
+		});
 
-    it('reflects session and message counts', async () => {
-      // Create a session with a message
-      const createRes = await post('/api/sessions', { userId: 'stats-user' }, authHeaders);
-      const session = await createRes.json();
-      await post(
-        '/api/messages',
-        { sessionId: session.id, role: 'user', content: 'count me' },
-        authHeaders,
-      );
+		it("reflects session and message counts", async () => {
+			// Create a session with a message
+			const createRes = await post(
+				"/api/sessions",
+				{ userId: "stats-user" },
+				authHeaders,
+			);
+			const session = await createRes.json();
+			await post(
+				"/api/messages",
+				{ sessionId: session.id, role: "user", content: "count me" },
+				authHeaders,
+			);
 
-      const res = await get('/api/stats', authHeaders);
-      const json = await res.json();
-      ok(json.activeSessions >= 1, 'at least 1 active session');
-      ok(json.totalMessages >= 1, 'at least 1 total message');
+			const res = await get("/api/stats", authHeaders);
+			const json = await res.json();
+			ok(json.activeSessions >= 1, "at least 1 active session");
+			ok(json.totalMessages >= 1, "at least 1 total message");
 
-      // Clean up
-      await del(`/api/sessions/${session.id}`, authHeaders);
-    });
-  });
+			// Clean up
+			await del(`/api/sessions/${session.id}`, authHeaders);
+		});
+	});
 
-  // ──────────────────────────────────────────────────────────────────────
-  // Cron (stub)
-  // ──────────────────────────────────────────────────────────────────────
+	// ──────────────────────────────────────────────────────────────────────
+	// Cron (stub)
+	// ──────────────────────────────────────────────────────────────────────
 
-  describe('GET /api/cron', () => {
-    it('returns empty array', async () => {
-      const res = await get('/api/cron', authHeaders);
-      strictEqual(res.status, 200);
-      const json = await res.json();
-      deepStrictEqual(json, []);
-    });
-  });
+	describe("GET /api/cron", () => {
+		it("returns empty array", async () => {
+			const res = await get("/api/cron", authHeaders);
+			strictEqual(res.status, 200);
+			const json = await res.json();
+			deepStrictEqual(json, []);
+		});
+	});
 
-  // ──────────────────────────────────────────────────────────────────────
-  // Provider presets
-  // ──────────────────────────────────────────────────────────────────────
+	// ──────────────────────────────────────────────────────────────────────
+	// Provider presets
+	// ──────────────────────────────────────────────────────────────────────
 
-  describe('GET /api/providers/presets', () => {
-    it('returns provider presets', async () => {
-      const res = await get('/api/providers/presets', authHeaders);
-      strictEqual(res.status, 200);
-      const json = await res.json();
-      ok(json.openai, 'has openai preset');
-      ok(json.anthropic, 'has anthropic preset');
-      ok(json.ollama, 'has ollama preset');
-      strictEqual(json.openai.baseUrl, 'https://api.openai.com/v1');
-    });
-  });
+	describe("GET /api/providers/presets", () => {
+		it("returns provider presets", async () => {
+			const res = await get("/api/providers/presets", authHeaders);
+			strictEqual(res.status, 200);
+			const json = await res.json();
+			ok(json.openai, "has openai preset");
+			ok(json.anthropic, "has anthropic preset");
+			ok(json.ollama, "has ollama preset");
+			strictEqual(json.openai.baseUrl, "https://api.openai.com/v1");
+		});
+	});
 
-  // ──────────────────────────────────────────────────────────────────────
-  // Providers CRUD
-  // ──────────────────────────────────────────────────────────────────────
+	// ──────────────────────────────────────────────────────────────────────
+	// Providers CRUD
+	// ──────────────────────────────────────────────────────────────────────
 
-  describe('Providers CRUD', () => {
-    let providerId: string;
+	describe("Providers CRUD", () => {
+		let providerId: string;
 
-    it('GET /api/providers returns empty list initially', async () => {
-      const res = await get('/api/providers', authHeaders);
-      strictEqual(res.status, 200);
-      const json = await res.json();
-      ok(Array.isArray(json), 'returns array');
-    });
+		it("GET /api/providers returns empty list initially", async () => {
+			const res = await get("/api/providers", authHeaders);
+			strictEqual(res.status, 200);
+			const json = await res.json();
+			ok(Array.isArray(json), "returns array");
+		});
 
-    it('POST /api/providers creates a provider', async () => {
-      const res = await post(
-        '/api/providers',
-        {
-          name: 'E2E Test Provider',
-          type: 'openai',
-          baseUrl: 'https://api.openai.com/v1',
-          apiKey: 'sk-test-key',
-          models: ['gpt-4o'],
-          defaultModel: 'gpt-4o',
-        },
-        authHeaders,
-      );
-      strictEqual(res.status, 201);
-      const json = await res.json();
-      ok(json.id, 'has provider id');
-      strictEqual(json.name, 'E2E Test Provider');
-      strictEqual(json.type, 'openai');
-      strictEqual(json.status, 'active');
-      strictEqual(json.defaultModel, 'gpt-4o');
-      providerId = json.id;
-    });
+		it("POST /api/providers creates a provider", async () => {
+			const res = await post(
+				"/api/providers",
+				{
+					name: "E2E Test Provider",
+					type: "openai",
+					baseUrl: "https://api.openai.com/v1",
+					apiKey: "sk-test-key",
+					models: ["gpt-4o"],
+					defaultModel: "gpt-4o",
+				},
+				authHeaders,
+			);
+			strictEqual(res.status, 201);
+			const json = await res.json();
+			ok(json.id, "has provider id");
+			strictEqual(json.name, "E2E Test Provider");
+			strictEqual(json.type, "openai");
+			strictEqual(json.status, "active");
+			strictEqual(json.defaultModel, "gpt-4o");
+			providerId = json.id;
+		});
 
-    it('POST /api/providers rejects missing name', async () => {
-      const res = await post(
-        '/api/providers',
-        { type: 'openai' },
-        authHeaders,
-      );
-      strictEqual(res.status, 400);
-    });
+		it("POST /api/providers rejects missing name", async () => {
+			const res = await post("/api/providers", { type: "openai" }, authHeaders);
+			strictEqual(res.status, 400);
+		});
 
-    it('POST /api/providers rejects missing type', async () => {
-      const res = await post(
-        '/api/providers',
-        { name: 'No Type' },
-        authHeaders,
-      );
-      strictEqual(res.status, 400);
-    });
+		it("POST /api/providers rejects missing type", async () => {
+			const res = await post(
+				"/api/providers",
+				{ name: "No Type" },
+				authHeaders,
+			);
+			strictEqual(res.status, 400);
+		});
 
-    it('GET /api/providers/:id returns the provider', async () => {
-      const res = await get(`/api/providers/${providerId}`, authHeaders);
-      strictEqual(res.status, 200);
-      const json = await res.json();
-      strictEqual(json.id, providerId);
-      strictEqual(json.name, 'E2E Test Provider');
-    });
+		it("GET /api/providers/:id returns the provider", async () => {
+			const res = await get(`/api/providers/${providerId}`, authHeaders);
+			strictEqual(res.status, 200);
+			const json = await res.json();
+			strictEqual(json.id, providerId);
+			strictEqual(json.name, "E2E Test Provider");
+		});
 
-    it('GET /api/providers/:id returns 404 for unknown id', async () => {
-      const res = await get('/api/providers/unknown-id', authHeaders);
-      strictEqual(res.status, 404);
-    });
+		it("GET /api/providers/:id returns 404 for unknown id", async () => {
+			const res = await get("/api/providers/unknown-id", authHeaders);
+			strictEqual(res.status, 404);
+		});
 
-    it('PUT /api/providers/:id updates the provider', async () => {
-      const res = await put(
-        `/api/providers/${providerId}`,
-        { name: 'Updated Provider', temperature: 0.5 },
-        authHeaders,
-      );
-      strictEqual(res.status, 200);
-      const json = await res.json();
-      strictEqual(json.name, 'Updated Provider');
-      strictEqual(json.temperature, 0.5);
-    });
+		it("PUT /api/providers/:id updates the provider", async () => {
+			const res = await put(
+				`/api/providers/${providerId}`,
+				{ name: "Updated Provider", temperature: 0.5 },
+				authHeaders,
+			);
+			strictEqual(res.status, 200);
+			const json = await res.json();
+			strictEqual(json.name, "Updated Provider");
+			strictEqual(json.temperature, 0.5);
+		});
 
-    it('PUT /api/providers/:id returns 404 for unknown id', async () => {
-      const res = await put(
-        '/api/providers/unknown-id',
-        { name: 'ghost' },
-        authHeaders,
-      );
-      strictEqual(res.status, 404);
-    });
+		it("PUT /api/providers/:id returns 404 for unknown id", async () => {
+			const res = await put(
+				"/api/providers/unknown-id",
+				{ name: "ghost" },
+				authHeaders,
+			);
+			strictEqual(res.status, 404);
+		});
 
-    it('DELETE /api/providers/:id removes the provider', async () => {
-      const res = await del(`/api/providers/${providerId}`, authHeaders);
-      strictEqual(res.status, 200);
-    });
+		it("DELETE /api/providers/:id removes the provider", async () => {
+			const res = await del(`/api/providers/${providerId}`, authHeaders);
+			strictEqual(res.status, 200);
+		});
 
-    it('DELETE /api/providers/:id returns 404 for unknown id', async () => {
-      const res = await del('/api/providers/unknown-id', authHeaders);
-      strictEqual(res.status, 404);
-    });
-  });
+		it("DELETE /api/providers/:id returns 404 for unknown id", async () => {
+			const res = await del("/api/providers/unknown-id", authHeaders);
+			strictEqual(res.status, 404);
+		});
+	});
 
-  // ──────────────────────────────────────────────────────────────────────
-  // Chat completions
-  // ──────────────────────────────────────────────────────────────────────
+	// ──────────────────────────────────────────────────────────────────────
+	// Chat completions
+	// ──────────────────────────────────────────────────────────────────────
 
-  describe('POST /api/chat/completions', () => {
-    it('returns 422 when no active providers exist', async () => {
-      const res = await post(
-        '/api/chat/completions',
-        { messages: [{ role: 'user', content: 'hi' }] },
-        authHeaders,
-      );
-      strictEqual(res.status, 422);
-      const json = await res.json();
-      ok(json.error?.includes('No active'), 'error mentions no active providers');
-    });
+	describe("POST /api/chat/completions", () => {
+		it("returns 422 when no active providers exist", async () => {
+			const res = await post(
+				"/api/chat/completions",
+				{ messages: [{ role: "user", content: "hi" }] },
+				authHeaders,
+			);
+			strictEqual(res.status, 422);
+			const json = await res.json();
+			ok(
+				json.error?.includes("No active"),
+				"error mentions no active providers",
+			);
+		});
 
-    it('returns 404 for non-existent providerId', async () => {
-      // First create an active provider
-      const createRes = await post(
-        '/api/providers',
-        {
-          name: 'Chat Test',
-          type: 'openai',
-          baseUrl: 'https://api.openai.com/v1',
-          apiKey: 'sk-invalid',
-          models: ['gpt-4o'],
-          defaultModel: 'gpt-4o',
-        },
-        authHeaders,
-      );
-      strictEqual(createRes.status, 201);
+		it("returns 404 for non-existent providerId", async () => {
+			// First create an active provider
+			const createRes = await post(
+				"/api/providers",
+				{
+					name: "Chat Test",
+					type: "openai",
+					baseUrl: "https://api.openai.com/v1",
+					apiKey: "sk-invalid",
+					models: ["gpt-4o"],
+					defaultModel: "gpt-4o",
+				},
+				authHeaders,
+			);
+			strictEqual(createRes.status, 201);
 
-      const res = await post(
-        '/api/chat/completions',
-        {
-          messages: [{ role: 'user', content: 'hi' }],
-          providerId: 'nonexistent-provider',
-        },
-        authHeaders,
-      );
-      strictEqual(res.status, 404);
-    });
-  });
+			const res = await post(
+				"/api/chat/completions",
+				{
+					messages: [{ role: "user", content: "hi" }],
+					providerId: "nonexistent-provider",
+				},
+				authHeaders,
+			);
+			strictEqual(res.status, 404);
+		});
+	});
 
-  // ──────────────────────────────────────────────────────────────────────
-  // Themes
-  // ──────────────────────────────────────────────────────────────────────
+	// ──────────────────────────────────────────────────────────────────────
+	// Themes
+	// ──────────────────────────────────────────────────────────────────────
 
-  describe('GET /api/themes', () => {
-    it('returns available themes', async () => {
-      const res = await get('/api/themes', authHeaders);
-      strictEqual(res.status, 200);
-      const json = await res.json();
-      ok(Array.isArray(json), 'returns array of themes');
-      ok(json.length > 0, 'has at least one theme');
-    });
-  });
+	describe("GET /api/themes", () => {
+		it("returns available themes", async () => {
+			const res = await get("/api/themes", authHeaders);
+			strictEqual(res.status, 200);
+			const json = await res.json();
+			ok(Array.isArray(json), "returns array of themes");
+			ok(json.length > 0, "has at least one theme");
+		});
+	});
 
-  // ──────────────────────────────────────────────────────────────────────
-  // 404 for unknown routes
-  // ──────────────────────────────────────────────────────────────────────
+	// ──────────────────────────────────────────────────────────────────────
+	// 404 for unknown routes
+	// ──────────────────────────────────────────────────────────────────────
 
-  describe('Unknown routes', () => {
-    it('returns 404 for unknown API path', async () => {
-      const res = await get('/api/unknown/route', authHeaders);
-      strictEqual(res.status, 404);
-    });
-  });
+	describe("Unknown routes", () => {
+		it("returns 404 for unknown API path", async () => {
+			const res = await get("/api/unknown/route", authHeaders);
+			strictEqual(res.status, 404);
+		});
+	});
 
-  // ──────────────────────────────────────────────────────────────────────
-  // CORS headers on API responses
-  // ──────────────────────────────────────────────────────────────────────
+	// ──────────────────────────────────────────────────────────────────────
+	// CORS headers on API responses
+	// ──────────────────────────────────────────────────────────────────────
 
-  describe('CORS headers on responses', () => {
-    it('includes Access-Control-Allow-Origin on API responses', async () => {
-      const res = await get('/api/health');
-      strictEqual(res.headers.get('access-control-allow-origin'), '*');
-    });
+	describe("CORS headers on responses", () => {
+		it("includes Access-Control-Allow-Origin on API responses", async () => {
+			const res = await get("/api/health");
+			strictEqual(res.headers.get("access-control-allow-origin"), "*");
+		});
 
-    it('includes Content-Type: application/json on API responses', async () => {
-      const res = await get('/api/health');
-      const ct = res.headers.get('content-type');
-      ok(ct?.includes('application/json'), 'content-type is application/json');
-    });
-  });
+		it("includes Content-Type: application/json on API responses", async () => {
+			const res = await get("/api/health");
+			const ct = res.headers.get("content-type");
+			ok(ct?.includes("application/json"), "content-type is application/json");
+		});
+	});
 });

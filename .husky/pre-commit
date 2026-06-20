@@ -1,0 +1,30 @@
+#!/usr/bin/env sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit checks..."
+
+echo "--- Running lint (fast) ---"
+npm run lint
+if [ $? -ne 0 ]; then
+  echo "❌ Lint failed. Fix issues before committing."
+  exit 1
+fi
+
+echo ""
+echo "--- Running unit tests (this may take 5-10 min) ---"
+echo "    Tip: press Ctrl+C to skip tests and commit with --no-verify"
+echo ""
+npm test
+if [ $? -ne 0 ]; then
+  echo "❌ Tests failed. Fix failures before committing."
+  exit 1
+fi
+
+echo "✅ All pre-commit checks passed!"
+
+if [ $? -ne 0 ]; then
+  echo "❌ Tests failed. Fix failures before committing."
+  exit 1
+fi
+
+echo "✅ All pre-commit checks passed!"

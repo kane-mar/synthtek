@@ -2,17 +2,16 @@
  * Plugins barrel export
  */
 
+export { PluginDiscoverer } from "./discovery.js";
+export { PluginLoader } from "./loader.js";
+export { PluginManager } from "./manager.js";
 export type {
-  Plugin,
-  PluginManifest,
-  PluginContext,
-  PluginStatus,
-  PluginState,
-  DiscoveredPlugin,
-  PluginConfig,
-  Logger,
-} from './types.js';
-
-export { PluginDiscoverer } from './discovery.js';
-export { PluginLoader } from './loader.js';
-export { PluginManager } from './manager.js';
+	DiscoveredPlugin,
+	Logger,
+	Plugin,
+	PluginConfig,
+	PluginContext,
+	PluginManifest,
+	PluginState,
+	PluginStatus,
+} from "./types.js";

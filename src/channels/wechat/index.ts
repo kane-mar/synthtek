@@ -1,2 +1,2 @@
-export { WeChatChannel } from './channel.js';
-export type * from './types.js';
+export { WeChatChannel } from "./channel.js";
+export type * from "./types.js";

@@ -3,30 +3,30 @@
  * synthtek CLI entry point
  */
 
-import { Command } from 'commander';
+import { Command } from "commander";
 import {
-  registerStatusCommand,
-  registerConfigCommand,
-  registerExecCommand,
-  registerSearchCommand,
-  registerFileCommand,
-  registerSpawnCommand,
-  registerAgentCommand,
-  registerPluginCommand,
-  registerChatCommand,
-  registerInitCommand,
-  registerLogsCommand,
-  registerRestartCommand,
-  registerStopCommand,
-  registerWebuiCommand,
-} from './cli/commands/index.js';
+	registerAgentCommand,
+	registerChatCommand,
+	registerConfigCommand,
+	registerExecCommand,
+	registerFileCommand,
+	registerInitCommand,
+	registerLogsCommand,
+	registerPluginCommand,
+	registerRestartCommand,
+	registerSearchCommand,
+	registerSpawnCommand,
+	registerStatusCommand,
+	registerStopCommand,
+	registerWebuiCommand,
+} from "./cli/commands/index.js";
 
 const program = new Command();
 
 program
-  .name('synthtek')
-  .description('A modular plugin-based AI agent framework')
-  .version('1.0.0');
+	.name("synthtek")
+	.description("A modular plugin-based AI agent framework")
+	.version("1.0.0");
 
 // ── Register all commands ───────────────────────────────────────────────────
 

@@ -36,6 +36,11 @@ coverage/
 # Temporary
 tmp/
 temp/
+tmp-*.cjs
+
+# Test artifacts
+test-results/
+*.bak
 
 # TypeScript cache
 *.tsbuildinfo

@@ -2,5 +2,9 @@
  * Multimodal module exports
  */
 
-export { MultimodalInput } from './input.js';
-export type { MultimodalConfig, ImageSource, MultimodalMessageOptions } from './input.js';
+export type {
+	ImageSource,
+	MultimodalConfig,
+	MultimodalMessageOptions,
+} from "./input.js";
+export { MultimodalInput } from "./input.js";

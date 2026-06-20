@@ -6,7 +6,7 @@
  * like path traversal, command injection, and DoS.
  */
 
-import { resolve, isAbsolute } from 'node:path';
+import { isAbsolute, resolve } from "node:path";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -34,39 +34,39 @@ const DEFAULT_MAX_OPS_PER_MINUTE = 60;
  * @throws Error if the path is invalid or attempts traversal
  */
 export function sanitizePath(
-  inputPath: string,
-  workspaceRoot: string = process.cwd(),
+	inputPath: string,
+	workspaceRoot: string = process.cwd(),
 ): string {
-  if (!inputPath || typeof inputPath !== 'string') {
-    throw new ValidationError('Path must be a non-empty string');
-  }
+	if (!inputPath || typeof inputPath !== "string") {
+		throw new ValidationError("Path must be a non-empty string");
+	}
 
-  // Reject paths with traversal sequences
-  if (inputPath.includes('..')) {
-    throw new ValidationError(
-      `Path contains traversal sequences: "${inputPath}"`,
-    );
-  }
+	// Reject paths with traversal sequences
+	if (inputPath.includes("..")) {
+		throw new ValidationError(
+			`Path contains traversal sequences: "${inputPath}"`,
+		);
+	}
 
-  // Reject null bytes
-  if (inputPath.includes('\0')) {
-    throw new ValidationError('Path contains null bytes');
-  }
+	// Reject null bytes
+	if (inputPath.includes("\0")) {
+		throw new ValidationError("Path contains null bytes");
+	}
 
-  // Resolve to absolute path
-  const resolvedPath = isAbsolute(inputPath)
-    ? inputPath
-    : resolve(workspaceRoot, inputPath);
+	// Resolve to absolute path
+	const resolvedPath = isAbsolute(inputPath)
+		? inputPath
+		: resolve(workspaceRoot, inputPath);
 
-  // Ensure the resolved path is within the workspace
-  const normalizedWorkspace = resolve(workspaceRoot);
-  if (!resolvedPath.startsWith(normalizedWorkspace)) {
-    throw new ValidationError(
-      `Path "${inputPath}" resolves outside workspace "${normalizedWorkspace}"`,
-    );
-  }
+	// Ensure the resolved path is within the workspace
+	const normalizedWorkspace = resolve(workspaceRoot);
+	if (!resolvedPath.startsWith(normalizedWorkspace)) {
+		throw new ValidationError(
+			`Path "${inputPath}" resolves outside workspace "${normalizedWorkspace}"`,
+		);
+	}
 
-  return resolvedPath;
+	return resolvedPath;
 }
 
 // ─── Config Key Validation ───────────────────────────────────────────────────
@@ -78,21 +78,21 @@ export function sanitizePath(
  * @throws Error if the key is invalid
  */
 export function validateConfigKey(key: string): void {
-  if (!key || typeof key !== 'string') {
-    throw new ValidationError('Config key must be a non-empty string');
-  }
+	if (!key || typeof key !== "string") {
+		throw new ValidationError("Config key must be a non-empty string");
+	}
 
-  if (key.length > MAX_CONFIG_KEY_LENGTH) {
-    throw new ValidationError(
-      `Config key exceeds maximum length of ${MAX_CONFIG_KEY_LENGTH} characters`,
-    );
-  }
+	if (key.length > MAX_CONFIG_KEY_LENGTH) {
+		throw new ValidationError(
+			`Config key exceeds maximum length of ${MAX_CONFIG_KEY_LENGTH} characters`,
+		);
+	}
 
-  if (!CONFIG_KEY_PATTERN.test(key)) {
-    throw new ValidationError(
-      `Config key contains invalid characters. Only alphanumeric, dots, underscores, and hyphens are allowed: "${key}"`,
-    );
-  }
+	if (!CONFIG_KEY_PATTERN.test(key)) {
+		throw new ValidationError(
+			`Config key contains invalid characters. Only alphanumeric, dots, underscores, and hyphens are allowed: "${key}"`,
+		);
+	}
 }
 
 /**
@@ -102,15 +102,15 @@ export function validateConfigKey(key: string): void {
  * @throws Error if the value is invalid
  */
 export function validateConfigValue(value: string): void {
-  if (typeof value !== 'string') {
-    throw new ValidationError('Config value must be a string');
-  }
+	if (typeof value !== "string") {
+		throw new ValidationError("Config value must be a string");
+	}
 
-  if (value.length > MAX_CONFIG_VALUE_LENGTH) {
-    throw new ValidationError(
-      `Config value exceeds maximum length of ${MAX_CONFIG_VALUE_LENGTH} characters`,
-    );
-  }
+	if (value.length > MAX_CONFIG_VALUE_LENGTH) {
+		throw new ValidationError(
+			`Config value exceeds maximum length of ${MAX_CONFIG_VALUE_LENGTH} characters`,
+		);
+	}
 }
 
 // ─── Command Validation ──────────────────────────────────────────────────────
@@ -123,33 +123,37 @@ export function validateConfigValue(value: string): void {
  * @throws Error if the command contains dangerous patterns
  */
 export function validateCommand(command: string): void {
-  if (!command || typeof command !== 'string') {
-    throw new ValidationError('Command must be a non-empty string');
-  }
+	if (!command || typeof command !== "string") {
+		throw new ValidationError("Command must be a non-empty string");
+	}
 
-  if (command.length > 4096) {
-    throw new ValidationError('Command exceeds maximum length of 4096 characters');
-  }
+	if (command.length > 4096) {
+		throw new ValidationError(
+			"Command exceeds maximum length of 4096 characters",
+		);
+	}
 
-  // Reject null bytes
-  if (command.includes('\0')) {
-    throw new ValidationError('Command contains null bytes');
-  }
+	// Reject null bytes
+	if (command.includes("\0")) {
+		throw new ValidationError("Command contains null bytes");
+	}
 
-  // Reject commands that attempt to overwrite system files
-  const dangerousPatterns = [
-    /sudo\s+/i,
-    /rm\s+-[rf]/,
-    /mkfs\s+/i,
-    /dd\s+if=/i,
-    /format\s+/i,
-  ];
+	// Reject commands that attempt to overwrite system files
+	const dangerousPatterns = [
+		/sudo\s+/i,
+		/rm\s+-[rf]/,
+		/mkfs\s+/i,
+		/dd\s+if=/i,
+		/format\s+/i,
+	];
 
-  for (const pattern of dangerousPatterns) {
-    if (pattern.test(command)) {
-      throw new ValidationError(`Command contains dangerous pattern: ${pattern.source}`);
-    }
-  }
+	for (const pattern of dangerousPatterns) {
+		if (pattern.test(command)) {
+			throw new ValidationError(
+				`Command contains dangerous pattern: ${pattern.source}`,
+			);
+		}
+	}
 }
 
 // ─── Rate Limiter ────────────────────────────────────────────────────────────
@@ -159,98 +163,98 @@ export function validateCommand(command: string): void {
  * Automatically cleans up expired entries.
  */
 export class RateLimiter {
-  private operations: Map<string, number[]> = new Map();
-  private maxOpsPerMinute: number;
-  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+	private operations: Map<string, number[]> = new Map();
+	private maxOpsPerMinute: number;
+	private cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
-  /**
-   * Create a new rate limiter.
-   *
-   * @param maxOpsPerMinute - Maximum operations allowed per minute
-   * @param cleanupIntervalMs - How often to clean up expired entries (default 60s)
-   */
-  constructor(
-    maxOpsPerMinute: number = DEFAULT_MAX_OPS_PER_MINUTE,
-    cleanupIntervalMs: number = 60_000,
-  ) {
-    this.maxOpsPerMinute = maxOpsPerMinute;
-    this.startCleanup(cleanupIntervalMs);
-  }
+	/**
+	 * Create a new rate limiter.
+	 *
+	 * @param maxOpsPerMinute - Maximum operations allowed per minute
+	 * @param cleanupIntervalMs - How often to clean up expired entries (default 60s)
+	 */
+	constructor(
+		maxOpsPerMinute: number = DEFAULT_MAX_OPS_PER_MINUTE,
+		cleanupIntervalMs: number = 60_000,
+	) {
+		this.maxOpsPerMinute = maxOpsPerMinute;
+		this.startCleanup(cleanupIntervalMs);
+	}
 
-  /**
-   * Check if an operation is allowed under the rate limit.
-   *
-   * @param key - Unique identifier for the operation type
-   * @returns true if allowed, false if rate limited
-   */
-  check(key: string = 'default'): boolean {
-    const now = Date.now();
-    const windowStart = now - 60_000;
+	/**
+	 * Check if an operation is allowed under the rate limit.
+	 *
+	 * @param key - Unique identifier for the operation type
+	 * @returns true if allowed, false if rate limited
+	 */
+	check(key: string = "default"): boolean {
+		const now = Date.now();
+		const windowStart = now - 60_000;
 
-    let ops = this.operations.get(key) ?? [];
-    // Remove expired entries
-    ops = ops.filter((t) => t > windowStart);
+		let ops = this.operations.get(key) ?? [];
+		// Remove expired entries
+		ops = ops.filter((t) => t > windowStart);
 
-    if (ops.length >= this.maxOpsPerMinute) {
-      this.operations.set(key, ops);
-      return false;
-    }
+		if (ops.length >= this.maxOpsPerMinute) {
+			this.operations.set(key, ops);
+			return false;
+		}
 
-    ops.push(now);
-    this.operations.set(key, ops);
-    return true;
-  }
+		ops.push(now);
+		this.operations.set(key, ops);
+		return true;
+	}
 
-  /**
-   * Get current operation count for a key.
-   */
-  getCurrentCount(key: string = 'default'): number {
-    const now = Date.now();
-    const windowStart = now - 60_000;
-    const ops = this.operations.get(key) ?? [];
-    return ops.filter((t) => t > windowStart).length;
-  }
+	/**
+	 * Get current operation count for a key.
+	 */
+	getCurrentCount(key: string = "default"): number {
+		const now = Date.now();
+		const windowStart = now - 60_000;
+		const ops = this.operations.get(key) ?? [];
+		return ops.filter((t) => t > windowStart).length;
+	}
 
-  /**
-   * Start periodic cleanup of expired entries.
-   */
-  private startCleanup(intervalMs: number): void {
-    this.cleanupInterval = setInterval(() => {
-      this.cleanup();
-    }, intervalMs);
-    // Don't keep process alive for cleanup
-    if (this.cleanupInterval.unref) {
-      this.cleanupInterval.unref();
-    }
-  }
+	/**
+	 * Start periodic cleanup of expired entries.
+	 */
+	private startCleanup(intervalMs: number): void {
+		this.cleanupInterval = setInterval(() => {
+			this.cleanup();
+		}, intervalMs);
+		// Don't keep process alive for cleanup
+		if (this.cleanupInterval.unref) {
+			this.cleanupInterval.unref();
+		}
+	}
 
-  /**
-   * Remove all expired entries from the rate limiter.
-   */
-  cleanup(): void {
-    const now = Date.now();
-    const windowStart = now - 60_000;
+	/**
+	 * Remove all expired entries from the rate limiter.
+	 */
+	cleanup(): void {
+		const now = Date.now();
+		const windowStart = now - 60_000;
 
-    for (const [key, ops] of this.operations.entries()) {
-      const filtered = ops.filter((t) => t > windowStart);
-      if (filtered.length === 0) {
-        this.operations.delete(key);
-      } else {
-        this.operations.set(key, filtered);
-      }
-    }
-  }
+		for (const [key, ops] of this.operations.entries()) {
+			const filtered = ops.filter((t) => t > windowStart);
+			if (filtered.length === 0) {
+				this.operations.delete(key);
+			} else {
+				this.operations.set(key, filtered);
+			}
+		}
+	}
 
-  /**
-   * Stop the rate limiter and clean up resources.
-   */
-  stop(): void {
-    if (this.cleanupInterval !== null) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = null;
-    }
-    this.operations.clear();
-  }
+	/**
+	 * Stop the rate limiter and clean up resources.
+	 */
+	stop(): void {
+		if (this.cleanupInterval !== null) {
+			clearInterval(this.cleanupInterval);
+			this.cleanupInterval = null;
+		}
+		this.operations.clear();
+	}
 }
 
 // ─── Validation Error ────────────────────────────────────────────────────────
@@ -259,10 +263,10 @@ export class RateLimiter {
  * Custom error class for validation failures.
  */
 export class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ValidationError';
-  }
+	constructor(message: string) {
+		super(message);
+		this.name = "ValidationError";
+	}
 }
 
 // ─── Glob Pattern Validation ─────────────────────────────────────────────────
@@ -274,23 +278,25 @@ export class ValidationError extends Error {
  * @throws Error if the pattern is invalid
  */
 export function validateGlobPattern(pattern: string): void {
-  if (!pattern || typeof pattern !== 'string') {
-    throw new ValidationError('Glob pattern must be a non-empty string');
-  }
+	if (!pattern || typeof pattern !== "string") {
+		throw new ValidationError("Glob pattern must be a non-empty string");
+	}
 
-  if (pattern.length > 1024) {
-    throw new ValidationError('Glob pattern exceeds maximum length of 1024 characters');
-  }
+	if (pattern.length > 1024) {
+		throw new ValidationError(
+			"Glob pattern exceeds maximum length of 1024 characters",
+		);
+	}
 
-  // Reject patterns with traversal sequences
-  if (pattern.includes('..')) {
-    throw new ValidationError('Glob pattern contains traversal sequences');
-  }
+	// Reject patterns with traversal sequences
+	if (pattern.includes("..")) {
+		throw new ValidationError("Glob pattern contains traversal sequences");
+	}
 
-  // Reject null bytes
-  if (pattern.includes('\0')) {
-    throw new ValidationError('Glob pattern contains null bytes');
-  }
+	// Reject null bytes
+	if (pattern.includes("\0")) {
+		throw new ValidationError("Glob pattern contains null bytes");
+	}
 }
 
 // ─── Timeout Validation ──────────────────────────────────────────────────────
@@ -303,16 +309,16 @@ export function validateGlobPattern(pattern: string): void {
  * @throws Error if the timeout is invalid
  */
 export function validateTimeout(
-  timeout: number,
-  maxTimeout: number = 3600,
+	timeout: number,
+	maxTimeout: number = 3600,
 ): void {
-  if (!Number.isFinite(timeout) || timeout <= 0) {
-    throw new ValidationError('Timeout must be a positive number');
-  }
+	if (!Number.isFinite(timeout) || timeout <= 0) {
+		throw new ValidationError("Timeout must be a positive number");
+	}
 
-  if (timeout > maxTimeout) {
-    throw new ValidationError(
-      `Timeout exceeds maximum of ${maxTimeout} seconds`,
-    );
-  }
+	if (timeout > maxTimeout) {
+		throw new ValidationError(
+			`Timeout exceeds maximum of ${maxTimeout} seconds`,
+		);
+	}
 }

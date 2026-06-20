@@ -7,10 +7,17 @@ on:
     branches: [main, master]
 
 env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   test:
+    name: Unit Tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -38,6 +45,7 @@ jobs:
         run: npm run test:coverage
 
   lint:
+    name: Lint Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,21 +62,139 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Run lint
+        run: npm run lint
+
   docker:
+    name: Build & Push Docker Image
     needs: [test, lint]
-    runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: false
-          tags: synthtek:latest
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Image digest
+        run: echo "Pushed ${{ steps.meta.outputs.tags }}"
+
+  deploy:
+    name: Deploy to Production
+    needs: [docker]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          port: ${{ secrets.PRODUCTION_PORT || '22' }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          password: ${{ secrets.PRODUCTION_PASSWORD }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            set -e
+            echo "Pulling latest image..."
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+            echo "Stopping existing container..."
+            docker stop synthtek 2>/dev/null || true
+            docker rm synthtek 2>/dev/null || true
+
+            echo "Starting new container..."
+            docker run -d \
+              --name synthtek \
+              --restart unless-stopped \
+              -p ${{ secrets.PRODUCTION_PORT_MAPPING || '8080:8080' }} \
+              -v /volume1/docker/synthtek/config:/root/.synthtek/config \
+              -v /volume1/docker/synthtek/data:/root/.synthtek/data \
+              -e SYNTHTEK_PORT=8080 \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+            echo "Cleaning up old images..."
+            docker image prune -f
+
+            echo "✅ Production deployment complete"
+
+      - name: Health check
+        run: |
+          echo "Waiting for container to become healthy..."
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              http://${{ secrets.PRODUCTION_HOST }}:$(echo "${{ secrets.PRODUCTION_PORT_MAPPING || '8080' }}" | cut -d: -f1)/api/health \
+              || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Container is healthy"
+              break
+            fi
+            if [ "$i" = "30" ]; then
+              echo "❌ Container health check failed"
+              exit 1
+            fi
+            sleep 5
+          done
+
+  e2e:
+    name: E2E Tests
+    needs: [deploy]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+
+      - name: Run e2e tests
+        run: npm run test:e2e
+        env:
+          E2E_BASE_URL: http://${{ secrets.PRODUCTION_HOST }}:$(echo "${{ secrets.PRODUCTION_PORT_MAPPING || '8080' }}" | cut -d: -f1)
+
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: test-results/
+          retention-days: 7

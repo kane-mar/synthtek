@@ -5,6 +5,9 @@ FROM node:20-slim AS builder
 
 WORKDIR /app
 
+# Install system dependencies required for building/downloading packages (like Puppeteer)
+RUN apt-get update && apt-get install -y --no-install-recommends unzip build-essential && rm -rf /var/lib/apt/lists/*
+
 # Install ALL dependencies (including dev for build)
 COPY package.json package-lock.json ./
 RUN npm install -g npm@latest && npm ci
@@ -21,6 +24,9 @@ FROM node:20-slim AS runtime
 
 WORKDIR /app
 
+# Install system dependencies required for running packages (like Puppeteer)
+RUN apt-get update && apt-get install -y --no-install-recommends unzip build-essential && rm -rf /var/lib/apt/lists/*
+
 # Install production dependencies only
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
@@ -28,10 +34,16 @@ RUN npm ci --omit=dev && npm cache clean --force
 # Copy compiled source (not tests) from builder
 COPY --from=builder /app/dist/src/ ./dist/src/
 
-# Create non-root user
+# Create non-root user and ensure workspace is writable
 RUN groupadd -r synthtek && \
     useradd -r -g synthtek -d /app -s /sbin/nologin synthtek && \
-    chown -R synthtek:synthtek /app
+    chown -R synthtek:synthtek /app && \
+    mkdir -p /data && \
+    chown synthtek:synthtek /data
+
+# Copy docker-entrypoint.sh (before switching to non-root user)
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 USER synthtek
 
@@ -47,5 +59,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "import('http').then(h => h.get('http://127.0.0.1:8080/api/health', r => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1)))" || exit 1
 
 # Default: start WebUI server on port 8080
-ENTRYPOINT ["node", "dist/src/cli.js"]
+ENTRYPOINT ["docker-entrypoint.sh", "node", "dist/src/cli.js"]
 CMD ["webui"]

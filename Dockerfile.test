@@ -1,0 +1,39 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Test image: includes dev deps + Playwright browser + system libraries
+# ──────────────────────────────────────────────────────────────────────────────
+FROM node:20-slim
+
+WORKDIR /app
+
+# System deps for building + Playwright Chromium
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      unzip build-essential \
+      libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+      libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 \
+      libgbm1 libpango-1.0-0 libcairo2 libasound2 libxshmfence1 \
+      fonts-liberation libx11-xcb1 wget && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install ALL dependencies (including dev)
+COPY package.json package-lock.json ./
+RUN npm install -g npm@latest && npm ci
+
+# Install Playwright browser
+RUN npx playwright install chromium
+
+# Copy source and compile
+COPY tsconfig.json ./
+COPY src/ ./src/
+COPY tests/ ./tests/
+COPY playwright.config.ts ./
+RUN npm run build && echo "Build successful"
+
+# Keep root for Playwright (uses --no-sandbox)
+ENV NODE_ENV=test
+ENV SYNTHTEK_WORKSPACE=/data
+
+EXPOSE 8080
+
+ENTRYPOINT ["node", "dist/src/cli.js"]
+CMD ["webui"]

@@ -3,94 +3,91 @@
  * Provides a reliable keep-alive mechanism for long-running operations.
  */
 
-import {
-  HeartbeatConfig,
-  HeartbeatState,
-} from './types.js';
+import type { HeartbeatConfig, HeartbeatState } from "./types.js";
 
 const DEFAULT_INTERVAL = 30_000; // 30 seconds
 
 export class HeartbeatManager {
-  private config: Required<HeartbeatConfig>;
-  private timer: ReturnType<typeof setInterval> | null;
-  private state: HeartbeatState;
+	private config: Required<HeartbeatConfig>;
+	private timer: ReturnType<typeof setInterval> | null;
+	private state: HeartbeatState;
 
-  constructor(config: HeartbeatConfig) {
-    this.config = {
-      interval: config.interval || DEFAULT_INTERVAL,
-      onTick: config.onTick,
-      startImmediately: config.startImmediately ?? true,
-    };
-    this.timer = null;
-    this.state = {
-      running: false,
-      ticks: 0,
-      errors: [],
-    };
-  }
+	constructor(config: HeartbeatConfig) {
+		this.config = {
+			interval: config.interval || DEFAULT_INTERVAL,
+			onTick: config.onTick,
+			startImmediately: config.startImmediately ?? true,
+		};
+		this.timer = null;
+		this.state = {
+			running: false,
+			ticks: 0,
+			errors: [],
+		};
+	}
 
-  /** Start the heartbeat */
-  start(): void {
-    if (this.state.running) return;
+	/** Start the heartbeat */
+	start(): void {
+		if (this.state.running) return;
 
-    this.state.running = true;
+		this.state.running = true;
 
-    if (this.config.startImmediately) {
-      this.tick();
-    }
+		if (this.config.startImmediately) {
+			this.tick();
+		}
 
-    this.timer = setInterval(() => this.tick(), this.config.interval);
-  }
+		this.timer = setInterval(() => this.tick(), this.config.interval);
+	}
 
-  /** Stop the heartbeat */
-  stop(): void {
-    if (!this.state.running) return;
+	/** Stop the heartbeat */
+	stop(): void {
+		if (!this.state.running) return;
 
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
+		if (this.timer) {
+			clearInterval(this.timer);
+			this.timer = null;
+		}
 
-    this.state.running = false;
-  }
+		this.state.running = false;
+	}
 
-  /** Check if the heartbeat is running */
-  isRunning(): boolean {
-    return this.state.running;
-  }
+	/** Check if the heartbeat is running */
+	isRunning(): boolean {
+		return this.state.running;
+	}
 
-  /** Get the current state */
-  getState(): HeartbeatState {
-    return { ...this.state };
-  }
+	/** Get the current state */
+	getState(): HeartbeatState {
+		return { ...this.state };
+	}
 
-  /** Get the interval in ms */
-  getInterval(): number {
-    return this.config.interval;
-  }
+	/** Get the interval in ms */
+	getInterval(): number {
+		return this.config.interval;
+	}
 
-  /** Update the interval (resets the timer) */
-  setInterval(interval: number): void {
-    this.config.interval = interval;
-    this.stop();
-    this.start();
-  }
+	/** Update the interval (resets the timer) */
+	setInterval(interval: number): void {
+		this.config.interval = interval;
+		this.stop();
+		this.start();
+	}
 
-  // ── Private ──────────────────────────────────────────────────────────────
+	// ── Private ──────────────────────────────────────────────────────────────
 
-  private async tick(): Promise<void> {
-    this.state.ticks++;
-    this.state.lastTickAt = new Date();
+	private async tick(): Promise<void> {
+		this.state.ticks++;
+		this.state.lastTickAt = new Date();
 
-    try {
-      await this.config.onTick();
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      this.state.errors.push(errorMsg);
-      // Keep only last 100 errors
-      if (this.state.errors.length > 100) {
-        this.state.errors = this.state.errors.slice(-100);
-      }
-    }
-  }
+		try {
+			await this.config.onTick();
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			this.state.errors.push(errorMsg);
+			// Keep only last 100 errors
+			if (this.state.errors.length > 100) {
+				this.state.errors = this.state.errors.slice(-100);
+			}
+		}
+	}
 }

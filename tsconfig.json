@@ -19,5 +19,5 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],
-  "exclude": ["node_modules", "dist", "src/services", "src/agents", "src/commands"]
+  "exclude": ["node_modules", "dist", "src/services", "src/agents", "src/commands", "tests/e2e"]
 }
