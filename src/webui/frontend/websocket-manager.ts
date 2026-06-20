@@ -90,13 +90,6 @@ export class WebSocketManager {
 		this.notifyStatus(true);
 	}
 
-	private startPolling(interval: number): void {
-		this.clearPollingTimer();
-		this.pollingTimer = setInterval(() => {
-			this.pollForMessages();
-		}, interval);
-	}
-
 	private pollForMessages(): void {
 		// In a real implementation, this would fetch from the server
 		// For now, it's a no-op that can be extended
@@ -107,6 +100,20 @@ export class WebSocketManager {
 		this.pingTimer = setInterval(() => {
 			this.sendPing();
 		}, DEFAULT_PING_INTERVAL);
+		// Don't keep the process alive for timers — avoids test hangs
+		if (this.pingTimer?.unref) {
+			this.pingTimer.unref();
+		}
+	}
+
+	private startPolling(interval: number): void {
+		this.clearPollingTimer();
+		this.pollingTimer = setInterval(() => {
+			this.pollForMessages();
+		}, interval);
+		if (this.pollingTimer?.unref) {
+			this.pollingTimer.unref();
+		}
 	}
 
 	private clearTimers(): void {
