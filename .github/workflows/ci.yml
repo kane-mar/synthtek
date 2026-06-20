@@ -39,7 +39,9 @@ jobs:
         run: npm run build
 
       - name: Run tests
-        run: npm test
+        run: |
+          node --version
+          npm test
 
   lint:
     name: Lint Check
