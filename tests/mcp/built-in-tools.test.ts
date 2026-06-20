@@ -171,7 +171,7 @@ describe("MCPServer built-in tools", () => {
 
 			const result = await server.callTool("glob", {
 				pattern: "*.ts",
-				path: "/root/.nanobot/workspace/synthtek/src",
+				path: ".",
 			});
 
 			ok(result, "result returned");

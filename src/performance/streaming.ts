@@ -107,5 +107,8 @@ export class StreamOptimizer {
 		this._flushTimer = setInterval(() => {
 			this.flush();
 		}, this._config.flushIntervalMs);
+		if (this._flushTimer?.unref) {
+			this._flushTimer.unref();
+		}
 	}
 }
