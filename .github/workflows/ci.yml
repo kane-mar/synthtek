@@ -39,7 +39,7 @@ jobs:
         run: npm run build
 
       - name: Run tests
-        run: node --test --test-skip-pattern='/webui-e2e-playwright/' 'dist/tests/**/*.test.js'
+        run: npm test
 
   lint:
     name: Lint Check
