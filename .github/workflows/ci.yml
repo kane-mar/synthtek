@@ -39,10 +39,7 @@ jobs:
         run: npm run build
 
       - name: Run tests
-        run: node --test --test-concurrency=2 --test-skip-pattern='/webui-e2e-playwright/' 'dist/tests/**/*.test.js'
-
-      - name: Run tests with coverage
-        run: node --test --experimental-test-coverage --test-concurrency=2 --test-skip-pattern='/webui-e2e-playwright/' 'dist/tests/**/*.test.js'
+        run: node --test --test-skip-pattern='/webui-e2e-playwright/' 'dist/tests/**/*.test.js'
 
   lint:
     name: Lint Check
