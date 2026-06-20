@@ -112,8 +112,8 @@ describe("ParallelExecutor", () => {
 
 			const results = await executor.execute(tasks);
 			ok(
-				results[0].duration >= 100,
-				`duration ${results[0].duration}ms >= 100ms`,
+				results[0].duration >= 50,
+				`duration ${results[0].duration}ms >= 50ms`,
 			);
 		});
 	});

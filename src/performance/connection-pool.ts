@@ -174,5 +174,8 @@ export class ConnectionPool {
 			},
 			Math.min(this._config.idleTimeoutMs, 5_000),
 		);
+		if (this._idleCheckTimer?.unref) {
+			this._idleCheckTimer.unref();
+		}
 	}
 }

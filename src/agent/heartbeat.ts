@@ -37,6 +37,9 @@ export class HeartbeatManager {
 		}
 
 		this.timer = setInterval(() => this.tick(), this.config.interval);
+		if (this.timer?.unref) {
+			this.timer.unref();
+		}
 	}
 
 	/** Stop the heartbeat */
