@@ -114,24 +114,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.PRODUCTION_PORT || '22' }} -H ${{ secrets.PRODUCTION_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.PRODUCTION_HOST }}
-          port: ${{ secrets.PRODUCTION_PORT || '22' }}
-          username: ${{ secrets.PRODUCTION_USER }}
-          password: ${{ secrets.PRODUCTION_PASSWORD }}
-          key: ${{ secrets.PRODUCTION_SSH_KEY }}
-          script: |
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -p ${{ secrets.PRODUCTION_PORT || '22' }} \
+            ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "
             set -e
-            echo "Pulling latest image..."
+            echo 'Pulling latest image...'
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
-            echo "Stopping existing container..."
+            echo 'Stopping existing container...'
             docker stop synthtek 2>/dev/null || true
             docker rm synthtek 2>/dev/null || true
 
-            echo "Starting new container..."
+            echo 'Starting new container...'
             docker run -d \
               --name synthtek \
               --restart unless-stopped \
@@ -141,10 +145,11 @@ jobs:
               -e SYNTHTEK_PORT=8080 \
               ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
-            echo "Cleaning up old images..."
+            echo 'Cleaning up old images...'
             docker image prune -f
 
-            echo "✅ Production deployment complete"
+            echo '✅ Production deployment complete'
+          "
 
       - name: Health check
         run: |
