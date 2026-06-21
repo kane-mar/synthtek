@@ -109,53 +109,42 @@ jobs:
     name: Deploy to Production
     needs: [docker]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up SSH key
+      - name: Deploy
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
+          set -e
+          echo 'Pulling latest image...'
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
-      - name: Deploy via SSH
-        run: |
-          ssh -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -p ${{ secrets.PRODUCTION_PORT || '22' }} \
-            ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "
-            set -e
-            echo 'Pulling latest image...'
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          echo 'Stopping existing container...'
+          docker stop synthtek 2>/dev/null || true
+          docker rm synthtek 2>/dev/null || true
 
-            echo 'Stopping existing container...'
-            docker stop synthtek 2>/dev/null || true
-            docker rm synthtek 2>/dev/null || true
+          echo 'Starting new container...'
+          docker run -d \
+            --name synthtek \
+            --restart unless-stopped \
+            -p ${{ secrets.PRODUCTION_PORT_MAPPING || '8080:8080' }} \
+            -v /volume1/docker/synthtek/config:/root/.synthtek/config \
+            -v /volume1/docker/synthtek/data:/root/.synthtek/data \
+            -e SYNTHTEK_PORT=8080 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
-            echo 'Starting new container...'
-            docker run -d \
-              --name synthtek \
-              --restart unless-stopped \
-              -p ${{ secrets.PRODUCTION_PORT_MAPPING || '8080:8080' }} \
-              -v /volume1/docker/synthtek/config:/root/.synthtek/config \
-              -v /volume1/docker/synthtek/data:/root/.synthtek/data \
-              -e SYNTHTEK_PORT=8080 \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          echo 'Cleaning up old images...'
+          docker image prune -f
 
-            echo 'Cleaning up old images...'
-            docker image prune -f
-
-            echo '✅ Production deployment complete'
-          "
+          echo '✅ Production deployment complete'
 
       - name: Health check
         run: |
           echo "Waiting for container to become healthy..."
           for i in $(seq 1 30); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-              http://${{ secrets.PRODUCTION_HOST }}:$(echo "${{ secrets.PRODUCTION_PORT_MAPPING || '8080' }}" | cut -d: -f1)/api/health \
+              http://localhost:$(echo "${{ secrets.PRODUCTION_PORT_MAPPING || '8080' }}" | cut -d: -f1)/api/health \
               || echo "000")
             if [ "$STATUS" = "200" ]; then
               echo "✅ Container is healthy"
