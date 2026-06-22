@@ -163,40 +163,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run API smoke tests against production
+      - name: Install Chromium system dependencies
         run: |
-          # Get the production container's IP on the Docker network
+          apt-get update -qq
+          apt-get install -y -qq libnspr4 libnss3 libatk1.0-0t64 libatk-bridge2.0-0t64 \
+            libcups2t64 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
+            libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2t64
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+
+      - name: Run full browser e2e tests against production
+        run: |
           SYNTHTEK_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' synthtek)
-          BASE="http://${SYNTHTEK_IP}:8080"
+          E2E_BASE_URL="http://${SYNTHTEK_IP}:8080" BASE_URL="http://${SYNTHTEK_IP}:8080" \
+            npx playwright test tests/e2e/*.spec.ts
 
-          echo "Testing production container at $BASE"
-
-          # Health endpoint
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/health" || echo "000")
-          if [ "$STATUS" = "200" ]; then
-            echo "✅ /api/health responds 200"
-          else
-            echo "❌ /api/health responded $STATUS"
-            exit 1
-          fi
-
-          # Frontend loads
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/" || echo "000")
-          if [ "$STATUS" = "200" ]; then
-            echo "✅ Frontend loads"
-          else
-            echo "❌ Frontend responded $STATUS"
-            exit 1
-          fi
-
-          # Check container is healthy via Docker
-          DOCKER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' synthtek)
-          if [ "$DOCKER_HEALTH" = "healthy" ]; then
-            echo "✅ Container health: $DOCKER_HEALTH"
-          else
-            echo "❌ Container health: $DOCKER_HEALTH"
-            exit 1
-          fi
-
-          echo ''
-          echo '✅ All production smoke tests passed'
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: test-results/
+          retention-days: 7
