@@ -142,15 +142,13 @@ jobs:
         run: |
           echo "Waiting for container to become healthy..."
           for i in $(seq 1 30); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-              http://localhost:$(echo "${{ secrets.PRODUCTION_PORT_MAPPING || '8080' }}" | cut -d: -f1)/api/health \
-              || echo "000")
-            if [ "$STATUS" = "200" ]; then
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' synthtek 2>/dev/null || echo "starting")
+            if [ "$STATUS" = "healthy" ]; then
               echo "✅ Container is healthy"
               break
             fi
             if [ "$i" = "30" ]; then
-              echo "❌ Container health check failed"
+              echo "❌ Container health check failed (status: $STATUS)"
               exit 1
             fi
             sleep 5
