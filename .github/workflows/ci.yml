@@ -171,13 +171,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build
+        run: npm run build
+
       - name: Install Playwright browsers
         run: npx playwright install chromium
 
       - name: Run e2e tests
-        run: |
-          SYNTHTEK_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' synthtek)
-          E2E_BASE_URL="http://${SYNTHTEK_IP}:8080" npm run test:e2e
+        run: npm run test:e2e
+        env:
+          # Point to the production container if e2e tests need it
+          E2E_BASE_URL: "http://$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' synthtek):8080"
 
       - name: Upload test artifacts
         if: failure()
