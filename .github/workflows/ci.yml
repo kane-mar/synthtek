@@ -177,7 +177,7 @@ jobs:
       - name: Run e2e tests
         run: |
           SYNTHTEK_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' synthtek)
-          BASE_URL="http://${SYNTHTEK_IP}:8080" npx playwright test tests/e2e/
+          BASE_URL="http://${SYNTHTEK_IP}:8080" npx playwright test tests/e2e/*.spec.ts
 
       - name: Upload test artifacts
         if: failure()
