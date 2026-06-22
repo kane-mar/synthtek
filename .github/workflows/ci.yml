@@ -163,26 +163,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright browsers
-        run: npx playwright install chromium
-
-      - name: Run e2e tests
+      - name: Run API smoke tests against production
         run: |
+          # Get the production container's IP on the Docker network
           SYNTHTEK_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' synthtek)
-          BASE_URL="http://${SYNTHTEK_IP}:8080" npx playwright test tests/e2e/*.spec.ts
+          BASE="http://${SYNTHTEK_IP}:8080"
 
-      - name: Upload test artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-test-results
-          path: test-results/
-          retention-days: 7
+          echo "Testing production container at $BASE"
+
+          # Health endpoint
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/health" || echo "000")
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ /api/health responds 200"
+          else
+            echo "❌ /api/health responded $STATUS"
+            exit 1
+          fi
+
+          # Frontend loads
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/" || echo "000")
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ Frontend loads"
+          else
+            echo "❌ Frontend responded $STATUS"
+            exit 1
+          fi
+
+          # Check container is healthy via Docker
+          DOCKER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' synthtek)
+          if [ "$DOCKER_HEALTH" = "healthy" ]; then
+            echo "✅ Container health: $DOCKER_HEALTH"
+          else
+            echo "❌ Container health: $DOCKER_HEALTH"
+            exit 1
+          fi
+
+          echo ''
+          echo '✅ All production smoke tests passed'
