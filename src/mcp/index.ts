@@ -4,7 +4,7 @@
 
 export { registerBuiltInTools } from "./built-in-tools.js";
 export { MCPClient } from "./client.js";
-export {
+export type {
 	JSONRPCRequest,
 	JSONRPCResponse,
 	MCPClientConfig,
