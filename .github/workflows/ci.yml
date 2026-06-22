@@ -163,13 +163,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Chromium system dependencies
-        run: |
-          apt-get update -qq
-          apt-get install -y -qq libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 \
-            libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
-            libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -178,8 +171,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright browsers
-        run: npx playwright install chromium
+      - name: Install Playwright system deps and browsers
+        run: |
+          npx playwright install-deps chromium
+          npx playwright install chromium
 
       - name: Run full browser e2e tests against production
         run: |
