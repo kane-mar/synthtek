@@ -18,12 +18,4 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // webServer is a fallback for CI/local when not using the Docker runner.
-  // For proper isolation, use: npm run test:e2e
-  webServer: {
-    command: 'node dist/src/webui/test-server.js',
-    port: 8080,
-    reuseExistingServer: true,
-    timeout: 10_000,
-  },
 });
