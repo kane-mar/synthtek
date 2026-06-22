@@ -175,10 +175,9 @@ jobs:
         run: npx playwright install chromium
 
       - name: Run e2e tests
-        run: npx playwright test --test-dir=tests/e2e
-        env:
-          # Point to production container via Docker bridge gateway
-          BASE_URL: "http://$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' synthtek):8080"
+        run: |
+          SYNTHTEK_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' synthtek)
+          BASE_URL="http://${SYNTHTEK_IP}:8080" npx playwright test tests/e2e/
 
       - name: Upload test artifacts
         if: failure()
