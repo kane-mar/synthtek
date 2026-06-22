@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-const BASE_URL = process.env.E2E_BASE_URL || process.env.BASE_URL || "http://localhost:8080";
+const BASE_URL =
+	process.env.E2E_BASE_URL || process.env.BASE_URL || "http://localhost:8080";
 
 test.describe("WebUI - Navigation & Default Page", () => {
 	test("loads the Chat page by default", async ({ page }) => {
