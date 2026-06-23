@@ -484,7 +484,7 @@ function renderChat(el) {
       // Build system message with language instruction
       let systemContent = agentConfig.systemPrompt;
       if (agentConfig.language && agentConfig.language !== 'English') {
-        systemContent += '\n\nYou must respond in ' + agentConfig.language + '.';
+        systemContent += '  You must respond in ' + agentConfig.language + '.';
       }
 
       // Build full message history from session
