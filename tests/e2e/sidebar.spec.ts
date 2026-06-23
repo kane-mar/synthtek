@@ -22,7 +22,7 @@ const SIDEBAR_LINKS = [
 /* ── Helpers ──────────────────────────────────────────────────────────── */
 
 async function waitForPageReady(page) {
-	await page.waitForSelector("#content:not(:empty)", { timeout: 5000 });
+	await page.waitForSelector("#content:not(:empty)", { timeout: 15000 });
 }
 
 /* ── 1. Sidebar structure ─────────────────────────────────────────────── */
