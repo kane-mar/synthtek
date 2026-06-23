@@ -7,6 +7,7 @@
 
 import { AnalyticsTracker } from "./analytics.js";
 import type {
+	AgentConfig,
 	AnalyticsSummary,
 	APIResponse,
 	CronJob,
@@ -33,6 +34,10 @@ export class WebUIBackend {
 	private readonly sessions: Map<string, Session> = new Map();
 	private readonly wsClients: Map<string, WebSocketClient> = new Map();
 	private readonly cronJobs: Map<string, CronJob> = new Map();
+	private agentConfig: AgentConfig = {
+		systemPrompt: "You are a helpful AI assistant.",
+		language: "English",
+	};
 	private startedAt: number | null = null;
 
 	constructor(config: WebUIConfig) {
@@ -290,6 +295,22 @@ export class WebUIBackend {
 		return this.cronJobs.delete(id);
 	}
 
+	// ── Agent Config ───────────────────────────────────────────────────────────
+
+	getAgentConfig(): AgentConfig {
+		return { ...this.agentConfig };
+	}
+
+	updateAgentConfig(update: Partial<AgentConfig>): AgentConfig {
+		if (update.systemPrompt !== undefined) {
+			this.agentConfig.systemPrompt = update.systemPrompt;
+		}
+		if (update.language !== undefined) {
+			this.agentConfig.language = update.language;
+		}
+		return this.getAgentConfig();
+	}
+
 	// ── REST API ───────────────────────────────────────────────────────────────
 
 	handleRequest(method: string, path: string, body: unknown): APIResponse {
@@ -395,6 +416,17 @@ export class WebUIBackend {
 				return { status: 200, body: { success: true } };
 			}
 			return { status: 404, body: { error: "Cron job not found" } };
+		}
+
+		// GET /api/config/agent
+		if (method === "GET" && path === "/api/config/agent") {
+			return { status: 200, body: this.getAgentConfig() };
+		}
+
+		// PUT /api/config/agent
+		if (method === "PUT" && path === "/api/config/agent") {
+			const req = body as Partial<AgentConfig>;
+			return { status: 200, body: this.updateAgentConfig(req) };
 		}
 
 		// GET /api/health

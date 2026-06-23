@@ -234,6 +234,12 @@ select.form-input{appearance:auto;cursor:pointer}
 .config-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 .config-tab:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:var(--radius)}
 
+/* Agent config */
+#config-agent textarea.form-input{min-height:200px;font-family:monospace;font-size:13px;line-height:1.5;resize:vertical}
+#config-agent .char-count{font-size:11px;color:var(--text-dim);text-align:right;margin-top:4px}
+#config-agent .save-status{font-size:12px;margin-left:8px;opacity:0;transition:opacity .3s}
+#config-agent .save-status.show{opacity:1}
+
 /* Scrollbar */
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -334,6 +340,12 @@ async function fetchJSONDelete(url) {
   const apiKey = typeof window !== 'undefined' && window.__synthtekApiKey;
   const headers = apiKey ? { Authorization: 'Bearer ' + apiKey } : {};
   return fetchJSON(url, { method: 'DELETE', headers });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
 }
 
 // ── Hash-based routing ───────────────────────────────────────────────────
@@ -465,8 +477,29 @@ function renderChat(el) {
         return;
       }
 
+      // Load agent config for system prompt + language
+      let agentConfig = { systemPrompt: 'You are a helpful AI assistant.', language: 'English' };
+      try { agentConfig = await fetchJSONGet(API+'/config/agent'); } catch{}
+
+      // Build system message with language instruction
+      let systemContent = agentConfig.systemPrompt;
+      if (agentConfig.language && agentConfig.language !== 'English') {
+        systemContent += '\n\nYou must respond in ' + agentConfig.language + '.';
+      }
+
+      // Build full message history from session
+      let history = [];
+      try { history = await fetchJSONGet(API+'/messages?sessionId='+sessionId); } catch{}
+      const historyMessages = Array.isArray(history)
+        ? history.map(m => ({ role: m.role, content: m.content }))
+        : [];
+      // The last message is the one we just added (user's text)
+      // Send system + full history to give the LLM full context
+      const messages = historyMessages;
+
       const response = await fetchJSONPost(API+'/chat/completions', {
-        messages: [{role: 'user', content: text}],
+        messages,
+        system: systemContent,
         providerId: active.id
       });
 
@@ -714,6 +747,7 @@ async function renderConfig(el, forcedTab) {
   const tab = forcedTab || 'providers';
   el.innerHTML = '<div class="config-tabs" role="tablist">' +
     '<button class="config-tab'+(tab==='providers'?' active':'')+'" data-config-tab="providers" role="tab">Providers</button>' +
+    '<button class="config-tab'+(tab==='agent'?' active':'')+'" data-config-tab="agent" role="tab">Agent</button>' +
     '<button class="config-tab'+(tab==='themes'?' active':'')+'" data-config-tab="themes" role="tab">Themes</button>' +
     '<button class="config-tab'+(tab==='channels'?' active':'')+'" data-config-tab="channels" role="tab">Channels</button>' +
     '</div><div id="config-panel"></div>';
@@ -727,6 +761,7 @@ async function renderConfig(el, forcedTab) {
 
   const panel = el.querySelector('#config-panel');
   if (tab === 'providers') await renderConfigProviders(panel);
+  else if (tab === 'agent') await renderConfigAgent(panel);
   else if (tab === 'themes') await renderConfigThemes(panel);
   else if (tab === 'channels') renderConfigChannels(panel);
 }
@@ -780,6 +815,77 @@ async function renderConfigThemes(el) {
       renderConfigThemes(el);
     };
   });
+}
+
+// ── Agent Config ──────────────────────────────────────────────────────────
+async function renderConfigAgent(el) {
+  let config = { systemPrompt: 'You are a helpful AI assistant.', language: 'English' };
+  try { config = await fetchJSONGet(API+'/config/agent'); } catch{}
+
+  el.innerHTML = '<div id="config-agent">' +
+    '<div class="card">' +
+      '<h3>Agent Configuration</h3>' +
+      '<p style="color:var(--text-dim);margin-bottom:16px;font-size:14px">Customize how the agent behaves and responds.</p>' +
+
+      '<div class="form-group">' +
+        '<label for="agent-language">Language</label>' +
+        '<select class="form-input" id="agent-language">' +
+          '<option value="English"'+(config.language==='English'?' selected':'')+'>English</option>' +
+          '<option value="Chinese"'+(config.language==='Chinese'?' selected':'')+'>中文 (Chinese)</option>' +
+          '<option value="Spanish"'+(config.language==='Spanish'?' selected':'')+'>Español (Spanish)</option>' +
+          '<option value="French"'+(config.language==='French'?' selected':'')+'>Français (French)</option>' +
+          '<option value="German"'+(config.language==='German'?' selected':'')+'>Deutsch (German)</option>' +
+          '<option value="Japanese"'+(config.language==='Japanese'?' selected':'')+'>日本語 (Japanese)</option>' +
+          '<option value="Korean"'+(config.language==='Korean'?' selected':'')+'>한국어 (Korean)</option>' +
+          '<option value="Portuguese"'+(config.language==='Portuguese'?' selected':'')+'>Português (Portuguese)</option>' +
+          '<option value="Arabic"'+(config.language==='Arabic'?' selected':'')+'>العربية (Arabic)</option>' +
+          '<option value="Russian"'+(config.language==='Russian'?' selected':'')+'>Русский (Russian)</option>' +
+          '<option value="Vietnamese"'+(config.language==='Vietnamese'?' selected':'')+'>Tiếng Việt (Vietnamese)</option>' +
+          '<option value="Thai"'+(config.language==='Thai'?' selected':'')+'>ไทย (Thai)</option>' +
+          '<option value="Indonesian"'+(config.language==='Indonesian'?' selected':'')+'>Bahasa Indonesia (Indonesian)</option>' +
+          '<option value="Hindi"'+(config.language==='Hindi'?' selected':'')+'>हिन्दी (Hindi)</option>' +
+        '</select>' +
+        '<p style="color:var(--text-dim);font-size:11px;margin-top:4px">The agent will respond in this language.</p>' +
+      '</div>' +
+
+      '<div class="form-group">' +
+        '<label for="agent-prompt">System Prompt</label>' +
+        '<textarea class="form-input" id="agent-prompt" placeholder="Enter system prompt...">'+escapeHtml(config.systemPrompt)+'</textarea>' +
+        '<div class="char-count"><span id="prompt-chars">'+config.systemPrompt.length+'</span> characters</div>' +
+      '</div>' +
+
+      '<div style="display:flex;align-items:center;margin-top:16px">' +
+        '<button class="btn btn-primary" id="save-agent-btn">Save</button>' +
+        '<span class="save-status" id="save-status"></span>' +
+      '</div>' +
+    '</div></div>';
+
+  // Character counter
+  const textarea = el.querySelector('#agent-prompt');
+  textarea.oninput = () => {
+    el.querySelector('#prompt-chars').textContent = textarea.value.length;
+  };
+
+  // Save
+  el.querySelector('#save-agent-btn').onclick = async () => {
+    const btn = el.querySelector('#save-agent-btn');
+    const status = el.querySelector('#save-status');
+    const lang = el.querySelector('#agent-language').value;
+    const prompt = el.querySelector('#agent-prompt').value;
+    btn.disabled = true;
+    status.textContent = 'Saving...';
+    status.className = 'save-status show';
+    try {
+      await fetchJSONPut(API+'/config/agent', { systemPrompt: prompt, language: lang });
+      status.textContent = '✓ Saved';
+      status.style.color = 'var(--green, #22c55e)';
+    } catch(e) {
+      status.textContent = '✗ Error: '+e.message;
+      status.style.color = 'var(--red, #ef4444)';
+    }
+    btn.disabled = false;
+    setTimeout(() => { status.className = 'save-status'; }, 2000);
+  };
 }
 
 function renderConfigChannels(el) {
@@ -1223,6 +1329,33 @@ export class WebUIServer {
 						sessionTimeout: this.config.sessionTimeout,
 						apiKeyConfigured: this.config.apiKey !== "",
 					});
+				}
+
+				// GET /api/config/agent — return agent config
+				if (req.method === "GET" && path === "/api/config/agent") {
+					return sendJson(res, 200, this.backend.getAgentConfig());
+				}
+
+				// PUT /api/config/agent — update agent config
+				if (req.method === "PUT" && path === "/api/config/agent") {
+					const update = body as Record<string, unknown>;
+					if (
+						typeof update.systemPrompt !== "undefined" &&
+						typeof update.systemPrompt !== "string"
+					) {
+						return sendJson(res, 400, { error: "systemPrompt must be a string" });
+					}
+					if (
+						typeof update.language !== "undefined" &&
+						typeof update.language !== "string"
+					) {
+						return sendJson(res, 400, { error: "language must be a string" });
+					}
+					return sendJson(
+						res,
+						200,
+						this.backend.updateAgentConfig(update as Partial<import("./types.js").AgentConfig>),
+					);
 				}
 
 				// ── Plugins ────────────────────────────────────────────────────────

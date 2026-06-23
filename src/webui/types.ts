@@ -171,3 +171,10 @@ export interface CronJob {
 	createdAt: number;
 	status: "active" | "paused" | "completed";
 }
+
+// ── Agent Config ────────────────────────────────────────────────────────────
+
+export interface AgentConfig {
+	systemPrompt: string;
+	language: string;
+}
