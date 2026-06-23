@@ -1081,7 +1081,7 @@ async function deleteProvider(id) {
     else throw new Error();
   } catch { document.getElementById('status-dot').style.background='var(--red)'; document.getElementById('status-text').textContent='Disconnected'; }
   navigate(pageFromHash());
-})();
+})().catch(e => console.error('Init error:', e));
 </script>
 </body>
 </html>`;

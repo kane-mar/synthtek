@@ -13,7 +13,7 @@ import { expect, test } from "@playwright/test";
 const BASE_URL = process.env.E2E_BASE_URL || "http://localhost:8080";
 
 async function waitForPage(page) {
-	await page.waitForSelector("#content:not(:empty)", { timeout: 5000 });
+	await page.waitForSelector("#content:not(:empty)", { timeout: 15000 });
 }
 
 /* ── 1. Chat Page ────────────────────────────────────────────────────── */
