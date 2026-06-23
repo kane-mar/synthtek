@@ -1344,21 +1344,23 @@ export class WebUIServer {
 						typeof update.systemPrompt !== "string"
 					) {
 						return sendJson(res, 400, {
-						error: "systemPrompt must be a string",
-					});
+							error: "systemPrompt must be a string",
+						});
 					}
 					if (
 						typeof update.language !== "undefined" &&
 						typeof update.language !== "string"
 					) {
 						return sendJson(res, 400, {
-						error: "language must be a string",
-					});
+							error: "language must be a string",
+						});
 					}
 					return sendJson(
 						res,
 						200,
-						this.backend.updateAgentConfig(update as Partial<import("./types.js").AgentConfig>),
+						this.backend.updateAgentConfig(
+							update as Partial<import("./types.js").AgentConfig>,
+						),
 					);
 				}
 
