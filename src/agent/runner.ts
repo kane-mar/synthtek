@@ -7,6 +7,7 @@ import type {
 	TelegramConfig,
 	TelegramMessage,
 } from "../channels/telegram/types.js";
+import { getSystemPrompt } from "../config/agent-config.js";
 import { SimpleLogger } from "../core/logger.js";
 import {
 	createFallbackProvider,
@@ -113,7 +114,7 @@ export class AgentRunner {
 
 		// Build loop config
 		const loopConfig: AgentLoopConfig = {
-			systemPrompt: config.systemPrompt ?? "You are a helpful AI assistant.",
+			systemPrompt: config.systemPrompt ?? getSystemPrompt(),
 			maxToolCalls: 20,
 			responseFormat: "markdown",
 			...config.loopConfig,

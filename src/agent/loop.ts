@@ -4,6 +4,7 @@
  */
 
 import { EventEmitter } from "node:events";
+import { getSystemPrompt } from "../config/agent-config.js";
 import type { LLMProvider, StreamChunk } from "../providers/types.js";
 import { ContextWindowManager } from "./context.js";
 import { AgentErrorHandler } from "./error-handler.js";
@@ -34,7 +35,7 @@ type LlmCallStrategy = (
 ) => Promise<LlmCallResult>;
 
 const DEFAULT_LOOP_CONFIG: AgentLoopConfig = {
-	systemPrompt: "You are a helpful AI assistant.",
+	systemPrompt: getSystemPrompt(),
 	maxToolCalls: 20,
 	retry: {
 		maxRetries: 3,

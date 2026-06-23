@@ -166,17 +166,18 @@ test.describe("Chat Page", () => {
 /* ── 2. Config / Settings Page Tabs ──────────────────────────────────── */
 
 test.describe("Settings Page - Tabs", () => {
-	test("config page has three tabs", async ({ page }) => {
+	test("config page has four tabs", async ({ page }) => {
 		await page.goto(BASE_URL);
 		await waitForPage(page);
 		await page.click('#sidebar nav a[data-page="config"]');
 		await waitForPage(page);
 
 		const tabs = page.locator(".config-tab");
-		await expect(tabs).toHaveCount(3);
+		await expect(tabs).toHaveCount(4);
 		await expect(tabs.nth(0)).toContainText("Providers");
-		await expect(tabs.nth(1)).toContainText("Themes");
-		await expect(tabs.nth(2)).toContainText("Channels");
+		await expect(tabs.nth(1)).toContainText("Agent");
+		await expect(tabs.nth(2)).toContainText("Themes");
+		await expect(tabs.nth(3)).toContainText("Channels");
 	});
 
 	test("Providers tab is active by default", async ({ page }) => {
@@ -197,8 +198,8 @@ test.describe("Settings Page - Tabs", () => {
 		await page.click('#sidebar nav a[data-page="config"]');
 		await waitForPage(page);
 
-		// Click Themes tab
-		await page.locator(".config-tab").nth(1).click();
+		// Click Themes tab (third tab)
+		await page.locator(".config-tab").nth(2).click();
 		await page.waitForTimeout(300);
 
 		// Verify themes content is visible
@@ -206,7 +207,7 @@ test.describe("Settings Page - Tabs", () => {
 		await expect(page.locator("text=Appearance")).toBeVisible();
 
 		// Themes tab should be active
-		const themesTab = page.locator(".config-tab").nth(1);
+		const themesTab = page.locator(".config-tab").nth(2);
 		await expect(themesTab).toHaveClass(/active/);
 	});
 
@@ -216,8 +217,8 @@ test.describe("Settings Page - Tabs", () => {
 		await page.click('#sidebar nav a[data-page="config"]');
 		await waitForPage(page);
 
-		// Click Channels tab (third tab)
-		await page.locator(".config-tab").nth(2).click();
+		// Click Channels tab (fourth tab)
+		await page.locator(".config-tab").nth(3).click();
 		await page.waitForTimeout(300);
 
 		// Verify channels content is visible — use a card title
@@ -226,7 +227,7 @@ test.describe("Settings Page - Tabs", () => {
 		await expect(page.locator('h3:has-text("Slack")')).toBeVisible();
 
 		// Channels tab should be active
-		const channelsTab = page.locator(".config-tab").nth(2);
+		const channelsTab = page.locator(".config-tab").nth(3);
 		await expect(channelsTab).toHaveClass(/active/);
 	});
 
@@ -239,15 +240,20 @@ test.describe("Settings Page - Tabs", () => {
 		// Start at Providers → should have add provider button
 		await expect(page.locator("#add-provider-btn")).toBeVisible();
 
-		// Switch to Themes
+		// Switch to Agent
 		await page.locator(".config-tab").nth(1).click();
 		await page.waitForTimeout(300);
-		await expect(page.locator(".theme-btn").first()).toBeVisible();
-		// Themes should NOT have add-provider-btn
+		await expect(page.locator("#agent-prompt")).toBeVisible();
+		// Agent should NOT have add-provider-btn
 		await expect(page.locator("#add-provider-btn")).not.toBeVisible();
 
-		// Switch to Channels
+		// Switch to Themes
 		await page.locator(".config-tab").nth(2).click();
+		await page.waitForTimeout(300);
+		await expect(page.locator(".theme-btn").first()).toBeVisible();
+
+		// Switch to Channels
+		await page.locator(".config-tab").nth(3).click();
 		await page.waitForTimeout(300);
 		await expect(page.locator('h3:has-text("Telegram")')).toBeVisible();
 
@@ -272,6 +278,181 @@ test.describe("Settings Page - Tabs", () => {
 		// Page should still be functional
 		await expect(page.locator("body")).toBeVisible();
 		await expect(page.locator("#add-provider-btn")).toBeVisible();
+	});
+});
+
+/* ── 7. Agent Configuration Tab ──────────────────────────────────────── */
+
+test.describe("Settings Page - Agent Config Tab", () => {
+	test("Agent tab renders with language dropdown and system prompt", async ({
+		page,
+	}) => {
+		await page.goto(BASE_URL);
+		await waitForPage(page);
+		await page.click('#sidebar nav a[data-page="config"]');
+		await waitForPage(page);
+
+		// Click Agent tab
+		await page.locator(".config-tab").nth(1).click();
+		await page.waitForTimeout(300);
+
+		// Should have language selector
+		await expect(page.locator("#agent-language")).toBeVisible();
+		// Should have system prompt textarea
+		await expect(page.locator("#agent-prompt")).toBeVisible();
+		// Should have save button
+		await expect(page.locator("#save-agent-btn")).toBeVisible();
+	});
+
+	test("Agent tab shows default language as English", async ({ page }) => {
+		await page.goto(BASE_URL);
+		await waitForPage(page);
+		await page.click('#sidebar nav a[data-page="config"]');
+		await waitForPage(page);
+
+		await page.locator(".config-tab").nth(1).click();
+		await page.waitForTimeout(300);
+
+		await expect(page.locator("#agent-language")).toHaveValue("English");
+	});
+
+	test("Agent tab shows saved system prompt", async ({ page }) => {
+		await page.goto(BASE_URL);
+		await waitForPage(page);
+		await page.click('#sidebar nav a[data-page="config"]');
+		await waitForPage(page);
+
+		await page.locator(".config-tab").nth(1).click();
+		await page.waitForTimeout(300);
+
+		// Textarea should not be empty
+		const promptVal = await page.locator("#agent-prompt").inputValue();
+		expect(promptVal.length).toBeGreaterThan(0);
+	});
+
+	test("changing language and saving works", async ({ page }) => {
+		await page.goto(BASE_URL);
+		await waitForPage(page);
+		await page.click('#sidebar nav a[data-page="config"]');
+		await waitForPage(page);
+
+		await page.locator(".config-tab").nth(1).click();
+		await page.waitForTimeout(300);
+
+		// Select Chinese
+		await page.locator("#agent-language").selectOption("Chinese");
+		await page.waitForTimeout(200);
+
+		// Save
+		await page.locator("#save-agent-btn").click();
+		await page.waitForTimeout(500);
+
+		// Should show success status
+		await expect(page.locator("#save-status")).toContainText("Saved");
+	});
+
+	test("changing system prompt and saving works", async ({ page }) => {
+		await page.goto(BASE_URL);
+		await waitForPage(page);
+		await page.click('#sidebar nav a[data-page="config"]');
+		await waitForPage(page);
+
+		await page.locator(".config-tab").nth(1).click();
+		await page.waitForTimeout(300);
+
+		// Type a custom prompt
+		const customPrompt = "You are a helpful assistant that speaks Chinese.";
+		await page.locator("#agent-prompt").fill(customPrompt);
+		await page.waitForTimeout(200);
+
+		// Save
+		await page.locator("#save-agent-btn").click();
+		await page.waitForTimeout(500);
+
+		// Should show success status
+		await expect(page.locator("#save-status")).toContainText("Saved");
+
+		// Verify the value persists after page reload
+		await page.reload();
+		await waitForPage(page);
+		await page.click('#sidebar nav a[data-page="config"]');
+		await waitForPage(page);
+		await page.locator(".config-tab").nth(1).click();
+		await page.waitForTimeout(300);
+
+		const promptVal = await page.locator("#agent-prompt").inputValue();
+		expect(promptVal).toBe(customPrompt);
+	});
+
+	test("character counter updates as user types", async ({ page }) => {
+		await page.goto(BASE_URL);
+		await waitForPage(page);
+		await page.click('#sidebar nav a[data-page="config"]');
+		await waitForPage(page);
+
+		await page.locator(".config-tab").nth(1).click();
+		await page.waitForTimeout(300);
+
+		// Get initial count
+		const initialCount = await page.locator("#prompt-chars").textContent();
+		const initialNum = parseInt(initialCount || "0", 10);
+
+		// Type additional text
+		await page.locator("#agent-prompt").fill("A".repeat(initialNum + 50));
+		await page.waitForTimeout(200);
+
+		// Character count should have increased
+		const newCount = await page.locator("#prompt-chars").textContent();
+		expect(parseInt(newCount || "0", 10)).toBe(initialNum + 50);
+	});
+
+	test("save button is disabled during save", async ({ page }) => {
+		await page.goto(BASE_URL);
+		await waitForPage(page);
+		await page.click('#sidebar nav a[data-page="config"]');
+		await waitForPage(page);
+
+		await page.locator(".config-tab").nth(1).click();
+		await page.waitForTimeout(300);
+
+		const saveBtn = page.locator("#save-agent-btn");
+		await expect(saveBtn).toBeEnabled();
+
+		// Click save — button should briefly disable
+		await saveBtn.click();
+		await expect(saveBtn).toBeDisabled();
+	});
+
+	test("switching language and restoring English round-trips correctly", async ({
+		page,
+	}) => {
+		await page.goto(BASE_URL);
+		await waitForPage(page);
+		await page.click('#sidebar nav a[data-page="config"]');
+		await waitForPage(page);
+
+		await page.locator(".config-tab").nth(1).click();
+		await page.waitForTimeout(300);
+
+		// Switch to French, save
+		await page.locator("#agent-language").selectOption("French");
+		await page.locator("#save-agent-btn").click();
+		await page.waitForTimeout(500);
+
+		// Switch back to English, save
+		await page.locator("#agent-language").selectOption("English");
+		await page.locator("#save-agent-btn").click();
+		await page.waitForTimeout(500);
+
+		// Reload and verify English is restored
+		await page.reload();
+		await waitForPage(page);
+		await page.click('#sidebar nav a[data-page="config"]');
+		await waitForPage(page);
+		await page.locator(".config-tab").nth(1).click();
+		await page.waitForTimeout(300);
+
+		await expect(page.locator("#agent-language")).toHaveValue("English");
 	});
 });
 

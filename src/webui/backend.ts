@@ -5,9 +5,12 @@
  * Handles sessions, messages, file uploads, authentication, and analytics.
  */
 
+import {
+	getAgentConfig as getSharedAgentConfig,
+	setAgentConfig as setSharedAgentConfig,
+} from "../config/agent-config.js";
 import { AnalyticsTracker } from "./analytics.js";
 import type {
-	AgentConfig,
 	AnalyticsSummary,
 	APIResponse,
 	CronJob,
@@ -34,9 +37,9 @@ export class WebUIBackend {
 	private readonly sessions: Map<string, Session> = new Map();
 	private readonly wsClients: Map<string, WebSocketClient> = new Map();
 	private readonly cronJobs: Map<string, CronJob> = new Map();
-	private agentConfig: AgentConfig = {
-		systemPrompt: "You are a helpful AI assistant.",
-		language: "English",
+	private agentConfig: import("./types.js").AgentConfig = {
+		systemPrompt: getSharedAgentConfig().systemPrompt,
+		language: getSharedAgentConfig().language,
 	};
 	private startedAt: number | null = null;
 
@@ -297,17 +300,27 @@ export class WebUIBackend {
 
 	// ── Agent Config ───────────────────────────────────────────────────────────
 
-	getAgentConfig(): AgentConfig {
+	getAgentConfig(): import("./types.js").AgentConfig {
+		const shared = getSharedAgentConfig();
+		this.agentConfig.systemPrompt = shared.systemPrompt;
+		this.agentConfig.language = shared.language;
 		return { ...this.agentConfig };
 	}
 
-	updateAgentConfig(update: Partial<AgentConfig>): AgentConfig {
+	updateAgentConfig(
+		update: Partial<import("./types.js").AgentConfig>,
+	): import("./types.js").AgentConfig {
 		if (update.systemPrompt !== undefined) {
 			this.agentConfig.systemPrompt = update.systemPrompt;
 		}
 		if (update.language !== undefined) {
 			this.agentConfig.language = update.language;
 		}
+		// Persist to shared config (writes to disk, propagates to AgentLoop, CLI, etc.)
+		setSharedAgentConfig({
+			systemPrompt: this.agentConfig.systemPrompt,
+			language: this.agentConfig.language,
+		});
 		return this.getAgentConfig();
 	}
 
@@ -425,7 +438,7 @@ export class WebUIBackend {
 
 		// PUT /api/config/agent
 		if (method === "PUT" && path === "/api/config/agent") {
-			const req = body as Partial<AgentConfig>;
+			const req = body as Partial<import("./types.js").AgentConfig>;
 			return { status: 200, body: this.updateAgentConfig(req) };
 		}
 

@@ -4,6 +4,7 @@
 
 import type { Command } from "commander";
 import { AgentLoop } from "../../agent/index.js";
+import { getSystemPrompt } from "../../config/agent-config.js";
 import { logger } from "../cli-context.js";
 
 export function registerChatCommand(program: Command): void {
@@ -25,7 +26,7 @@ export function registerChatCommand(program: Command): void {
 			) => {
 				try {
 					const agent = new AgentLoop({
-						systemPrompt: opts.prompt || "You are a helpful AI assistant.",
+						systemPrompt: opts.prompt || getSystemPrompt(),
 						maxToolCalls: 20,
 						model: opts.model,
 					});

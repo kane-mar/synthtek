@@ -4,6 +4,7 @@
 
 import { Command } from "commander";
 import { AgentLoop } from "../../agent/index.js";
+import { getSystemPrompt } from "../../config/agent-config.js";
 import { logger } from "../cli-context.js";
 
 export function registerAgentCommand(program: Command): void {
@@ -24,7 +25,7 @@ export function registerAgentCommand(program: Command): void {
 					}) => {
 						try {
 							const agent = new AgentLoop({
-								systemPrompt: opts.prompt || "You are a helpful AI assistant.",
+								systemPrompt: opts.prompt || getSystemPrompt(),
 								maxToolCalls: 20,
 								model: opts.model,
 								temperature: parseFloat(opts.temperature || "0.7"),
@@ -62,7 +63,7 @@ export function registerAgentCommand(program: Command): void {
 				.action(async (message: string, opts: { model?: string }) => {
 					try {
 						const agent = new AgentLoop({
-							systemPrompt: "You are a helpful AI assistant.",
+							systemPrompt: getSystemPrompt(),
 							maxToolCalls: 20,
 							model: opts.model,
 						});

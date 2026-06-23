@@ -2,6 +2,7 @@
  * Configuration module — schema, loader, secrets, multi-instance, hot-reload
  */
 
+export * from "./agent-config.js";
 export * from "./hot-reload.js";
 export * from "./loader.js";
 export * from "./multi-instance.js";

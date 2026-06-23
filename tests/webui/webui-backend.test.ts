@@ -4,6 +4,7 @@
 
 import { ok, strictEqual } from "node:assert";
 import { beforeEach, describe, it } from "node:test";
+import { deleteAgentConfigFile } from "../../src/config/agent-config.js";
 import { WebUIBackend } from "../../src/webui/backend.js";
 import type { WebUIConfig } from "../../src/webui/types.js";
 
@@ -19,6 +20,8 @@ describe("WebUIBackend", () => {
 	let backend: WebUIBackend;
 
 	beforeEach(() => {
+		// Reset shared agent config first so each test starts fresh
+		deleteAgentConfigFile();
 		backend = new WebUIBackend(defaultConfig);
 	});
 
@@ -251,6 +254,82 @@ describe("WebUIBackend", () => {
 				sessionActivity: { totalSessions: number };
 			};
 			ok(summary.sessionActivity.totalSessions >= 0, "has session count");
+		});
+	});
+
+	describe("agent config", () => {
+		it("returns default agent config via GET", () => {
+			const handler = backend.handleRequest("GET", "/api/config/agent", {});
+			strictEqual(handler.status, 200);
+			const config = handler.body as Record<string, unknown>;
+			ok(config, "has body");
+			const prompt = (config as Record<string, unknown>).systemPrompt as string;
+			ok(prompt.startsWith("### Role and Persona"), "starts with role header");
+			ok(prompt.length > 200, "prompt is sufficiently detailed");
+			strictEqual((config as Record<string, unknown>).language, "English");
+		});
+
+		it("updates system prompt via PUT", () => {
+			const handler = backend.handleRequest("PUT", "/api/config/agent", {
+				systemPrompt: "You are a math tutor.",
+			});
+			strictEqual(handler.status, 200);
+			const config = handler.body as Record<string, unknown>;
+			strictEqual(config.systemPrompt, "You are a math tutor.");
+			strictEqual(config.language, "English");
+		});
+
+		it("updates language via PUT", () => {
+			const handler = backend.handleRequest("PUT", "/api/config/agent", {
+				language: "Chinese",
+			});
+			strictEqual(handler.status, 200);
+			const config = handler.body as Record<string, unknown>;
+			strictEqual(config.language, "Chinese");
+			const prompt1 = config.systemPrompt as string;
+			ok(prompt1.startsWith("### Role and Persona"), "system prompt unchanged");
+		});
+
+		it("returns updated config after multiple PUTs", () => {
+			backend.handleRequest("PUT", "/api/config/agent", {
+				systemPrompt: "Be concise.",
+				language: "German",
+			});
+			const handler = backend.handleRequest("GET", "/api/config/agent", {});
+			strictEqual(handler.status, 200);
+			const config = handler.body as Record<string, unknown>;
+			strictEqual(config.systemPrompt, "Be concise.");
+			strictEqual(config.language, "German");
+		});
+
+		it("accepts any type (backend does not validate — server layer validates)", () => {
+			// Backend handleRequest is type-agnostic; validation is in server.ts HTTP layer
+			const handler = backend.handleRequest("PUT", "/api/config/agent", {
+				systemPrompt: 123,
+				language: 456,
+			});
+			strictEqual(handler.status, 200);
+		});
+
+		it("does not modify config when update is empty", () => {
+			const handler = backend.handleRequest("PUT", "/api/config/agent", {});
+			strictEqual(handler.status, 200);
+			const config = handler.body as Record<string, unknown>;
+			const prompt2 = config.systemPrompt as string;
+			ok(prompt2.startsWith("### Role and Persona"), "system prompt unchanged");
+			strictEqual(config.language, "English");
+		});
+
+		it("returns a copy not a reference", () => {
+			const handler1 = backend.handleRequest("GET", "/api/config/agent", {});
+			const config1 = handler1.body as Record<string, unknown>;
+			config1.systemPrompt = "Hacked!";
+			const handler2 = backend.handleRequest("GET", "/api/config/agent", {});
+			const config2 = handler2.body as Record<string, unknown>;
+			ok(
+				(config2.systemPrompt as string).startsWith("### Role and Persona"),
+				"original unchanged",
+			);
 		});
 	});
 });

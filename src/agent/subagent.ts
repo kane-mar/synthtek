@@ -6,6 +6,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { getSystemPrompt } from "../config/agent-config.js";
 import { SimpleLogger } from "../core/logger.js";
 import type { LLMProvider } from "../providers/types.js";
 import { AgentLoop } from "./loop.js";
@@ -70,7 +71,8 @@ export class SubagentSpawner {
 		const loopConfig: AgentLoopConfig = {
 			systemPrompt:
 				config.systemPrompt ??
-				"You are a helpful AI assistant working on a specific task.",
+				getSystemPrompt() +
+					"\n\nYou are working on a specific delegated task for the main agent.",
 			maxToolCalls: config.maxToolCalls ?? 15,
 			model: config.model,
 			temperature: config.temperature,
