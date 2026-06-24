@@ -264,8 +264,9 @@ describe("WebUIBackend", () => {
 			const config = handler.body as Record<string, unknown>;
 			ok(config, "has body");
 			const prompt = (config as Record<string, unknown>).systemPrompt as string;
-			ok(prompt.startsWith("You are a helpful"), "starts with friendly intro");
-			strictEqual(prompt, "You are a helpful AI assistant.", "prompt matches default");
+			ok(prompt.startsWith("You are an elite,"), "starts with new default prompt header");
+			ok(prompt.includes("Ownership"), "contains Ownership mandate");
+			ok(prompt.includes("Execution Framework"), "contains Execution Framework section");
 			strictEqual((config as Record<string, unknown>).language, "English");
 		});
 
@@ -287,7 +288,7 @@ describe("WebUIBackend", () => {
 			const config = handler.body as Record<string, unknown>;
 			strictEqual(config.language, "Chinese");
 			const prompt1 = config.systemPrompt as string;
-			strictEqual(prompt1, "You are a helpful AI assistant.", "system prompt unchanged");
+			ok(prompt1.startsWith("You are an elite,"), "system prompt unchanged from default");
 		});
 
 		it("returns updated config after multiple PUTs", () => {
@@ -316,7 +317,7 @@ describe("WebUIBackend", () => {
 			strictEqual(handler.status, 200);
 			const config = handler.body as Record<string, unknown>;
 			const prompt2 = config.systemPrompt as string;
-			strictEqual(prompt2, "You are a helpful AI assistant.", "system prompt unchanged");
+			ok(prompt2.startsWith("You are an elite,"), "system prompt unchanged from default");
 			strictEqual(config.language, "English");
 		});
 
@@ -326,9 +327,8 @@ describe("WebUIBackend", () => {
 			config1.systemPrompt = "Hacked!";
 			const handler2 = backend.handleRequest("GET", "/api/config/agent", {});
 			const config2 = handler2.body as Record<string, unknown>;
-			strictEqual(
-				config2.systemPrompt as string,
-				"You are a helpful AI assistant.",
+			ok(
+				(config2.systemPrompt as string).startsWith("You are an elite,"),
 				"original unchanged",
 			);
 		});
