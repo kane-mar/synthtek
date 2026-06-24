@@ -406,7 +406,7 @@ test.describe("Settings Page - Agent Config Tab", () => {
 		expect(parseInt(newCount || "0", 10)).toBe(initialNum + 50);
 	});
 
-	test("save button is disabled during save", async ({ page }) => {
+	test("saving agent config shows status indicator", async ({ page }) => {
 		await page.goto(BASE_URL);
 		await waitForPage(page);
 		await page.click('#sidebar nav a[data-page="config"]');
@@ -416,11 +416,15 @@ test.describe("Settings Page - Agent Config Tab", () => {
 		await page.waitForTimeout(300);
 
 		const saveBtn = page.locator("#save-agent-btn");
+		const saveStatus = page.locator("#save-status");
 		await expect(saveBtn).toBeEnabled();
+		await expect(saveStatus).not.toBeVisible();
 
-		// Click save — button should briefly disable
-		await saveBtn.dispatchEvent("click");
-		await expect(saveBtn).toBeDisabled({ timeout: 2000 });
+		// Click save — status should show "Saving..." then "✓ Saved"
+		await saveBtn.click();
+		await expect(saveStatus).toContainText("Saving...", { timeout: 2000 });
+		await expect(saveStatus).toContainText("✓ Saved", { timeout: 5000 });
+		await expect(saveBtn).toBeEnabled();
 	});
 
 	test("switching language and restoring English round-trips correctly", async ({

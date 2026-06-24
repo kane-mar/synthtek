@@ -867,8 +867,8 @@ async function renderConfigAgent(el) {
   };
 
   // Save
-  el.querySelector('#save-agent-btn').onclick = async () => {
-    const btn = el.querySelector('#save-agent-btn');
+  el.querySelector('#save-agent-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
     const status = el.querySelector('#save-status');
     const lang = el.querySelector('#agent-language').value;
     const prompt = el.querySelector('#agent-prompt').value;
@@ -885,7 +885,7 @@ async function renderConfigAgent(el) {
     }
     btn.disabled = false;
     setTimeout(() => { status.className = 'save-status'; }, 2000);
-  };
+  });
 }
 
 function renderConfigChannels(el) {
