@@ -419,8 +419,8 @@ test.describe("Settings Page - Agent Config Tab", () => {
 		await expect(saveBtn).toBeEnabled();
 
 		// Click save — button should briefly disable
-		await saveBtn.click();
-		await expect(saveBtn).toBeDisabled();
+		await saveBtn.dispatchEvent("click");
+		await expect(saveBtn).toBeDisabled({ timeout: 2000 });
 	});
 
 	test("switching language and restoring English round-trips correctly", async ({
