@@ -264,9 +264,15 @@ describe("WebUIBackend", () => {
 			const config = handler.body as Record<string, unknown>;
 			ok(config, "has body");
 			const prompt = (config as Record<string, unknown>).systemPrompt as string;
-			ok(prompt.startsWith("You are an elite,"), "starts with new default prompt header");
+			ok(
+				prompt.startsWith("You are an elite,"),
+				"starts with new default prompt header",
+			);
 			ok(prompt.includes("Ownership"), "contains Ownership mandate");
-			ok(prompt.includes("Execution Framework"), "contains Execution Framework section");
+			ok(
+				prompt.includes("Execution Framework"),
+				"contains Execution Framework section",
+			);
 			strictEqual((config as Record<string, unknown>).language, "English");
 		});
 
@@ -288,7 +294,10 @@ describe("WebUIBackend", () => {
 			const config = handler.body as Record<string, unknown>;
 			strictEqual(config.language, "Chinese");
 			const prompt1 = config.systemPrompt as string;
-			ok(prompt1.startsWith("You are an elite,"), "system prompt unchanged from default");
+			ok(
+				prompt1.startsWith("You are an elite,"),
+				"system prompt unchanged from default",
+			);
 		});
 
 		it("returns updated config after multiple PUTs", () => {
@@ -317,7 +326,10 @@ describe("WebUIBackend", () => {
 			strictEqual(handler.status, 200);
 			const config = handler.body as Record<string, unknown>;
 			const prompt2 = config.systemPrompt as string;
-			ok(prompt2.startsWith("You are an elite,"), "system prompt unchanged from default");
+			ok(
+				prompt2.startsWith("You are an elite,"),
+				"system prompt unchanged from default",
+			);
 			strictEqual(config.language, "English");
 		});
 
