@@ -38,6 +38,14 @@ Adhere strictly to the following operating principles:
 
 export const DEFAULT_LANGUAGE = "English";
 
+/**
+ * Stale-config detection: when this hash differs from what's stored in the
+ * persisted config file, the config is treated as stale and DEFAULT_CONFIG
+ * is returned instead.  Bump this when DEFAULT_SYSTEM_PROMPT changes so that
+ * old persisted configs are automatically invalidated.
+ */
+const DEFAULT_PROMPT_HASH = hashString(DEFAULT_SYSTEM_PROMPT);
+
 const DEFAULT_CONFIG: AgentPersistedConfig = {
 	systemPrompt: DEFAULT_SYSTEM_PROMPT,
 	language: DEFAULT_LANGUAGE,
@@ -48,6 +56,18 @@ const DEFAULT_CONFIG: AgentPersistedConfig = {
 export interface AgentPersistedConfig {
 	systemPrompt: string;
 	language: string;
+	/** Hash of DEFAULT_SYSTEM_PROMPT at time of save. Stale when code changes. */
+	defaultPromptHash?: string;
+}
+
+// ── Simple string hash (fast, stable, no dependencies) ──────────────────────
+
+function hashString(s: string): string {
+	let h = 0;
+	for (let i = 0; i < s.length; i++) {
+		h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+	}
+	return h.toString(16);
 }
 
 // ── Config file path (resolve relative to project root) ──────────────────────
@@ -82,6 +102,13 @@ export function getAgentConfig(): AgentPersistedConfig {
 		if (existsSync(filePath)) {
 			const raw = readFileSync(filePath, "utf-8");
 			const parsed = JSON.parse(raw) as Partial<AgentPersistedConfig>;
+			// If the persisted config was saved against a different DEFAULT_SYSTEM_PROMPT
+			// (e.g. after a code deployment), treat it as stale and return the new default.
+			if (parsed.defaultPromptHash !== DEFAULT_PROMPT_HASH) {
+				// Config is stale — ignore the file, use default
+				cachedConfig = { ...DEFAULT_CONFIG };
+				return { ...cachedConfig };
+			}
 			cachedConfig = {
 				systemPrompt: parsed.systemPrompt ?? DEFAULT_CONFIG.systemPrompt,
 				language: parsed.language ?? DEFAULT_CONFIG.language,
@@ -101,6 +128,7 @@ export function setAgentConfig(
 	const merged: AgentPersistedConfig = {
 		systemPrompt: update.systemPrompt ?? current.systemPrompt,
 		language: update.language ?? current.language,
+		defaultPromptHash: DEFAULT_PROMPT_HASH,
 	};
 
 	const filePath = configFilePath();
@@ -140,4 +168,10 @@ export function deleteAgentConfigFile(): void {
 	} catch {
 		// ignore
 	}
+}
+
+/** Reset agent config to defaults and delete persisted file */
+export function resetAgentConfig(): AgentPersistedConfig {
+	deleteAgentConfigFile();
+	return { ...DEFAULT_CONFIG };
 }

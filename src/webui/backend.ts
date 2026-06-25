@@ -7,6 +7,7 @@
 
 import {
 	getAgentConfig as getSharedAgentConfig,
+	resetAgentConfig as resetSharedAgentConfig,
 	setAgentConfig as setSharedAgentConfig,
 } from "../config/agent-config.js";
 import { AnalyticsTracker } from "./analytics.js";
@@ -324,6 +325,13 @@ export class WebUIBackend {
 		return this.getAgentConfig();
 	}
 
+	resetAgentConfig(): import("./types.js").AgentConfig {
+		const defaults = resetSharedAgentConfig();
+		this.agentConfig.systemPrompt = defaults.systemPrompt;
+		this.agentConfig.language = defaults.language;
+		return { ...this.agentConfig };
+	}
+
 	// ── REST API ───────────────────────────────────────────────────────────────
 
 	handleRequest(method: string, path: string, body: unknown): APIResponse {
@@ -440,6 +448,11 @@ export class WebUIBackend {
 		if (method === "PUT" && path === "/api/config/agent") {
 			const req = body as Partial<import("./types.js").AgentConfig>;
 			return { status: 200, body: this.updateAgentConfig(req) };
+		}
+
+		// DELETE /api/config/agent — reset to defaults
+		if (method === "DELETE" && path === "/api/config/agent") {
+			return { status: 200, body: this.resetAgentConfig() };
 		}
 
 		// GET /api/health

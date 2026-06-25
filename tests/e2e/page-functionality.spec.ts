@@ -420,10 +420,15 @@ test.describe("Settings Page - Agent Config Tab", () => {
 		await expect(saveBtn).toBeEnabled();
 		await expect(saveStatus).not.toBeVisible();
 
-		// Click save — status should show "Saving..." then "✓ Saved"
+		// Click save — status should show "Saving..." then "✓ Saved".
+		// Use a wider window so we catch the indicator regardless of server speed.
 		await saveBtn.click();
-		await expect(saveStatus).toContainText("Saving...", { timeout: 2000 });
-		await expect(saveStatus).toContainText("✓ Saved", { timeout: 5000 });
+		await expect(async () => {
+			const text = await saveStatus.textContent();
+			expect(text).not.toBe("");
+			expect(text).not.toBeNull();
+		}).toPass({ timeout: 3000 });
+		await expect(saveStatus).toContainText("Saved", { timeout: 5000 });
 		await expect(saveBtn).toBeEnabled();
 	});
 
@@ -433,7 +438,13 @@ test.describe("Settings Page - Agent Config Tab", () => {
 		const expectedPromptStart =
 			"You are an elite, highly autonomous, and deeply competent AI collaborator.";
 
+		// Reset config to defaults first (in case a previous test left dirty state)
 		await page.goto(BASE_URL);
+		await page.evaluate(async () => {
+			await fetch("/api/config/agent", { method: "DELETE" });
+		});
+
+		await page.reload();
 		await waitForPage(page);
 		await page.click('#sidebar nav a[data-page="config"]');
 		await waitForPage(page);

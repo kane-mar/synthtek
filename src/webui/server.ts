@@ -1336,6 +1336,11 @@ export class WebUIServer {
 					return sendJson(res, 200, this.backend.getAgentConfig());
 				}
 
+				// DELETE /api/config/agent — reset to defaults
+				if (req.method === "DELETE" && path === "/api/config/agent") {
+					return sendJson(res, 200, this.backend.resetAgentConfig());
+				}
+
 				// PUT /api/config/agent — update agent config
 				if (req.method === "PUT" && path === "/api/config/agent") {
 					const update = body as Record<string, unknown>;
