@@ -312,13 +312,12 @@ describe("WebUIBackend", () => {
 			strictEqual(config.language, "German");
 		});
 
-		it("accepts any type (backend does not validate — server layer validates)", () => {
-			// Backend handleRequest is type-agnostic; validation is in server.ts HTTP layer
+		it("rejects invalid types via validation", () => {
 			const handler = backend.handleRequest("PUT", "/api/config/agent", {
 				systemPrompt: 123,
 				language: 456,
 			});
-			strictEqual(handler.status, 200);
+			strictEqual(handler.status, 400);
 		});
 
 		it("does not modify config when update is empty", () => {
@@ -343,6 +342,36 @@ describe("WebUIBackend", () => {
 				(config2.systemPrompt as string).startsWith("You are an elite,"),
 				"original unchanged",
 			);
+		});
+
+		it("resets to defaults via DELETE", () => {
+			// First change the config
+			backend.handleRequest("PUT", "/api/config/agent", {
+				systemPrompt: "Custom prompt",
+				language: "French",
+			});
+			let config = backend.handleRequest("GET", "/api/config/agent", {})
+				.body as Record<string, unknown>;
+			strictEqual(config.systemPrompt, "Custom prompt");
+
+			// Reset via DELETE
+			const handler = backend.handleRequest("DELETE", "/api/config/agent", {});
+			strictEqual(handler.status, 200);
+			config = handler.body as Record<string, unknown>;
+			ok(
+				(config.systemPrompt as string).startsWith("You are an elite,"),
+				"reset to default prompt",
+			);
+			strictEqual(config.language, "English");
+
+			// Verify subsequent GET also returns defaults
+			const getHandler = backend.handleRequest("GET", "/api/config/agent", {});
+			const getConfig = getHandler.body as Record<string, unknown>;
+			ok(
+				(getConfig.systemPrompt as string).startsWith("You are an elite,"),
+				"GET after reset returns defaults",
+			);
+			strictEqual(getConfig.language, "English");
 		});
 	});
 });

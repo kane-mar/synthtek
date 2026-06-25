@@ -26,8 +26,35 @@ import type {
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
+/** Built-in theme definitions served by GET /api/themes */
+const AVAILABLE_THEMES: Array<{ id: string; name: string }> = [
+	{ id: "dark", name: "Dark (GitHub)" },
+	{ id: "light", name: "Light" },
+	{ id: "midnight", name: "Midnight" },
+	{ id: "ocean", name: "Ocean" },
+	{ id: "nord", name: "Nord" },
+];
+
 function generateId(): string {
 	return `_${Math.random().toString(36).slice(2, 11)}`;
+}
+
+type RouteHandler = (body: unknown, params: RouteParams) => APIResponse;
+
+interface RouteEntry {
+	method: string;
+	/** Exact path, e.g. "/api/sessions" */
+	exactPath?: string;
+	/** Prefix path for routes with path params, e.g. "/api/tools/" */
+	prefixPath?: string;
+	/** Name of the dynamic path parameter (e.g. "name" for /api/tools/:name) */
+	paramName?: string;
+	handler: RouteHandler;
+}
+
+export interface RouteParams extends Record<string, string> {
+	/** Full path including query string, if available */
+	_fullPath: string;
 }
 
 export class WebUIBackend {
@@ -38,6 +65,7 @@ export class WebUIBackend {
 	private readonly sessions: Map<string, Session> = new Map();
 	private readonly wsClients: Map<string, WebSocketClient> = new Map();
 	private readonly cronJobs: Map<string, CronJob> = new Map();
+	private readonly routes: RouteEntry[] = [];
 	private agentConfig: import("./types.js").AgentConfig = {
 		systemPrompt: getSharedAgentConfig().systemPrompt,
 		language: getSharedAgentConfig().language,
@@ -48,6 +76,199 @@ export class WebUIBackend {
 		this.config = config;
 		this.analytics = new AnalyticsTracker();
 		this.initDefaultTools();
+		this.initRoutes();
+	}
+
+	// ── Route Registration ────────────────────────────────────────────────────
+
+	private initRoutes(): void {
+		this.get("/api/sessions", (_body, _params) => ({
+			status: 200,
+			body: this.listSessions(),
+		}));
+
+		this.post("/api/sessions", (body) => {
+			const req = body as { userId?: string };
+			const session = this.createSession(req.userId ?? "anonymous");
+			if (session) {
+				return { status: 201, body: session };
+			}
+			return { status: 400, body: { error: "Max sessions reached" } };
+		});
+
+		this.getWithPrefix("/api/messages", (_body, params) => {
+			const url = new URL(params._fullPath, "http://localhost");
+			const sessionId = url.searchParams.get("sessionId") ?? "";
+			return { status: 200, body: this.getMessages(sessionId) };
+		});
+
+		this.post("/api/messages", (body) => {
+			const req = body as {
+				sessionId?: string;
+				role?: string;
+				content?: string;
+			};
+			const message = this.addMessage(req.sessionId ?? "", {
+				role: req.role as "user" | "assistant" | "system",
+				content: req.content ?? "",
+			});
+			if (message) {
+				return { status: 201, body: message };
+			}
+			return { status: 404, body: { error: "Session not found" } };
+		});
+
+		this.get("/api/tools", (_body, _params) => ({
+			status: 200,
+			body: this.listTools(),
+		}));
+
+		this.post("/api/tools", (body) => {
+			const req = body as {
+				name?: string;
+				description?: string;
+				category?: string;
+			};
+			if (!req.name) {
+				return { status: 400, body: { error: "name is required" } };
+			}
+			if (this.tools.has(req.name)) {
+				return { status: 409, body: { error: "Tool already exists" } };
+			}
+			const tool = this.addTool(
+				req.name,
+				req.description || "",
+				req.category || "custom",
+			);
+			return { status: 201, body: tool };
+		});
+
+		this.delete("/api/tools/:name", (_body, params) => {
+			const name = decodeURIComponent(params.name);
+			if (this.deleteTool(name)) {
+				return { status: 200, body: { success: true } };
+			}
+			return { status: 404, body: { error: "Tool not found" } };
+		});
+
+		this.get("/api/cron", (_body, _params) => ({
+			status: 200,
+			body: this.listCronJobs(),
+		}));
+
+		this.post("/api/cron", (body) => {
+			const req = body as { schedule?: string; message?: string };
+			if (!req.schedule || !req.message) {
+				return {
+					status: 400,
+					body: { error: "schedule and message are required" },
+				};
+			}
+			const job = this.createCronJob(req.schedule, req.message);
+			return { status: 201, body: job };
+		});
+
+		this.delete("/api/cron/:id", (_body, params) => {
+			const id = params.id;
+			if (this.deleteCronJob(id)) {
+				return { status: 200, body: { success: true } };
+			}
+			return { status: 404, body: { error: "Cron job not found" } };
+		});
+
+		this.get("/api/config/agent", (_body, _params) => ({
+			status: 200,
+			body: this.getAgentConfig(),
+		}));
+
+		this.put("/api/config/agent", (body) => {
+			const req = body as Record<string, unknown>;
+			const validation = this.validateAgentConfig(req);
+			if (!validation.valid) {
+				return { status: 400, body: { error: validation.error } };
+			}
+			return {
+				status: 200,
+				body: this.updateAgentConfig(
+					req as Partial<import("./types.js").AgentConfig>,
+				),
+			};
+		});
+
+		this.delete("/api/config/agent", (_body, _params) => ({
+			status: 200,
+			body: this.resetAgentConfig(),
+		}));
+
+		this.get("/api/health", (_body, _params) => ({
+			status: 200,
+			body: this.healthCheck(),
+		}));
+
+		this.get("/api/stats", (_body, _params) => ({
+			status: 200,
+			body: this.getStats(),
+		}));
+
+		this.get("/api/analytics/summary", (_body, _params) => ({
+			status: 200,
+			body: this.getAnalyticsSummary(),
+		}));
+
+		this.get("/api/themes", (_body, _params) => ({
+			status: 200,
+			body: this.listThemes(),
+		}));
+
+		this.get("/api/plugins", (_body, _params) => ({
+			status: 200,
+			body: this.listPlugins(),
+		}));
+
+		this.get("/api/config", (_body, _params) => ({
+			status: 200,
+			body: this.getSanitizedConfig(),
+		}));
+
+		this.delete("/api/sessions/:id", (_body, params) => ({
+			status: this.deleteSession(params.id) ? 200 : 404,
+			body: {},
+		}));
+	}
+
+	private register(
+		method: string,
+		path: string,
+		handler: RouteHandler,
+	): void {
+		if (path.includes(":")) {
+			const prefix = path.split(":")[0];
+			const paramName = path.slice(prefix.length + 1);
+			this.routes.push({ method, prefixPath: prefix, paramName, handler });
+		} else {
+			this.routes.push({ method, exactPath: path, handler });
+		}
+	}
+
+	private get(path: string, handler: RouteHandler): void {
+		this.register("GET", path, handler);
+	}
+
+	private post(path: string, handler: RouteHandler): void {
+		this.register("POST", path, handler);
+	}
+
+	private put(path: string, handler: RouteHandler): void {
+		this.register("PUT", path, handler);
+	}
+
+	private delete(path: string, handler: RouteHandler): void {
+		this.register("DELETE", path, handler);
+	}
+
+	/** Register a prefix-based route (for routes with query params) */
+	private getWithPrefix(prefix: string, handler: RouteHandler): void {
+		this.routes.push({ method: "GET", prefixPath: prefix, handler });
 	}
 
 	// ── Session Management ─────────────────────────────────────────────────────
@@ -163,6 +384,30 @@ export class WebUIBackend {
 			activeSessions: this.sessions.size,
 			totalMessages,
 			uptime: this.startedAt ? Date.now() - this.startedAt : 0,
+		};
+	}
+
+	// ── Themes ─────────────────────────────────────────────────────────────────
+
+	listThemes(): Array<{ id: string; name: string }> {
+		return [...AVAILABLE_THEMES];
+	}
+
+	// ── Plugins ────────────────────────────────────────────────────────────────
+
+	listPlugins(): unknown[] {
+		return []; // Standalone WebUI has no plugin system — always empty
+	}
+
+	// ── Sanitized Config ───────────────────────────────────────────────────────
+
+	getSanitizedConfig(): Record<string, unknown> {
+		return {
+			host: this.config.host,
+			port: this.config.port,
+			maxSessions: this.config.maxSessions,
+			sessionTimeout: this.config.sessionTimeout,
+			apiKeyConfigured: this.config.apiKey !== "",
 		};
 	}
 
@@ -308,9 +553,34 @@ export class WebUIBackend {
 		return { ...this.agentConfig };
 	}
 
+	validateAgentConfig(
+		update: Record<string, unknown>,
+	): { valid: true } | { valid: false; error: string } {
+		if (
+			update.systemPrompt !== undefined &&
+			typeof update.systemPrompt !== "string"
+		) {
+			return { valid: false, error: "systemPrompt must be a string" };
+		}
+		if (
+			update.language !== undefined &&
+			typeof update.language !== "string"
+		) {
+			return { valid: false, error: "language must be a string" };
+		}
+		return { valid: true };
+	}
+
 	updateAgentConfig(
 		update: Partial<import("./types.js").AgentConfig>,
 	): import("./types.js").AgentConfig {
+		const validation = this.validateAgentConfig(
+			update as Record<string, unknown>,
+		);
+		if (!validation.valid) {
+			throw new Error(validation.error);
+		}
+
 		if (update.systemPrompt !== undefined) {
 			this.agentConfig.systemPrompt = update.systemPrompt;
 		}
@@ -334,140 +604,29 @@ export class WebUIBackend {
 
 	// ── REST API ───────────────────────────────────────────────────────────────
 
-	handleRequest(method: string, path: string, body: unknown): APIResponse {
-		// GET /api/sessions
-		if (method === "GET" && path === "/api/sessions") {
-			return {
-				status: 200,
-				body: this.listSessions(),
-			};
-		}
+	handleRequest(
+		method: string,
+		fullPath: string,
+		body: unknown,
+		queryString?: string,
+	): APIResponse {
+		const fullUrl = queryString ? `${fullPath}?${queryString}` : fullPath;
 
-		// POST /api/sessions
-		if (method === "POST" && path === "/api/sessions") {
-			const req = body as { userId?: string };
-			const session = this.createSession(req.userId ?? "anonymous");
-			if (session) {
-				return { status: 201, body: session };
+		for (const route of this.routes) {
+			if (route.method !== method) continue;
+
+			if (route.exactPath !== undefined && route.exactPath === fullPath) {
+				return route.handler(body, { _fullPath: fullUrl });
 			}
-			return { status: 400, body: { error: "Max sessions reached" } };
-		}
 
-		// GET /api/messages?sessionId=xxx
-		if (method === "GET" && path.startsWith("/api/messages")) {
-			const url = new URL(path, "http://localhost");
-			const sessionId = url.searchParams.get("sessionId") ?? "";
-			return { status: 200, body: this.getMessages(sessionId) };
-		}
-
-		// POST /api/messages
-		if (method === "POST" && path === "/api/messages") {
-			const req = body as {
-				sessionId?: string;
-				role?: string;
-				content?: string;
-			};
-			const message = this.addMessage(req.sessionId ?? "", {
-				role: req.role as "user" | "assistant" | "system",
-				content: req.content ?? "",
-			});
-			if (message) {
-				return { status: 201, body: message };
+			if (route.prefixPath !== undefined && fullPath.startsWith(route.prefixPath)) {
+				const paramValue = fullPath.slice(route.prefixPath.length);
+				const params: RouteParams = { _fullPath: fullUrl };
+				if (route.paramName && paramValue) {
+					params[route.paramName] = paramValue;
+				}
+				return route.handler(body, params);
 			}
-			return { status: 404, body: { error: "Session not found" } };
-		}
-
-		// GET /api/tools
-		if (method === "GET" && path === "/api/tools") {
-			return { status: 200, body: this.listTools() };
-		}
-
-		// POST /api/tools
-		if (method === "POST" && path === "/api/tools") {
-			const req = body as {
-				name?: string;
-				description?: string;
-				category?: string;
-			};
-			if (!req.name) {
-				return { status: 400, body: { error: "name is required" } };
-			}
-			if (this.tools.has(req.name)) {
-				return { status: 409, body: { error: "Tool already exists" } };
-			}
-			const tool = this.addTool(
-				req.name,
-				req.description || "",
-				req.category || "custom",
-			);
-			return { status: 201, body: tool };
-		}
-
-		// DELETE /api/tools/:name
-		if (method === "DELETE" && path.startsWith("/api/tools/")) {
-			const name = decodeURIComponent(path.slice("/api/tools/".length));
-			if (this.deleteTool(name)) {
-				return { status: 200, body: { success: true } };
-			}
-			return { status: 404, body: { error: "Tool not found" } };
-		}
-
-		// GET /api/cron
-		if (method === "GET" && path === "/api/cron") {
-			return { status: 200, body: this.listCronJobs() };
-		}
-
-		// POST /api/cron
-		if (method === "POST" && path === "/api/cron") {
-			const req = body as { schedule?: string; message?: string };
-			if (!req.schedule || !req.message) {
-				return {
-					status: 400,
-					body: { error: "schedule and message are required" },
-				};
-			}
-			const job = this.createCronJob(req.schedule, req.message);
-			return { status: 201, body: job };
-		}
-
-		// DELETE /api/cron/:id
-		if (method === "DELETE" && path.startsWith("/api/cron/")) {
-			const id = path.slice("/api/cron/".length);
-			if (this.deleteCronJob(id)) {
-				return { status: 200, body: { success: true } };
-			}
-			return { status: 404, body: { error: "Cron job not found" } };
-		}
-
-		// GET /api/config/agent
-		if (method === "GET" && path === "/api/config/agent") {
-			return { status: 200, body: this.getAgentConfig() };
-		}
-
-		// PUT /api/config/agent
-		if (method === "PUT" && path === "/api/config/agent") {
-			const req = body as Partial<import("./types.js").AgentConfig>;
-			return { status: 200, body: this.updateAgentConfig(req) };
-		}
-
-		// DELETE /api/config/agent — reset to defaults
-		if (method === "DELETE" && path === "/api/config/agent") {
-			return { status: 200, body: this.resetAgentConfig() };
-		}
-
-		// GET /api/health
-		if (method === "GET" && path === "/api/health") {
-			return { status: 200, body: this.healthCheck() };
-		}
-
-		// GET /api/stats
-		if (method === "GET" && path === "/api/stats") {
-			return { status: 200, body: this.getStats() };
-		}
-
-		// GET /api/analytics/summary
-		if (method === "GET" && path === "/api/analytics/summary") {
-			return { status: 200, body: this.getAnalyticsSummary() };
 		}
 
 		return { status: 404, body: { error: "Not found" } };

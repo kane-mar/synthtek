@@ -1089,94 +1089,7 @@ async function deleteProvider(id) {
 
 // ── Server ──────────────────────────────────────────────────────────────────
 
-// Available themes for the WebUI
-interface Theme {
-	id: string;
-	name: string;
-	cssVariables: Record<string, string>;
-}
 
-const AVAILABLE_THEMES: Theme[] = [
-	{
-		id: "dark",
-		name: "Dark (GitHub)",
-		cssVariables: {
-			"--bg": "#0d1117",
-			"--surface": "#161b22",
-			"--border": "#30363d",
-			"--text": "#c9d1d9",
-			"--text-dim": "#8b949e",
-			"--accent": "#58a6ff",
-			"--green": "#3fb950",
-			"--red": "#f85149",
-			"--yellow": "#d29922",
-		},
-	},
-	{
-		id: "light",
-		name: "Light",
-		cssVariables: {
-			"--bg": "#ffffff",
-			"--surface": "#f6f8fa",
-			"--border": "#d0d7de",
-			"--text": "#1f2328",
-			"--text-dim": "#656d76",
-			"--accent": "#0969da",
-			"--green": "#1a7f37",
-			"--red": "#cf222e",
-			"--yellow": "#9a6700",
-		},
-	},
-	{
-		id: "midnight",
-		name: "Midnight",
-		cssVariables: {
-			"--bg": "#0a0e17",
-			"--surface": "#111827",
-			"--border": "#1e293b",
-			"--text": "#e2e8f0",
-			"--text-dim": "#64748b",
-			"--accent": "#818cf8",
-			"--green": "#34d399",
-			"--red": "#f87171",
-			"--yellow": "#fbbf24",
-		},
-	},
-	{
-		id: "ocean",
-		name: "Ocean",
-		cssVariables: {
-			"--bg": "#0c1821",
-			"--surface": "#142334",
-			"--border": "#1e3a5f",
-			"--text": "#c5d8e8",
-			"--text-dim": "#5a8fa8",
-			"--accent": "#00b4d8",
-			"--green": "#2ec4b6",
-			"--red": "#e63946",
-			"--yellow": "#f4a261",
-		},
-	},
-	{
-		id: "nord",
-		name: "Nord",
-		cssVariables: {
-			"--bg": "#2e3440",
-			"--surface": "#3b4252",
-			"--border": "#4c566a",
-			"--text": "#d8dee9",
-			"--text-dim": "#7b88a1",
-			"--accent": "#88c0d0",
-			"--green": "#a3be8c",
-			"--red": "#bf616a",
-			"--yellow": "#ebcb8b",
-		},
-	},
-];
-
-function getAvailableThemes(): Theme[] {
-	return AVAILABLE_THEMES;
-}
 
 export class WebUIServer {
 	private backend: WebUIBackend;
@@ -1209,6 +1122,7 @@ export class WebUIServer {
 
 			const url = new URL(req.url || "/", `http://${req.headers.host}`);
 			const path = url.pathname;
+			const queryString = url.searchParams.toString();
 
 			// API routes
 			if (path.startsWith("/api/")) {
@@ -1311,91 +1225,13 @@ export class WebUIServer {
 					);
 				}
 
-				// ── Themes ──────────────────────────────────────────────────────────
-
-				// GET /api/themes
-				if (req.method === "GET" && path === "/api/themes") {
-					return sendJson(res, 200, getAvailableThemes());
-				}
-
-				// ── Config ─────────────────────────────────────────────────────────
-
-				// GET /api/config — return sanitized WebUI config (no API key)
-				if (req.method === "GET" && path === "/api/config") {
-					return sendJson(res, 200, {
-						host: this.config.host,
-						port: this.config.port,
-						maxSessions: this.config.maxSessions,
-						sessionTimeout: this.config.sessionTimeout,
-						apiKeyConfigured: this.config.apiKey !== "",
-					});
-				}
-
-				// GET /api/config/agent — return agent config
-				if (req.method === "GET" && path === "/api/config/agent") {
-					return sendJson(res, 200, this.backend.getAgentConfig());
-				}
-
-				// DELETE /api/config/agent — reset to defaults
-				if (req.method === "DELETE" && path === "/api/config/agent") {
-					return sendJson(res, 200, this.backend.resetAgentConfig());
-				}
-
-				// PUT /api/config/agent — update agent config
-				if (req.method === "PUT" && path === "/api/config/agent") {
-					const update = body as Record<string, unknown>;
-					if (
-						typeof update.systemPrompt !== "undefined" &&
-						typeof update.systemPrompt !== "string"
-					) {
-						return sendJson(res, 400, {
-							error: "systemPrompt must be a string",
-						});
-					}
-					if (
-						typeof update.language !== "undefined" &&
-						typeof update.language !== "string"
-					) {
-						return sendJson(res, 400, {
-							error: "language must be a string",
-						});
-					}
-					return sendJson(
-						res,
-						200,
-						this.backend.updateAgentConfig(
-							update as Partial<import("./types.js").AgentConfig>,
-						),
-					);
-				}
-
-				// ── Plugins ────────────────────────────────────────────────────────
-
-				// GET /api/plugins — return plugin states (empty when WebUI runs standalone)
-				if (req.method === "GET" && path === "/api/plugins") {
-					return sendJson(res, 200, []);
-				}
-
-				// ── Existing routes ────────────────────────────────────────────────
-
-				// GET /api/messages?sessionId=xxx
-				if (req.method === "GET" && path === "/api/messages") {
-					const sessionId = url.searchParams.get("sessionId");
-					return sendJson(
-						res,
-						200,
-						sessionId ? this.backend.getMessages(sessionId) : [],
-					);
-				}
-
-				// DELETE /api/sessions/:id
-				if (req.method === "DELETE" && path.startsWith("/api/sessions/")) {
-					const id = path.split("/").pop();
-					return sendJson(res, this.backend.deleteSession(id!) ? 200 : 404, {});
-				}
-
-				// All other API routes
-				const response = this.backend.handleRequest(req.method!, path, body);
+				// Delegate all remaining API routes to the backend's router
+				const response = this.backend.handleRequest(
+					req.method!,
+					path,
+					body,
+					queryString,
+				);
 				return sendJson(res, response.status, response.body);
 			}
 
