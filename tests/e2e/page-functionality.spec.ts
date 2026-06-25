@@ -427,6 +427,35 @@ test.describe("Settings Page - Agent Config Tab", () => {
 		await expect(saveBtn).toBeEnabled();
 	});
 
+	test("system prompt in WebUI matches the configured default", async ({
+		page,
+	}) => {
+		const expectedPromptStart =
+			"You are an elite, highly autonomous, and deeply competent AI collaborator.";
+
+		await page.goto(BASE_URL);
+		await waitForPage(page);
+		await page.click('#sidebar nav a[data-page="config"]');
+		await waitForPage(page);
+
+		await page.locator(".config-tab").nth(1).click();
+		await page.waitForTimeout(300);
+
+		// Verify the textarea contains the expected default prompt
+		const promptVal = await page.locator("#agent-prompt").inputValue();
+		expect(promptVal.startsWith(expectedPromptStart)).toBe(true);
+		expect(promptVal.includes("Ownership")).toBe(true);
+		expect(promptVal.includes("Execution Framework")).toBe(true);
+		expect(promptVal.length).toBeGreaterThan(500);
+
+		// Verify the API returns the same prompt shown in the UI
+		const apiResponse = await page.evaluate(async () => {
+			const resp = await fetch("/api/config/agent");
+			return resp.json();
+		});
+		expect(apiResponse.systemPrompt).toBe(promptVal);
+	});
+
 	test("switching language and restoring English round-trips correctly", async ({
 		page,
 	}) => {
