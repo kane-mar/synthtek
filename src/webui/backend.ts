@@ -236,11 +236,7 @@ export class WebUIBackend {
 		}));
 	}
 
-	private register(
-		method: string,
-		path: string,
-		handler: RouteHandler,
-	): void {
+	private register(method: string, path: string, handler: RouteHandler): void {
 		if (path.includes(":")) {
 			const prefix = path.split(":")[0];
 			const paramName = path.slice(prefix.length + 1);
@@ -562,10 +558,7 @@ export class WebUIBackend {
 		) {
 			return { valid: false, error: "systemPrompt must be a string" };
 		}
-		if (
-			update.language !== undefined &&
-			typeof update.language !== "string"
-		) {
+		if (update.language !== undefined && typeof update.language !== "string") {
 			return { valid: false, error: "language must be a string" };
 		}
 		return { valid: true };
@@ -619,7 +612,10 @@ export class WebUIBackend {
 				return route.handler(body, { _fullPath: fullUrl });
 			}
 
-			if (route.prefixPath !== undefined && fullPath.startsWith(route.prefixPath)) {
+			if (
+				route.prefixPath !== undefined &&
+				fullPath.startsWith(route.prefixPath)
+			) {
 				const paramValue = fullPath.slice(route.prefixPath.length);
 				const params: RouteParams = { _fullPath: fullUrl };
 				if (route.paramName && paramValue) {

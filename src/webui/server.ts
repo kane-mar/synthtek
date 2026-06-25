@@ -1089,8 +1089,6 @@ async function deleteProvider(id) {
 
 // ── Server ──────────────────────────────────────────────────────────────────
 
-
-
 export class WebUIServer {
 	private backend: WebUIBackend;
 	private providerManager: ProviderManager;
