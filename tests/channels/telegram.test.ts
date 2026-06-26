@@ -6,6 +6,7 @@
 import { equal, ok, rejects } from "node:assert";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { TelegramChannel } from "../../src/channels/telegram/channel.js";
+import { BaseChannel } from "../../src/channels/base-channel.js";
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,37 @@ describe("TelegramChannel", () => {
 		} catch {
 			// Ignore cleanup errors
 		}
+	});
+
+	// ─── H1: BaseChannel integration ─────────────────────────────────────────
+
+	describe("BaseChannel integration (H1)", () => {
+		it("extends BaseChannel", () => {
+			ok(channel instanceof BaseChannel);
+		});
+
+		it("supports onMessage / onError registration", () => {
+			// BaseChannel provides onMessage() and onError() registration
+			equal(typeof channel.onMessage, "function");
+			equal(typeof channel.onError, "function");
+		});
+
+		it("has connect/disconnect lifecycle methods", () => {
+			// Must implement connect/disconnect for wireBaseChannel compatibility
+			equal(typeof channel.connect, "function");
+			equal(typeof channel.disconnect, "function");
+		});
+
+		it("tracks sent messages via recordSent", () => {
+			// BaseChannel should track message counts
+			equal(typeof (channel as any).recordSent, "function");
+		});
+
+		it("provides channel state", () => {
+			// BaseChannel uses ChannelState enum for lifecycle
+			ok(typeof channel.isConnected === "function");
+			equal(channel.isConnected(), false);
+		});
 	});
 
 	// ─── Constructor ─────────────────────────────────────────────────────────

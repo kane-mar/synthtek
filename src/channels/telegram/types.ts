@@ -355,6 +355,8 @@ export interface TelegramMediaGroupBuffer {
 // ─── Stats ───────────────────────────────────────────────────────────────────
 
 export interface TelegramStats {
+	/** Whether the channel is connected */
+	connected: boolean;
 	/** Whether polling is active */
 	polling: boolean;
 	/** Last processed update ID */
@@ -363,6 +365,10 @@ export interface TelegramStats {
 	messagesReceived: number;
 	/** Total messages sent */
 	messagesSent: number;
+	/** Total errors */
+	errors?: number;
+	/** Timestamp of last activity */
+	lastActivity?: number;
 	/** Total media sent */
 	mediaSent: number;
 	/** Active stream buffers */

@@ -19,6 +19,8 @@ import type {
 	TelegramUserInfo,
 } from "./types.js";
 
+import { BaseChannel } from "../base-channel.js";
+
 const API_BASE = "https://api.telegram.org/bot";
 const TELEGRAM_MAX_MESSAGE_LEN = 4000;
 const SEND_MAX_RETRIES = 3;
@@ -384,21 +386,18 @@ const BOT_COMMANDS: TelegramBotCommand[] = [
 	{ command: "help", description: "Show available commands" },
 ];
 
-export class TelegramChannel {
-	private config: Required<TelegramConfig>;
+export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage> {
+	protected config: Required<TelegramConfig>;
 	private botUsername?: string;
 	private botId?: number;
 	private lastUpdateId = 0;
 	private polling = false;
 	private pollingInterval?: ReturnType<typeof setInterval>;
-	private onMessage?: (message: TelegramMessage) => void;
-	private onError?: (error: Error) => void;
 	private typingTimeout = new Map<
 		string | number,
 		ReturnType<typeof setTimeout>
 	>();
 	private reconnectAttempts = 0;
-	private started = false;
 
 	// Advanced state
 	private streamBuffers = new Map<number | string, TelegramStreamBuffer>();
@@ -416,11 +415,10 @@ export class TelegramChannel {
 	>();
 	private messageThreads = new Map<string, number>(); // "chatId:replyToMsgId" -> threadId
 	private chatIds = new Map<string, number>(); // senderId -> chatId for replies
-	private messagesReceived = 0;
-	private messagesSent = 0;
 	private mediaSent = 0;
 
 	constructor(config: TelegramConfig) {
+		super(config);
 		this.config = {
 			token: config.token,
 			webhookUrl: config.webhookUrl ?? "",
@@ -445,28 +443,38 @@ export class TelegramChannel {
 	// ─── Lifecycle ───────────────────────────────────────────────────────────
 
 	/** Start long polling */
+	/**
+	 * Start the Telegram bot (backward-compat entry point).
+	 * Registers message/error handlers via BaseChannel, then starts connect().
+	 */
 	async start(
-		onMessage: (message: TelegramMessage) => void,
+		onMessage: (message: TelegramMessage) => void | Promise<void>,
 		onError?: (error: Error) => void,
 	): Promise<void> {
-		this.onMessage = onMessage;
-		this.onError = onError;
+		this.onMessage(async (msg) => {
+			await onMessage(msg);
+		});
+		if (onError) this.onError(event => onError(event.error));
+		await this.connect();
+	}
+
+	// ── BaseChannel Lifecycle ─────────────────────────────────────────────────
+
+	/** Connect to Telegram — starts long polling */
+	async connect(): Promise<void> {
 		this.polling = true;
-		this.started = true;
-
-		// Get bot info
 		await this.getBotInfo();
-
-		// Register bot commands
 		await this.registerBotCommands();
-
-		// Start polling loop
 		this.pollingLoop();
 	}
 
-	/** Stop long polling */
+	/** Backward-compat stop — delegates to disconnect */
 	async stop(): Promise<void> {
-		this.started = false;
+		await this.disconnect();
+	}
+
+	/** Disconnect from Telegram — stops polling */
+	async disconnect(): Promise<void> {
 		this.polling = false;
 
 		// Cancel all typing indicators
@@ -599,7 +607,7 @@ export class TelegramChannel {
 			}
 
 			results.push({ messageId: data.result.message_id });
-			this.messagesSent++;
+			this.recordSent();
 		}
 
 		return results;
@@ -631,7 +639,7 @@ export class TelegramChannel {
 					: undefined,
 				...threadKwargs,
 			});
-			this.messagesSent++;
+			this.recordSent();
 		} catch (error) {
 			// Fallback to plain text
 			console.warn(
@@ -652,7 +660,7 @@ export class TelegramChannel {
 						: undefined,
 					...threadKwargs,
 				});
-				this.messagesSent++;
+				this.recordSent();
 			} catch (fallbackError) {
 				console.error(`[Telegram] Failed to send message:`, fallbackError);
 			}
@@ -661,7 +669,7 @@ export class TelegramChannel {
 
 	/** Send an outbound message (integration with agent loop) */
 	async sendOutboundMessage(msg: TelegramOutboundMessage): Promise<void> {
-		if (!this.started) {
+		if (!this.isConnected()) {
 			console.warn("[Telegram] Bot not running");
 			return;
 		}
@@ -1539,11 +1547,15 @@ export class TelegramChannel {
 
 	/** Get client stats */
 	getStats(): TelegramStats {
+		const baseStats = super.getStats();
 		return {
+			connected: baseStats.connected,
 			polling: this.polling,
 			lastUpdateId: this.lastUpdateId,
-			messagesReceived: this.messagesReceived,
-			messagesSent: this.messagesSent,
+			messagesReceived: baseStats.messagesReceived,
+			messagesSent: baseStats.messagesSent,
+			errors: baseStats.errors,
+			lastActivity: baseStats.lastActivity,
 			mediaSent: this.mediaSent,
 			activeStreams: this.streamBuffers.size,
 			activeTyping: this.typingTasks.size,
@@ -1554,7 +1566,7 @@ export class TelegramChannel {
 	// ── Private helpers ────────────────────────────────────────────────────────
 
 	private async pollingLoop(): Promise<void> {
-		while (this.polling && this.started) {
+		while (this.polling && this.isConnected()) {
 			try {
 				const updates = await this.getUpdates();
 
@@ -1578,7 +1590,7 @@ export class TelegramChannel {
 					const message = parseMessage(update);
 					if (!message) continue;
 
-					this.messagesReceived++;
+					this.recordReceived();
 
 					// Check allow_from
 					const senderId = `${message.fromId}|${message.fromUsername ?? ""}`;
@@ -1631,9 +1643,7 @@ export class TelegramChannel {
 					}
 
 					// Forward to message handler
-					if (this.onMessage) {
-						this.onMessage(message);
-					}
+					await this.dispatchMessage(message);
 				}
 			} catch (error) {
 				this.reconnectAttempts++;
@@ -1642,13 +1652,9 @@ export class TelegramChannel {
 					error,
 				);
 
-				if (this.onError) {
-					this.onError(
-						error instanceof Error ? error : new Error(String(error)),
-					);
-				}
+			this.emitError(error instanceof Error ? error : new Error(String(error)));
 
-				// Wait before retrying with exponential backoff
+			// Wait before retrying with exponential backoff
 				const delay = Math.min(
 					this.config.retryDelay * 1.5 ** this.reconnectAttempts,
 					60000,
@@ -1664,9 +1670,7 @@ export class TelegramChannel {
 		if (!command) return;
 
 		// Route to message handler with command
-		if (this.onMessage) {
-			this.onMessage(message);
-		}
+		await this.dispatchMessage(message);
 	}
 
 	/** Handle callback queries (inline buttons, etc.) */
@@ -1680,8 +1684,8 @@ export class TelegramChannel {
 			});
 
 			// Forward to message handler if there's data
-			if (query.data && this.onMessage) {
-				this.onMessage({
+			if (query.data) {
+				await this.dispatchMessage({
 					messageId: query.message.messageId,
 					chatId: query.message.chat.id,
 					fromId: query.from.id,
