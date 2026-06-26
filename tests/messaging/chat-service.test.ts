@@ -52,6 +52,7 @@ describe("ChatService", () => {
 	it("returns error when no provider is available", async () => {
 		const mockProviderManager = {
 			list: () => [],
+			getActiveProvider: () => null,
 		};
 		const service = new ChatService(mockProviderManager as never);
 		const result = await service.sendMessage({
@@ -158,23 +159,30 @@ describe("ChatService", () => {
 	});
 
 	it("uses completion handler when provided", async () => {
+		const providers = [
+			{
+				id: "p1",
+				name: "P1",
+				type: "openai",
+				status: "active" as const,
+				apiKey: "",
+				baseUrl: "",
+				models: [],
+				defaultModel: "gpt-3.5-turbo",
+				temperature: 0.7,
+				maxTokens: 2048,
+			},
+		];
 		const service = new ChatService(
 			{
-				list: () => [
-					{
-						id: "p1",
-						name: "P1",
-						type: "openai",
-						status: "active",
-						apiKey: "",
-						baseUrl: "",
-						models: [],
-						defaultModel: "gpt-3.5-turbo",
-						temperature: 0.7,
-						maxTokens: 2048,
-					},
-				],
+				list: () => providers,
 				find: () => null,
+				getActiveProvider: (providerId?: string) => {
+					if (providerId) {
+						return providers.find((p) => p.id === providerId) ?? null;
+					}
+					return providers[0] ?? null;
+				},
 			},
 			{
 				completionHandler: async (provider, messages) => {
@@ -194,23 +202,30 @@ describe("ChatService", () => {
 	});
 
 	it("reports errors from completion handler", async () => {
+		const providers = [
+			{
+				id: "p1",
+				name: "P1",
+				type: "openai",
+				status: "active" as const,
+				apiKey: "",
+				baseUrl: "",
+				models: [],
+				defaultModel: "gpt-3.5-turbo",
+				temperature: 0.7,
+				maxTokens: 2048,
+			},
+		];
 		const service = new ChatService(
 			{
-				list: () => [
-					{
-						id: "p1",
-						name: "P1",
-						type: "openai",
-						status: "active",
-						apiKey: "",
-						baseUrl: "",
-						models: [],
-						defaultModel: "gpt-3.5-turbo",
-						temperature: 0.7,
-						maxTokens: 2048,
-					},
-				],
+				list: () => providers,
 				find: () => null,
+				getActiveProvider: (providerId?: string) => {
+					if (providerId) {
+						return providers.find((p) => p.id === providerId) ?? null;
+					}
+					return providers[0] ?? null;
+				},
 			},
 			{
 				completionHandler: async () => {

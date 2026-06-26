@@ -23,17 +23,19 @@ export enum ChannelState {
 }
 
 /** Stats reported by getStats() */
-export interface ChannelStats {
+export interface ChannelStats<TAdditional = Record<string, never>> {
 	/** Whether the channel is currently connected */
 	connected: boolean;
 	/** Number of messages sent */
 	messagesSent: number;
 	/** Number of messages received */
 	messagesReceived: number;
+	/** Number of errors encountered */
+	errors?: number;
 	/** Timestamp of last activity (send or receive), or undefined */
 	lastActivity?: number;
-	/** Platform-specific stats (optional) */
-	[key: string]: unknown;
+	/** Platform-specific stats */
+	platform?: TAdditional;
 }
 
 /** Error event emitted by channels */

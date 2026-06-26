@@ -39,6 +39,11 @@ export class MultiProvider implements LLMProvider {
 	}
 
 	getConfig(): ProviderConfig {
+		// Return the first child provider's config as representative
+		// Each child's config should be inspected individually via its own getConfig()
+		if (this.providers.length > 0) {
+			return this.providers[0].getConfig();
+		}
 		return {
 			provider: "multi-fallback",
 			apiKey: "",

@@ -177,8 +177,6 @@ export class AgentLoop {
 		if (this.errorHandler.isCircuitOpen()) {
 			return true;
 		}
-		// Emit event when transitioning from open to half-open
-		this.events.emit("agent:circuit_breaker:half_open");
 		return false;
 	}
 
@@ -899,7 +897,16 @@ export class AgentLoop {
 		return this.running;
 	}
 
-	// ── Events ───────────────────────────────────────────────────────────────
+	// ── Events ──────────────────────────────────────────────────────────────
+	//
+	// Event map (documented):
+	//   "agent:started"                     → ()
+	//   "agent:stopped"                     → ()
+	//   "agent:state_changed"               → (state: string)
+	//   "agent:message_processed"           → (result: AgentLoopResult)
+	//   "agent:circuit_breaker:open"        → ()
+	//   "agent:circuit_breaker:closed"      → ()
+	//   "agent:retry"                       → ({ attempt, maxRetries, error, delay })
 
 	on(event: string, listener: (...args: unknown[]) => void): void {
 		this.events.on(event, listener);

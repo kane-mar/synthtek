@@ -240,6 +240,13 @@ export function registerChatCommand(program: Command): void {
 						{
 							list: () => providers,
 							find: (id: string) => providers.find((p) => p.id === id) || null,
+							getActiveProvider: (providerId?: string) => {
+								if (providerId) {
+									return providers.find((p) => p.id === providerId) ?? null;
+								}
+								const active = providers.filter((p) => p.status === "active");
+								return active[0] ?? null;
+							},
 						},
 						{
 							completionHandler: async (_provider, messages) => {

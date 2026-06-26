@@ -153,13 +153,46 @@ export class DiscordChannel {
 	private mediaSent = 0;
 
 	constructor(config: DiscordConfig) {
-		const intents = config.intents ?? [
-			GatewayIntentBits.Guilds,
-			GatewayIntentBits.GuildMessages,
-			GatewayIntentBits.GuildMembers,
-			GatewayIntentBits.MessageContent,
-			GatewayIntentBits.GuildMessageReactions,
-		];
+		const defaultConfig = {
+			clientId: "",
+			guildIds: [] as string[],
+			intents: [] as string[],
+			reconnectDelay: 5000,
+			maxReconnectAttempts: 0,
+			presenceInterval: 0,
+			adminIds: [] as string[],
+			slashCommands: true,
+			reactions: true,
+			reactEmoji: "👀",
+			maxMessageLength: DISCORD_MAX_MESSAGE_LEN,
+			typingInterval: TYPING_INTERVAL_MS,
+			downloadMedia: true,
+			mediaDir: "./media",
+			presence: true,
+			presenceActivity: "synthtek",
+			presenceStatus: "online" as const,
+		};
+
+		this.config = { ...defaultConfig, ...config };
+
+		const intents = (
+			this.config.intents.length > 0
+				? this.config.intents
+				: [
+						"Guilds",
+						"GuildMessages",
+						"GuildMembers",
+						"MessageContent",
+						"GuildMessageReactions",
+					]
+		).map((i) => {
+			const bit = GatewayIntentBits[i as keyof typeof GatewayIntentBits];
+			if (!bit) {
+				console.warn(`[Discord] Unknown intent "${i}", falling back to Guilds`);
+				return GatewayIntentBits.Guilds;
+			}
+			return bit;
+		});
 
 		const partials = [
 			Partials.Channel,
@@ -168,34 +201,7 @@ export class DiscordChannel {
 			Partials.Reaction,
 		];
 
-		this.client = new Client({
-			intents: intents.map((i) => {
-				const bit = GatewayIntentBits[i as keyof typeof GatewayIntentBits];
-				return bit ?? GatewayIntentBits.Guilds;
-			}),
-			partials,
-		});
-
-		this.config = {
-			token: config.token,
-			clientId: config.clientId ?? "",
-			guildIds: config.guildIds ?? [],
-			intents: config.intents ?? [],
-			reconnectDelay: config.reconnectDelay ?? 5000,
-			maxReconnectAttempts: config.maxReconnectAttempts ?? 0,
-			presenceInterval: config.presenceInterval ?? 0,
-			adminIds: config.adminIds ?? [],
-			slashCommands: config.slashCommands ?? true,
-			reactions: config.reactions ?? true,
-			reactEmoji: config.reactEmoji ?? "👀",
-			maxMessageLength: config.maxMessageLength ?? DISCORD_MAX_MESSAGE_LEN,
-			typingInterval: config.typingInterval ?? TYPING_INTERVAL_MS,
-			downloadMedia: config.downloadMedia ?? true,
-			mediaDir: config.mediaDir ?? "./media",
-			presence: config.presence ?? true,
-			presenceActivity: config.presenceActivity ?? "synthtek",
-			presenceStatus: config.presenceStatus ?? "online",
-		};
+		this.client = new Client({ intents, partials });
 
 		this.setupEventHandlers();
 	}

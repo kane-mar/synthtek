@@ -69,6 +69,8 @@ export class AgentRunner {
 	private telegram?: TelegramChannel;
 	private discord?: DiscordChannel;
 	private slack?: SlackChannel;
+	/** All actively wired BaseChannel instances (for lifecycle management) */
+	private activeChannels = new Set<{ disconnect: () => Promise<void> }>();
 	private config: AgentRunnerConfig;
 	private running: boolean;
 	private providers: LLMProvider[];
@@ -171,37 +173,41 @@ export class AgentRunner {
 	 * (tool calling, context management, multi-step reasoning).
 	 */
 	private createChatService(): void {
+		const buildProviderMeta = (): {
+			id: string;
+			name: string;
+			type: string;
+			status: "active";
+			apiKey: string;
+			baseUrl: string;
+			models: string[];
+			defaultModel: string;
+			temperature: number;
+			maxTokens: number;
+		} => ({
+			id: this.config.provider,
+			name: this.config.provider,
+			type: this.config.provider,
+			status: "active" as const,
+			apiKey: this.config.apiKey,
+			baseUrl: this.config.baseUrl ?? "",
+			models: this.config.model ? [this.config.model] : [],
+			defaultModel: this.config.model ?? "default",
+			temperature: 0.7,
+			maxTokens: 4096,
+		});
+
 		const providerManagerLike = {
-			list: () => [
-				{
-					id: this.config.provider,
-					name: this.config.provider,
-					type: this.config.provider,
-					status: "active" as const,
-					apiKey: this.config.apiKey,
-					baseUrl: this.config.baseUrl ?? "",
-					models: this.config.model ? [this.config.model] : [],
-					defaultModel: this.config.model ?? "default",
-					temperature: 0.7,
-					maxTokens: 4096,
-				},
-			],
-			find: (id: string) => {
-				if (id === this.config.provider) {
-					return {
-						id: this.config.provider,
-						name: this.config.provider,
-						type: this.config.provider,
-						status: "active" as const,
-						apiKey: this.config.apiKey,
-						baseUrl: this.config.baseUrl ?? "",
-						models: this.config.model ? [this.config.model] : [],
-						defaultModel: this.config.model ?? "default",
-						temperature: 0.7,
-						maxTokens: 4096,
-					};
+			list: () => [buildProviderMeta()],
+			find: (id: string) =>
+				id === this.config.provider ? buildProviderMeta() : null,
+			getActiveProvider: (providerId?: string) => {
+				if (providerId) {
+					return providerId === this.config.provider
+						? buildProviderMeta()
+						: null;
 				}
-				return null;
+				return buildProviderMeta();
 			},
 		};
 
@@ -387,6 +393,17 @@ export class AgentRunner {
 			);
 		}
 
+		// Disconnect all base-channel instances
+		for (const ch of this.activeChannels) {
+			stopPromises.push(
+				ch
+					.disconnect()
+					.catch((e: Error) =>
+						this.logger.warn("Channel disconnect error", { error: e.message }),
+					),
+			);
+		}
+
 		await Promise.allSettled(stopPromises);
 	}
 
@@ -421,7 +438,7 @@ export class AgentRunner {
 
 	private async startTelegram(config: TelegramConfig): Promise<void> {
 		this.telegram = new TelegramChannel(config);
-		this.telegram.start(
+		await this.telegram.start(
 			async (message: TelegramMessage) => {
 				if (!message.text && !message.caption) return;
 				const content = message.text || message.caption || "";
@@ -461,96 +478,144 @@ export class AgentRunner {
 		this.logger.info("Discord channel started");
 	}
 
+	/** Wire a generic BaseChannel to ChatService */
+	private async wireBaseChannel(
+		channel: {
+			onMessage: (handler: (msg: any) => Promise<void>) => void;
+			connect: () => Promise<void>;
+			disconnect: () => Promise<void>;
+			sendMessage: (options: any) => Promise<unknown>;
+		},
+		channelName: string,
+	): Promise<void> {
+		// Track for lifecycle management
+		this.activeChannels.add(channel as { disconnect: () => Promise<void> });
+
+		channel.onMessage(async (msg: any) => {
+			const content = msg.text ?? msg.content ?? "";
+			if (!content) return;
+			await this.handleChannelMessage(content, channelName, async (text) => {
+				try {
+					await channel.sendMessage({ text, content: text, body: text });
+				} catch (err: unknown) {
+					const msg2 = err instanceof Error ? err.message : "send failed";
+					this.logger.error(`${channelName} send error`, {
+						error: msg2,
+					});
+				}
+			});
+		});
+		await channel.connect();
+		this.logger.info(`${channelName} channel started`);
+	}
+
 	// ── Slack ────────────────────────────────────────────────────────────────
 
 	private async startSlack(
 		config: import("../channels/slack/types.js").SlackConfig,
 	): Promise<void> {
 		const { SlackChannel } = await import("../channels/slack/channel.js");
-		this.slack = new SlackChannel(config);
-		this.logger.info("Slack channel started");
+		const slack = new SlackChannel(config) as any;
+		this.slack = slack;
+		await this.wireBaseChannel(slack, "slack");
 	}
 
 	// ── WeChat ───────────────────────────────────────────────────────────────
 
 	private async startWeChat(
-		_config: import("../channels/wechat/types.js").WeChatConfig,
+		config: import("../channels/wechat/types.js").WeChatConfig,
 	): Promise<void> {
-		this.logger.info(
-			"WeChat channel configured (start pending implementation)",
-		);
+		const { WeChatChannel } = await import("../channels/wechat/channel.js");
+		const channel = new WeChatChannel(config);
+		await channel.connect();
+		this.logger.info("WeChat channel started");
 	}
 
 	// ── WeCom ────────────────────────────────────────────────────────────────
 
 	private async startWeCom(
-		_config: import("../channels/wecom/types.js").WeComConfig,
+		config: import("../channels/wecom/types.js").WeComConfig,
 	): Promise<void> {
-		this.logger.info("WeCom channel configured (start pending implementation)");
+		const { WeComChannel } = await import("../channels/wecom/channel.js");
+		await this.wireBaseChannel(new WeComChannel(config), "wecom");
 	}
 
 	// ── Feishu ───────────────────────────────────────────────────────────────
 
 	private async startFeishu(
-		_config: import("../channels/feishu/types.js").FeishuConfig,
+		config: import("../channels/feishu/types.js").FeishuConfig,
 	): Promise<void> {
-		this.logger.info(
-			"Feishu channel configured (start pending implementation)",
-		);
+		const { FeishuChannel } = await import("../channels/feishu/channel.js");
+		await this.wireBaseChannel(new FeishuChannel(config), "feishu");
 	}
 
 	// ── Matrix ───────────────────────────────────────────────────────────────
 
 	private async startMatrix(
-		_config: import("../channels/matrix/types.js").MatrixConfig,
+		config: import("../channels/matrix/types.js").MatrixConfig,
 	): Promise<void> {
-		this.logger.info(
-			"Matrix channel configured (start pending implementation)",
-		);
+		const { MatrixChannel } = await import("../channels/matrix/channel.js");
+		await this.wireBaseChannel(new MatrixChannel(config), "matrix");
 	}
 
 	// ── QQ ───────────────────────────────────────────────────────────────────
 
 	private async startQQ(
-		_config: import("../channels/qq/types.js").QQConfig,
+		config: import("../channels/qq/types.js").QQConfig,
 	): Promise<void> {
-		this.logger.info("QQ channel configured (start pending implementation)");
+		const { QQChannel } = await import("../channels/qq/channel.js");
+		await this.wireBaseChannel(new QQChannel(config), "qq");
 	}
 
 	// ── DingTalk ─────────────────────────────────────────────────────────────
 
 	private async startDingTalk(
-		_config: import("../channels/dingtalk/types.js").DingTalkConfig,
+		config: import("../channels/dingtalk/types.js").DingTalkConfig,
 	): Promise<void> {
-		this.logger.info(
-			"DingTalk channel configured (start pending implementation)",
-		);
+		const { DingTalkChannel } = await import("../channels/dingtalk/channel.js");
+		await this.wireBaseChannel(new DingTalkChannel(config), "dingtalk");
 	}
 
 	// ── Email ────────────────────────────────────────────────────────────────
 
 	private async startEmail(
-		_config: import("../channels/email/types.js").EmailConfig,
+		config: import("../channels/email/types.js").EmailConfig,
 	): Promise<void> {
-		this.logger.info("Email channel configured (start pending implementation)");
+		const { EmailChannel } = await import("../channels/email/channel.js");
+		const channel = new EmailChannel(config);
+		channel.onMessage(async (msg: any) => {
+			const content = msg.text ?? msg.content ?? "";
+			if (!content) return;
+			await this.handleChannelMessage(content, "email", async (text) => {
+				try {
+					await channel.sendEmail({ to: "", subject: "", text });
+				} catch (err: unknown) {
+					this.logger.error("email send error", {
+						error: err instanceof Error ? err.message : "send failed",
+					});
+				}
+			});
+		});
+		await channel.connect();
+		this.logger.info("email channel started");
 	}
 
 	// ── Teams ────────────────────────────────────────────────────────────────
 
 	private async startTeams(
-		_config: import("../channels/teams/types.js").TeamsConfig,
+		config: import("../channels/teams/types.js").TeamsConfig,
 	): Promise<void> {
-		this.logger.info("Teams channel configured (start pending implementation)");
+		const { TeamsChannel } = await import("../channels/teams/channel.js");
+		await this.wireBaseChannel(new TeamsChannel(config), "teams");
 	}
 
 	// ── WhatsApp ─────────────────────────────────────────────────────────────
 
 	private async startWhatsApp(
-		_config: import("../channels/whatsapp/types.js").WhatsAppConfig,
+		config: import("../channels/whatsapp/types.js").WhatsAppConfig,
 	): Promise<void> {
-		this.logger.info(
-			"WhatsApp channel configured (start pending implementation)",
-		);
+		const { WhatsAppChannel } = await import("../channels/whatsapp/channel.js");
+		await this.wireBaseChannel(new WhatsAppChannel(config), "whatsapp");
 	}
 
 	// ── WebSocket ────────────────────────────────────────────────────────────
@@ -565,76 +630,54 @@ export class AgentRunner {
 
 	// ── CLI message processing (kept for backward compat) ────────────────────
 
-	/** Process a message through the agent loop (for CLI/API use) */
+	/** Process a message through ChatService (for CLI/API use) */
 	async processMessage(
 		content: string,
-		chatId: number | string,
-		fromId?: number,
-		fromUsername?: string,
-	): Promise<void> {
-		const provider = this.providers[0];
-
-		// Show typing indicator
-		if (this.telegram) {
-			await this.telegram.sendTyping(chatId);
-		}
-
-		const result = await this.loop.processMessage(
-			{
-				role: "user",
-				content,
-				metadata: { chatId, fromId, fromUsername },
-			},
-			provider,
-		);
-
-		// Send response
-		if (this.telegram) {
-			await this.telegram.sendTyping(chatId, "typing");
-			await this.telegram.sendMessage(chatId, result.response);
-		} else {
-			console.log(result.response);
-		}
-	}
-
-	/** Process a message with streaming output */
-	async processMessageStream(
-		_content: string,
-		chatId: number | string,
+		_chatId?: number | string,
 		_fromId?: number,
 		_fromUsername?: string,
 	): Promise<void> {
-		const provider = this.providers[0];
-
-		if (this.telegram) {
-			await this.telegram.sendTyping(chatId);
+		if (!this.chatService || !this.running) {
+			console.log("Agent is not running. Call start() first.");
+			return;
 		}
 
-		let accumulated = "";
-		let firstChunk = true;
+		const result = await this.chatService.sendMessage({
+			messages: [{ role: "user", content }],
+			system: this.config.systemPrompt ?? getSystemPrompt(),
+		});
 
-		for await (const chunk of provider.chatStream({
-			messages: this.loop
-				.getContext()
-				.getFormattedMessages() as import("../providers/types.js").ProviderMessage[],
-			model: this.config.model ?? provider.getConfig().model ?? "default",
-			system: this.config.systemPrompt,
-		})) {
-			accumulated += chunk.delta;
-
-			if (this.telegram) {
-				if (firstChunk) {
-					firstChunk = false;
-					await this.telegram.sendTyping(chatId, "typing");
-				}
-			}
+		if (result.error) {
+			console.error(`Error: ${result.error}`);
+			return;
 		}
 
-		if (this.telegram) {
-			await this.telegram.sendMessage(chatId, accumulated);
-		} else {
-			console.log(accumulated);
+		console.log(result.content);
+	}
+
+	/** Process a message with streaming output (legacy — prefer processMessage) */
+	async processMessageStream(
+		content: string,
+		_chatId?: number | string,
+		_fromId?: number,
+		_fromUsername?: string,
+	): Promise<void> {
+		if (!this.chatService || !this.running) {
+			console.log("Agent is not running. Call start() first.");
+			return;
 		}
+
+		const result = await this.chatService.sendMessage({
+			messages: [{ role: "user", content }],
+			system: this.config.systemPrompt ?? getSystemPrompt(),
+		});
+
+		if (result.error) {
+			console.error(`Error: ${result.error}`);
+			return;
+		}
+
+		console.log(result.content);
 	}
 
 	// ── Private helpers ──────────────────────────────────────────────────────

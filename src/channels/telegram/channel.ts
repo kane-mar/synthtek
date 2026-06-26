@@ -37,6 +37,21 @@ const MEDIA_SEND_METHODS: Record<string, string> = {
 	document: "sendDocument",
 };
 
+/** Telegram API methods that support GET requests (read-only) */
+const GET_METHODS = new Set([
+	"getMe",
+	"getUpdates",
+	"getFile",
+	"getChat",
+	"getChatAdministrators",
+	"getChatMember",
+	"getChatMembersCount",
+	"getUserProfilePhotos",
+	"getWebhookInfo",
+	"getMyCommands",
+	"getBusinessConnection",
+]);
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Escape text for Telegram HTML parse mode */
@@ -378,7 +393,10 @@ export class TelegramChannel {
 	private pollingInterval?: ReturnType<typeof setInterval>;
 	private onMessage?: (message: TelegramMessage) => void;
 	private onError?: (error: Error) => void;
-	private typingTimeout?: ReturnType<typeof setTimeout>;
+	private typingTimeout = new Map<
+		string | number,
+		ReturnType<typeof setTimeout>
+	>();
 	private reconnectAttempts = 0;
 	private started = false;
 
@@ -829,11 +847,35 @@ export class TelegramChannel {
 
 		// If data is a Buffer, send as uploaded file
 		if (Buffer.isBuffer(file.data)) {
-			// Note: In production, use FormData for file uploads
-			body[fileType] = file.data;
-		} else {
-			body[fileType] = file.data;
+			// Use FormData for binary file uploads
+			const formData = new FormData();
+			formData.append("chat_id", String(chatId));
+			const blob = new Blob([file.data.buffer as ArrayBuffer], {
+				type: "application/octet-stream",
+			});
+			formData.append(fileType, blob, file.name);
+			if (caption) formData.append("caption", caption);
+			if (options?.parseMode) formData.append("parse_mode", options.parseMode);
+			if (options?.messageThreadId !== undefined) {
+				formData.append("message_thread_id", String(options.messageThreadId));
+			}
+
+			const response = await fetch(
+				`${API_BASE}${this.config.token}/${method}`,
+				{ method: "POST", body: formData },
+			);
+			const data = (await response.json()) as {
+				ok: boolean;
+				result?: { message_id: number };
+			};
+			if (!data.ok) {
+				throw new Error(`Failed to send ${fileType}: ${JSON.stringify(data)}`);
+			}
+			return data.result ? { messageId: data.result.message_id } : null;
 		}
+
+		// For string URLs, use the standard JSON API
+		body[fileType] = file.data;
 
 		const response = await this.apiCall(method, body);
 		const data = (await response.json()) as {
@@ -959,9 +1001,10 @@ export class TelegramChannel {
 
 	/** Send a typing indicator with auto-refresh */
 	async sendTyping(chatId: number | string, action = "typing"): Promise<void> {
-		// Clear previous typing timeout
-		if (this.typingTimeout) {
-			clearTimeout(this.typingTimeout);
+		// Clear previous typing timeout for this chat
+		const existingTimeout = this.typingTimeout.get(chatId);
+		if (existingTimeout) {
+			clearTimeout(existingTimeout);
 		}
 
 		// Clear previous typing interval for this chat
@@ -984,9 +1027,12 @@ export class TelegramChannel {
 		this.typingTasks.set(chatId, interval);
 
 		// Auto-stop after 30 seconds
-		this.typingTimeout = setTimeout(() => {
-			this.stopTyping(chatId);
-		}, 30_000);
+		this.typingTimeout.set(
+			chatId,
+			setTimeout(() => {
+				this.stopTyping(chatId);
+			}, 30_000),
+		);
 	}
 
 	/** Stop typing indicator for a chat */
@@ -996,9 +1042,10 @@ export class TelegramChannel {
 			clearInterval(interval);
 			this.typingTasks.delete(chatId);
 		}
-		if (this.typingTimeout) {
-			clearTimeout(this.typingTimeout);
-			this.typingTimeout = undefined;
+		const timeout = this.typingTimeout.get(chatId);
+		if (timeout) {
+			clearTimeout(timeout);
+			this.typingTimeout.delete(chatId);
 		}
 	}
 
@@ -1693,7 +1740,18 @@ export class TelegramChannel {
 		this.mediaGroupBuffers.set(bufferKey, buffer);
 
 		// Set timeout to flush buffer
-		const timeout = setTimeout(() => {
+		const timeout = setTimeout(async () => {
+			const buf = this.mediaGroupBuffers.get(bufferKey);
+			if (buf && buf.items.length > 0) {
+				try {
+					await this.apiCall("sendMediaGroup", {
+						chat_id: buf.chatId,
+						media: buf.items,
+					});
+				} catch (err) {
+					console.error("[Telegram] Failed to send media group:", err);
+				}
+			}
 			this.mediaGroupBuffers.delete(bufferKey);
 		}, MEDIA_GROUP_BUFFER_MS);
 		this.mediaGroupTimeouts.set(bufferKey, timeout);
@@ -1763,14 +1821,26 @@ export class TelegramChannel {
 		const timeout = setTimeout(() => controller.abort(), 30_000);
 
 		try {
-			const response = await fetch(url, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
+			const isGetMethod = GET_METHODS.has(method);
+			const response = await fetch(
+				isGetMethod && body
+					? `${url}?${new URLSearchParams(
+							Object.entries(body).map(([k, v]) => [k, String(v)]),
+						)}`
+					: url,
+				{
+					method: isGetMethod ? "GET" : "POST",
+					headers: isGetMethod
+						? undefined
+						: { "Content-Type": "application/json" },
+					body: isGetMethod
+						? undefined
+						: body
+							? JSON.stringify(body)
+							: undefined,
+					signal: controller.signal,
 				},
-				body: body ? JSON.stringify(body) : undefined,
-				signal: controller.signal,
-			});
+			);
 
 			clearTimeout(timeout);
 			return response;

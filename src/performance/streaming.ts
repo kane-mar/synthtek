@@ -12,8 +12,6 @@ const DEFAULT_STREAMING_CONFIG: StreamingConfig = {
 	enableCompression: false,
 };
 
-let chunkCounter = 0;
-
 export class StreamOptimizer {
 	private readonly _config: StreamingConfig;
 	private readonly _buffer: StreamChunk[] = [];
@@ -21,15 +19,11 @@ export class StreamOptimizer {
 	private _totalChunks = 0;
 	private _totalBytes = 0;
 	private _flushTimer: ReturnType<typeof setInterval> | null = null;
+	private _chunkCounter = 0;
 
 	constructor(config?: Partial<StreamingConfig>) {
 		this._config = { ...DEFAULT_STREAMING_CONFIG, ...config };
 		this._startFlushTimer();
-	}
-
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	get flushTimer(): ReturnType<typeof setInterval> | null {
-		return this._flushTimer;
 	}
 
 	push(content: string): void {
@@ -81,9 +75,7 @@ export class StreamOptimizer {
 			totalChunks: this._totalChunks,
 			totalBytes: this._totalBytes,
 			averageLatencyMs: 0,
-			compressedBytes: this._config.enableCompression
-				? Math.floor(this._totalBytes * 0.7)
-				: 0,
+			compressedBytes: 0,
 		};
 	}
 
@@ -91,12 +83,17 @@ export class StreamOptimizer {
 		return this._config.enableCompression;
 	}
 
+	/** Access the internal flush timer (for testing) */
+	getFlushTimer(): ReturnType<typeof setInterval> | null {
+		return this._flushTimer;
+	}
+
 	// ── Private ──────────────────────────────────────────────────────────────
 
 	private _createChunk(content: string, isFinal: boolean): StreamChunk {
-		chunkCounter++;
+		this._chunkCounter++;
 		return {
-			id: `chunk_${chunkCounter}`,
+			id: `chunk_${this._chunkCounter}`,
 			content,
 			timestamp: Date.now(),
 			isFinal,

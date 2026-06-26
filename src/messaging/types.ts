@@ -49,7 +49,7 @@ export interface LLMProviderConfig {
 export interface ProviderManagerLike {
 	list(): LLMProviderConfig[];
 	find?(id: string): LLMProviderConfig | null;
-	getActiveProvider?(providerId?: string): LLMProviderConfig | null;
+	getActiveProvider(providerId?: string): LLMProviderConfig | null;
 }
 
 /** A function that executes the actual LLM completion call */
