@@ -309,6 +309,10 @@ export interface DiscordStats {
 	messagesReceived: number;
 	/** Total messages sent */
 	messagesSent: number;
+	/** Total errors */
+	errors?: number;
+	/** Timestamp of last activity */
+	lastActivity?: number;
 	/** Total media sent */
 	mediaSent: number;
 	/** Active stream buffers */

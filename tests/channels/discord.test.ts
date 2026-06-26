@@ -6,6 +6,7 @@
 import { equal, ok, rejects } from "node:assert";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { DiscordChannel } from "../../src/channels/discord/channel.js";
+import { BaseChannel } from "../../src/channels/base-channel.js";
 
 // ─── Test doubles ────────────────────────────────────────────────────────────
 
@@ -87,6 +88,33 @@ describe("DiscordChannel", () => {
 		} catch {
 			// Ignore cleanup errors
 		}
+	});
+
+	// ─── H1: BaseChannel integration ─────────────────────────────────────────
+
+	describe("BaseChannel integration (H1)", () => {
+		it("extends BaseChannel", () => {
+			channel = new DiscordChannel({ token: "test-token" });
+			ok(channel instanceof BaseChannel);
+		});
+
+		it("supports onMessage / onError registration", () => {
+			channel = new DiscordChannel({ token: "test-token" });
+			ok(typeof channel.onMessage, "function");
+			ok(typeof channel.onError, "function");
+		});
+
+		it("has connect/disconnect lifecycle methods", () => {
+			channel = new DiscordChannel({ token: "test-token" });
+			ok(typeof channel.connect, "function");
+			ok(typeof channel.disconnect, "function");
+		});
+
+		it("provides channel state", () => {
+			channel = new DiscordChannel({ token: "test-token" });
+			ok(typeof channel.isConnected === "function");
+			equal(channel.isConnected(), false);
+		});
 	});
 
 	describe("constructor", () => {

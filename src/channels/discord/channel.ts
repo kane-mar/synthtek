@@ -30,6 +30,8 @@ import {
 	type VoiceChannel,
 } from "discord.js";
 
+import { BaseChannel } from "../base-channel.js";
+
 import type {
 	DiscordChannelInfo,
 	DiscordConfig,
@@ -135,24 +137,20 @@ const DISCORD_MAX_MESSAGE_LEN = 2000;
 const STREAM_EDIT_INTERVAL_MS = 600;
 const TYPING_INTERVAL_MS = 8000;
 
-export class DiscordChannel {
+export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 	private client: Client;
-	private config: Required<DiscordConfig>;
+	protected config: Required<DiscordConfig>;
 	private botUser: any;
-	private onMessage?: (message: DiscordMessage) => void;
-	private onError?: (error: Error) => void;
 	private reconnectAttempts = 0;
 	private presenceInterval: ReturnType<typeof setInterval> | undefined;
-	private started = false;
 
 	// Advanced state
 	private streamBuffers = new Map<string, DiscordStreamBuffer>();
 	private typingIntervals = new Map<string, ReturnType<typeof setInterval>>();
-	private messagesReceived = 0;
-	private messagesSent = 0;
 	private mediaSent = 0;
 
 	constructor(config: DiscordConfig) {
+		super(config);
 		const defaultConfig = {
 			clientId: "",
 			guildIds: [] as string[],
@@ -239,7 +237,7 @@ export class DiscordChannel {
 			}
 			if (msg.type !== 0 && msg.type !== 7 && msg.type !== 19) return;
 			const parsed = parseMessage(msg);
-			this.messagesReceived++;
+			this.recordReceived();
 
 			// Start typing indicator
 			this.sendTypingWithAutoRefresh(msg.channelId);
@@ -254,7 +252,7 @@ export class DiscordChannel {
 			}
 
 			if (parsed.text.trim()) {
-				this.onMessage?.(parsed);
+				this.dispatchMessage(parsed);
 			}
 		});
 
@@ -269,7 +267,7 @@ export class DiscordChannel {
 			}
 			const parsed = parseMessage(newMsg);
 			parsed.isEdited = true;
-			this.onMessage?.(parsed);
+			this.dispatchMessage(parsed);
 		});
 
 		// Handle interaction commands (slash commands)
@@ -289,8 +287,7 @@ export class DiscordChannel {
 			}
 
 			// Forward to message handler
-			if (this.onMessage) {
-				this.onMessage({
+			this.dispatchMessage({
 					messageId: interaction.id,
 					channelId: interaction.channelId,
 					guildId: interaction.guildId,
@@ -310,7 +307,6 @@ export class DiscordChannel {
 					reactionCount: 0,
 					isSystem: false,
 				});
-			}
 		});
 
 		// Handle button interactions
@@ -318,8 +314,7 @@ export class DiscordChannel {
 			if (!interaction.isButton()) return;
 
 			const customId = interaction.customId;
-			if (this.onMessage) {
-				this.onMessage({
+			this.dispatchMessage({
 					messageId: interaction.id,
 					channelId: interaction.channelId,
 					guildId: interaction.guildId,
@@ -339,11 +334,10 @@ export class DiscordChannel {
 					reactionCount: 0,
 					isSystem: false,
 				});
-			}
 		});
 
 		this.client.on("error", (error: Error) => {
-			this.onError?.(error);
+			this.emitError(error);
 		});
 
 		this.client.on("disconnect", () => {
@@ -356,9 +350,9 @@ export class DiscordChannel {
 					`[Discord] Disconnected. Reconnecting in ${this.config.reconnectDelay}ms (attempt ${this.reconnectAttempts})`,
 				);
 				setTimeout(() => {
-					if (this.started) {
+					if (this.isConnected()) {
 						this.client.login(this.config.token).catch((err: Error) => {
-							this.onError?.(err);
+							this.emitError(err);
 						});
 					}
 				}, this.config.reconnectDelay);
@@ -442,19 +436,28 @@ export class DiscordChannel {
 
 	/** Start the Discord bot */
 	async start(
-		onMessage: (message: DiscordMessage) => void,
+		onMessage: (message: DiscordMessage) => void | Promise<void>,
 		onError?: (error: Error) => void,
 	): Promise<void> {
-		this.onMessage = onMessage;
-		this.onError = onError;
-		this.started = true;
+		this.onMessage(async (msg) => {
+			await onMessage(msg);
+		});
+		if (onError) this.onError(event => onError(event.error));
 		await this.client.login(this.config.token);
 	}
 
-	/** Stop the Discord bot */
-	async stop(): Promise<void> {
-		this.started = false;
+	/** Connect to Discord — logs in the client */
+	async connect(): Promise<void> {
+		await this.client.login(this.config.token);
+	}
 
+	/** Backward-compat stop — delegates to disconnect */
+	async stop(): Promise<void> {
+		await this.disconnect();
+	}
+
+	/** Disconnect from Discord */
+	async disconnect(): Promise<void> {
 		// Cancel all typing indicators
 		for (const interval of this.typingIntervals.values()) {
 			clearInterval(interval);
@@ -569,7 +572,7 @@ export class DiscordChannel {
 
 	/** Send an outbound message (integration with agent loop) */
 	async sendOutboundMessage(msg: DiscordOutboundMessage): Promise<void> {
-		if (!this.started) {
+		if (!this.isConnected()) {
 			console.warn("[Discord] Bot not running");
 			return;
 		}
@@ -608,7 +611,7 @@ export class DiscordChannel {
 			for (const chunk of this.splitMessage(msg.content)) {
 				try {
 					await (ch as any).send({ content: chunk });
-					this.messagesSent++;
+					this.recordSent();
 				} catch (error) {
 					console.error("[Discord] Failed to send message:", error);
 				}
@@ -667,11 +670,14 @@ export class DiscordChannel {
 
 	/** Get client stats */
 	getStats(): DiscordStats {
+		const baseStats = super.getStats();
 		return {
 			connected: this.client.readyAt !== null,
 			ready: this.client.isReady(),
-			messagesReceived: this.messagesReceived,
-			messagesSent: this.messagesSent,
+			messagesReceived: baseStats.messagesReceived,
+			messagesSent: baseStats.messagesSent,
+			errors: baseStats.errors,
+			lastActivity: baseStats.lastActivity,
 			mediaSent: this.mediaSent,
 			activeStreams: this.streamBuffers.size,
 			activeTyping: this.typingIntervals.size,
