@@ -3,7 +3,8 @@
  */
 
 import { RateLimiter } from "../core/cli-validation.js";
-import { ConfigServiceImpl, SimpleLogger } from "../core/index.js";
+import { ConfigServiceImpl } from "../core/config.js";
+import { SimpleLogger } from "../core/logger.js";
 
 export const logger = new SimpleLogger({ level: "info", prefix: "synthtek" });
 export const config = new ConfigServiceImpl();
