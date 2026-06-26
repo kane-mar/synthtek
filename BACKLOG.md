@@ -75,7 +75,7 @@ Code quality backlog for synthtek architecture cleanup.
   
   **Impact**: Estimated ~2,000 lines of duplication eliminated across provider implementations. (`src/providers/*/provider.ts`)
 
-- [ ] **H8 — Telegram channel god class (1,852 lines, 50+ methods)** — `src/channels/telegram/channel.ts` does ***everything*** in a single file:
+- [x] **H8 — Split Telegram god class (1,852 lines)** — ~314 lines of formatting helpers extracted to `telegram/format.ts`. Remaining: extract API calls, messaging, admin, polling, streaming. ✅ PARTIALLY FIXED (2026-06-26: format.ts extracted)
   - Markdown → HTML conversion (lines 86-334, ~250 lines of regex spaghetti — this alone should be a utility module)
   - Message sending (`sendMessage`, `sendTextWithHtml`, `sendOutboundMessage`, `sendMedia`, `sendAlbum`, `sendFile`)
   - Media processing
@@ -230,9 +230,9 @@ Code quality backlog for synthtek architecture cleanup.
 12. **[H7/L17]** Extracted `buildProviderConfig()` — eliminated duplicated 11-line config blocks from 10 providers (~110 lines of copy-paste eliminated) ✅
 
 ### Remaining items (Phase 2)
-13. **H1** — Refactor Telegram/Discord to extend BaseChannel (~3,000 lines, massive)
-14. **H6** — Remaining `any` types in Discord (26 casts)
-15. **H8** — Split Telegram god class (1,852 lines)
+13. **H1** — Refactor Telegram/Discord to extend BaseChannel ✅ FIXED
+14. **H6** — Remaining `any` types in Discord ✅ FIXED
+15. **H8** — Split Telegram god class (1,852 lines) ⬜ Partially done (format.ts extracted)
 16. **H9** — Split WebUI server god file (1,430 lines)
 17. **M14** — Standardize sendMessage signatures across channels
 18. **L19** — Reduce property sprawl in Telegram/Discord classes
