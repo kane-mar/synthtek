@@ -42,16 +42,207 @@ describe("AgentRunner", () => {
 		assert.ok(runner);
 	});
 
-	it("creates an instance with telegram token", () => {
+	it("creates an instance with telegram token (legacy)", () => {
 		const config = makeConfig({ telegramToken: "123456:ABC-DEF" });
 		const runner = new AgentRunner(config);
 		assert.ok(runner);
 	});
 
-	it("creates an instance with telegram webhook", () => {
+	it("creates an instance with telegram webhook (legacy)", () => {
 		const config = makeConfig({
 			telegramToken: "123456:ABC-DEF",
 			telegramWebhookUrl: "https://example.com/webhook",
+		});
+		const runner = new AgentRunner(config);
+		assert.ok(runner);
+	});
+
+	it("creates an instance with channelConfigs.telegram", () => {
+		const config = makeConfig({
+			channelConfigs: {
+				telegram: {
+					token: "123:ABC",
+					usePolling: true,
+				},
+			},
+		});
+		const runner = new AgentRunner(config);
+		assert.ok(runner);
+	});
+
+	it("creates an instance with channelConfigs.discord", () => {
+		const config = makeConfig({
+			channelConfigs: {
+				discord: {
+					token: "bot-token",
+				},
+			},
+		});
+		const runner = new AgentRunner(config);
+		assert.ok(runner);
+	});
+
+	it("creates an instance with channelConfigs.slack", () => {
+		const config = makeConfig({
+			channelConfigs: {
+				slack: {
+					token: "xoxb-test",
+				},
+			},
+		});
+		const runner = new AgentRunner(config);
+		assert.ok(runner);
+	});
+
+	it("creates an instance with channelConfigs.wechat", () => {
+		const config = makeConfig({
+			channelConfigs: {
+				wechat: {
+					appId: "wx-test",
+					appSecret: "secret",
+					token: "token",
+					encodingAESKey: "aes-key",
+				},
+			},
+		});
+		const runner = new AgentRunner(config);
+		assert.ok(runner);
+	});
+
+	it("creates an instance with channelConfigs.wecom", () => {
+		const config = makeConfig({
+			channelConfigs: {
+				wecom: {
+					corpId: "corp",
+					agentSecret: "secret",
+					agentId: 1000001,
+				},
+			},
+		});
+		const runner = new AgentRunner(config);
+		assert.ok(runner);
+	});
+
+	it("creates an instance with channelConfigs.feishu", () => {
+		const config = makeConfig({
+			channelConfigs: {
+				feishu: {
+					appId: "app",
+					appSecret: "secret",
+				},
+			},
+		});
+		const runner = new AgentRunner(config);
+		assert.ok(runner);
+	});
+
+	it("creates an instance with channelConfigs.matrix", () => {
+		const config = makeConfig({
+			channelConfigs: {
+				matrix: {
+					homeserver: "https://matrix.org",
+					userId: "@user:matrix.org",
+					accessToken: "token",
+				},
+			},
+		});
+		const runner = new AgentRunner(config);
+		assert.ok(runner);
+	});
+
+	it("creates an instance with channelConfigs.qq", () => {
+		const config = makeConfig({
+			channelConfigs: {
+				qq: {
+					appId: "app-id",
+					token: "token",
+					secret: "secret",
+				},
+			},
+		});
+		const runner = new AgentRunner(config);
+		assert.ok(runner);
+	});
+
+	it("creates an instance with channelConfigs.dingtalk", () => {
+		const config = makeConfig({
+			channelConfigs: {
+				dingtalk: {
+					clientId: "client",
+					clientSecret: "secret",
+				},
+			},
+		});
+		const runner = new AgentRunner(config);
+		assert.ok(runner);
+	});
+
+	it("creates an instance with channelConfigs.email", () => {
+		const config = makeConfig({
+			channelConfigs: {
+				email: {
+					smtpHost: "smtp.example.com",
+					smtpPort: 587,
+					smtpUser: "user",
+					smtpPass: "pass",
+					imapHost: "imap.example.com",
+					imapPort: 993,
+					imapUser: "user",
+					imapPass: "pass",
+					fromAddress: "bot@example.com",
+				},
+			},
+		});
+		const runner = new AgentRunner(config);
+		assert.ok(runner);
+	});
+
+	it("creates an instance with channelConfigs.teams", () => {
+		const config = makeConfig({
+			channelConfigs: {
+				teams: {
+					appId: "app",
+					appPassword: "pass",
+				},
+			},
+		});
+		const runner = new AgentRunner(config);
+		assert.ok(runner);
+	});
+
+	it("creates an instance with channelConfigs.whatsapp", () => {
+		const config = makeConfig({
+			channelConfigs: {
+				whatsapp: {
+					phoneNumberId: "phone",
+					businessId: "biz",
+					accessToken: "token",
+				},
+			},
+		});
+		const runner = new AgentRunner(config);
+		assert.ok(runner);
+	});
+
+	it("creates an instance with channelConfigs.websocket", () => {
+		const config = makeConfig({
+			channelConfigs: {
+				websocket: {
+					port: 8080,
+				},
+			},
+		});
+		const runner = new AgentRunner(config);
+		assert.ok(runner);
+	});
+
+	it("creates an instance with multiple channels", () => {
+		const config = makeConfig({
+			channelConfigs: {
+				telegram: { token: "123:ABC", usePolling: true },
+				discord: { token: "bot-token" },
+				slack: { token: "xoxb-test" },
+			},
 		});
 		const runner = new AgentRunner(config);
 		assert.ok(runner);
