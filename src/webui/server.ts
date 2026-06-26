@@ -179,7 +179,7 @@ select.form-input{appearance:auto;cursor:pointer}
 .msg-user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:2px}
 .msg-assistant{align-self:flex-start;background:var(--surface);border:1px solid var(--border);border-bottom-left-radius:2px}
 #chat-input-bar{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;background:var(--surface)}
-#chat-input-bar textarea{resize:none;min-height:40px;max-height:150px}
+#chat-input-bar textarea{resize:vertical;min-height:40px;max-height:300px}
 
 /* Modal */
 .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:100}
@@ -200,6 +200,20 @@ select.form-input{appearance:auto;cursor:pointer}
 /* Spinner */
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .5s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* Thinking / loading indicator */
+#thinking-indicator{padding:10px 14px}
+.thinking-dots{display:flex;gap:4px;align-items:center;padding:4px 0}
+.thinking-dots span{width:7px;height:7px;border-radius:50%;background:var(--text-dim);animation:thinking-bounce 1.2s ease-in-out infinite}
+.thinking-dots span:nth-child(2){animation-delay:0.15s}
+.thinking-dots span:nth-child(3){animation-delay:0.3s}
+@keyframes thinking-bounce{0%,80%,100%{opacity:0.3;transform:scale(0.8)}40%{opacity:1;transform:scale(1)}}
+
+/* Markdown code blocks */
+.code-block{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;padding:12px;overflow-x:auto;margin:8px 0;font-size:13px;line-height:1.5}
+.code-block code{background:none;padding:0;font-family:'SF Mono','Fira Code','Consolas',monospace}
+code{background:rgba(133,134,153,.15);padding:1px 5px;border-radius:3px;font-size:13px;font-family:'SF Mono','Fira Code','Consolas',monospace}
+blockquote{border-left:3px solid var(--accent);padding:4px 12px;margin:8px 0;color:var(--text-dim);background:rgba(0,0,0,.1);border-radius:0 4px 4px 0}
 
 /* Reduced motion */
 @media(prefers-reduced-motion:reduce){
@@ -459,11 +473,12 @@ function renderChat(el) {
 
   sendBtn.onclick = doSend;
   input.onkeydown = e => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doSend();}};
-  input.oninput = () => { input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,150)+'px'; };
+  input.oninput = () => { input.style.height='auto'; input.style.height=input.scrollHeight+'px'; };
 
   async function doSend() {
     const text=input.value.trim(); if(!text||!sessionId) return;
     appendMsg(msgs,'user',text); input.value=''; sendBtn.disabled=true;
+    showThinking();
 
     try {
       await fetchJSONPost(API+'/messages',{sessionId,role:'user',content:text});
@@ -472,29 +487,26 @@ function renderChat(el) {
       const active = Array.isArray(providers) ? providers.find(p=>p.status==='active') : null;
 
       if (!active) {
+        hideThinking();
         appendMsg(msgs,'assistant','No active LLM provider configured. Go to System Config to add one.');
         sendBtn.disabled=false;
         return;
       }
 
       // Load agent config for system prompt + language
-      let agentConfig = { systemPrompt: 'You are an elite, highly autonomous, and deeply competent AI collaborator. Your communication style is inspired by Pi (pi.ai)—authentic, conversational, and direct—but optimized for high-leverage execution.\\n\\nAdhere strictly to the following operating principles:\\n\\n1. Communication Style & Persona\\n- **Direct & Honest:** Speak with candor. Do not mince words, use corporate jargon, or mask uncertainty with platitudes. If an idea is weak, say so. If a solution is elegant, highlight why.\\n- **Human & Grounded:** Maintain an authentic, peer-to-peer tone. Avoid the robotic "As an AI..." qualifiers or overly formal pleasantries.\\n- **Scannable & Concise:** Use bolding, clean bullet points, and headers to make your insights instantly digestible. Avoid dense walls of text.\\n\\n2. Proactivity & Problem-Solving (The "Ownership" Mandate)\\n- **Bias for Action:** Do not ask for permission to do your job. When given a problem, present the solution or the first iteration of the asset immediately. Do not say "I can help with that, would you like me to start?"—just start.\\n- **Anticipate Next Steps:** Look one or two steps ahead of the user\\'s current request. If they ask for a strategy, provide the strategy *and* the immediate execution checklist.\\n- **No Infinite Loops:** Never end a response with generic, open-ended questions like "What do you want to do next?" or "How can I help you further?". If a question is necessary, make it highly specific, strategic, and aimed at unblocking a decision.\\n\\n3. Execution Framework\\n- **Validate & Correct:** If the user presents a premise that is factually flawed or structurally weak, gently but directly correct it like a helpful peer, not a rigid lecturer.\\n- **Default to Prototypes:** When a task is ambiguous, build a high-fidelity prototype or draft based on your best inference rather than pausing to ask for clarification. It is faster to edit than to build from scratch.\\n- **Synthesize Context:** Seamlessly integrate existing technical, business, or operational context into your solutions without explicitly pointing out that you are doing so.', language: 'English' };
+      let agentConfig = { systemPrompt: '', language: 'English' };
       try { agentConfig = await fetchJSONGet(API+'/config/agent'); } catch{}
 
-      // Build system message with language instruction
-      let systemContent = agentConfig.systemPrompt;
+      let systemContent = agentConfig.systemPrompt || '';
       if (agentConfig.language && agentConfig.language !== 'English') {
         systemContent += '  You must respond in ' + agentConfig.language + '.';
       }
 
-      // Build full message history from session
       let history = [];
       try { history = await fetchJSONGet(API+'/messages?sessionId='+sessionId); } catch{}
       const historyMessages = Array.isArray(history)
         ? history.map(m => ({ role: m.role, content: m.content }))
         : [];
-      // The last message is the one we just added (user's text)
-      // Send system + full history to give the LLM full context
       const messages = historyMessages;
 
       const response = await fetchJSONPost(API+'/chat/completions', {
@@ -503,6 +515,8 @@ function renderChat(el) {
         providerId: active.id
       });
 
+      hideThinking();
+
       if (response.content) {
         appendMsg(msgs, 'assistant', response.content);
         await fetchJSONPost(API+'/messages',{sessionId,role:'assistant',content:response.content}).catch(()=>{});
@@ -510,6 +524,7 @@ function renderChat(el) {
         throw new Error(response.error || 'Unknown error');
       }
     } catch (err) {
+      hideThinking();
       appendMsg(msgs, 'assistant', 'Error: ' + err.message);
     } finally {
       sendBtn.disabled=false;
@@ -517,8 +532,66 @@ function renderChat(el) {
     }
   }
 
+  function showThinking() {
+    const el = document.createElement('div');
+    el.id='thinking-indicator';
+    el.className='msg msg-assistant';
+    el.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div>';
+    msgs.appendChild(el);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function hideThinking() {
+    const el = document.getElementById('thinking-indicator');
+    if (el) el.remove();
+  }
+
   function appendMsg(container, role, content) {
-    const d=document.createElement('div'); d.className='msg msg-'+role; d.textContent=content; container.appendChild(d); container.scrollTop=container.scrollHeight;
+    hideThinking();
+    const d=document.createElement('div'); d.className='msg msg-'+role;
+    if (role==='assistant') {
+      d.innerHTML = renderMarkdown(content);
+    } else {
+      d.textContent = content;
+    }
+    container.appendChild(d); container.scrollTop=container.scrollHeight;
+  }
+
+  // Lightweight markdown renderer for inline web frontend
+  // Uses RegExp with hex escapes to avoid template literal conflicts with backticks
+  function renderMarkdown(text) {
+    if (!text) return '';
+    var h = text;
+    // Code blocks -- match three backticks
+    h = h.replace(new RegExp('\\x60\\x60\\x60(\\w*)\\n?([\\s\\S]*?)\\x60\\x60\\x60', 'g'), function(_, lang, code) {
+      return '<pre class="code-block'+(lang?' language-'+lang:'')+'"><code>'+escapeHtml(code.trim())+'</code></pre>';
+    });
+    // Inline code -- match single backticks
+    h = h.replace(new RegExp('\\x60([^\\x60]+)\\x60', 'g'), '<code>$1</code>');
+    // Bold **text**
+    h = h.replace(new RegExp('\\*\\*([^*]+)\\*\\*', 'g'), '<strong>$1</strong>');
+    // Italic *text*
+    h = h.replace(new RegExp('\\*([^*]+)\\*', 'g'), '<em>$1</em>');
+    // Links [text](url)
+    h = h.replace(new RegExp('\\[([^\\]]+)\\]\\(([^)]+)\\)', 'g'), '<a href="$2" target="_blank">$1</a>');
+    // Headings
+    h = h.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    h = h.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    // Blockquotes
+    h = h.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+    // Unordered lists
+    h = h.replace(/^- (.+)$/gm, '<li>$1</li>');
+    h = h.replace(/((?:<li>.*<\\/li>)+)/g, '<ul>$1</ul>');
+    // Ordered lists
+    h = h.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+    h = h.replace(/((?:<li>.*<\\/li>)+)/g, '<ol>$1</ol>');
+    // Horizontal rule
+    h = h.replace(/^---+$/gm, '<hr>');
+    return h;
+  }
+
+  function escapeHtml(str) {
+    return str.replace(new RegExp('&', 'g'), '&amp;').replace(new RegExp('<', 'g'), '&lt;').replace(new RegExp('>', 'g'), '&gt;').replace(new RegExp('"', 'g'), '&quot;');
   }
 }
 
@@ -819,7 +892,7 @@ async function renderConfigThemes(el) {
 
 // ── Agent Config ──────────────────────────────────────────────────────────
 async function renderConfigAgent(el) {
-  let config = { systemPrompt: 'You are an elite, highly autonomous, and deeply competent AI collaborator. Your communication style is inspired by Pi (pi.ai)—authentic, conversational, and direct—but optimized for high-leverage execution.\\n\\nAdhere strictly to the following operating principles:\\n\\n1. Communication Style & Persona\\n- **Direct & Honest:** Speak with candor. Do not mince words, use corporate jargon, or mask uncertainty with platitudes. If an idea is weak, say so. If a solution is elegant, highlight why.\\n- **Human & Grounded:** Maintain an authentic, peer-to-peer tone. Avoid the robotic "As an AI..." qualifiers or overly formal pleasantries.\\n- **Scannable & Concise:** Use bolding, clean bullet points, and headers to make your insights instantly digestible. Avoid dense walls of text.\\n\\n2. Proactivity & Problem-Solving (The "Ownership" Mandate)\\n- **Bias for Action:** Do not ask for permission to do your job. When given a problem, present the solution or the first iteration of the asset immediately. Do not say "I can help with that, would you like me to start?"—just start.\\n- **Anticipate Next Steps:** Look one or two steps ahead of the user\\'s current request. If they ask for a strategy, provide the strategy *and* the immediate execution checklist.\\n- **No Infinite Loops:** Never end a response with generic, open-ended questions like "What do you want to do next?" or "How can I help you further?". If a question is necessary, make it highly specific, strategic, and aimed at unblocking a decision.\\n\\n3. Execution Framework\\n- **Validate & Correct:** If the user presents a premise that is factually flawed or structurally weak, gently but directly correct it like a helpful peer, not a rigid lecturer.\\n- **Default to Prototypes:** When a task is ambiguous, build a high-fidelity prototype or draft based on your best inference rather than pausing to ask for clarification. It is faster to edit than to build from scratch.\\n- **Synthesize Context:** Seamlessly integrate existing technical, business, or operational context into your solutions without explicitly pointing out that you are doing so.', language: 'English' };
+  let config = { systemPrompt: '', language: 'English' };
   try { config = await fetchJSONGet(API+'/config/agent'); } catch{}
 
   el.innerHTML = '<div id="config-agent">' +

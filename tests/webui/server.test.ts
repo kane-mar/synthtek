@@ -48,6 +48,24 @@ describe("WebUIServer", () => {
 			const html = await res.text();
 			assert.ok(html.includes("Synthtek"));
 			assert.ok(html.includes("<!DOCTYPE html>"));
+			// ── Loading indicator ───────────────────────────────────────────
+			assert.ok(
+				html.includes("thinking") ||
+					html.includes("spinner") ||
+					html.includes("loading-indicator"),
+				"Frontend must have a loading indicator for AI responses",
+			);
+			// ── Markdown rendering ──────────────────────────────────────────
+			assert.ok(
+				html.includes("renderMarkdown") ||
+					(html.includes("**") && html.includes("```")),
+				"Frontend must render markdown in assistant messages",
+			);
+			// ── Resizable textarea ──────────────────────────────────────────
+			assert.ok(
+				html.includes("resize:vertical") || html.includes("resize: both"),
+				"Message textarea must be user-resizable",
+			);
 		} finally {
 			await server.stop();
 		}
