@@ -2,6 +2,8 @@
  * Telegram Channel — Bot API integration for synthtek
  */
 
+import type { StreamBuffer } from "../../performance/types.js";
+
 export type TelegramGroupPolicy = "open" | "mention";
 
 export interface TelegramConfig {
@@ -210,16 +212,8 @@ export interface TelegramReaction {
 
 // ─── Streaming ───────────────────────────────────────────────────────────────
 
-export interface TelegramStreamBuffer {
-	/** Accumulated text */
-	text: string;
-	/** Message ID being edited */
-	messageId: number | null;
-	/** Last edit timestamp (ms) */
-	lastEdit: number;
-	/** Stream session ID */
-	streamId: string | null;
-}
+/** Stream buffer for Telegram streaming output */
+export type TelegramStreamBuffer = StreamBuffer<number>;
 
 // ─── Reply Context ───────────────────────────────────────────────────────────
 

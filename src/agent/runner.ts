@@ -31,8 +31,6 @@ import {
 import type { LLMProvider } from "../providers/types.js";
 import { type AgentHooks, AgentLoop, type AgentLoopConfig } from "./index.js";
 
-registerDefaultProviders();
-
 export interface AgentRunnerConfig {
 	/** Provider type to use (openai, anthropic, openrouter, ollama, lmstudio, llamacpp) */
 	provider: string;
@@ -76,6 +74,7 @@ export class AgentRunner {
 	private providers: LLMProvider[];
 
 	constructor(config: AgentRunnerConfig) {
+		registerDefaultProviders();
 		this.config = config;
 		this.logger = new SimpleLogger({
 			level: config.logLevel ?? "info",

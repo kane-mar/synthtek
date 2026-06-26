@@ -2,6 +2,8 @@
  * Discord Channel — Discord.js integration for synthtek
  */
 
+import type { StreamBuffer } from "../../performance/types.js";
+
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 export interface DiscordConfig {
@@ -257,16 +259,8 @@ export interface DiscordPermission {
 
 // ─── Streaming ───────────────────────────────────────────────────────────────
 
-export interface DiscordStreamBuffer {
-	/** Accumulated text */
-	text: string;
-	/** Message ID being edited */
-	messageId: string | null;
-	/** Last edit timestamp (ms) */
-	lastEdit: number;
-	/** Stream session ID */
-	streamId: string | null;
-}
+/** Stream buffer for Discord streaming output */
+export type DiscordStreamBuffer = StreamBuffer<string>;
 
 // ─── Outbound Message ────────────────────────────────────────────────────────
 

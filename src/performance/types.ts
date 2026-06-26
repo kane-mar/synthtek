@@ -142,6 +142,15 @@ export interface StreamChunk {
 	isFinal: boolean;
 }
 
+/** Shared stream buffer for channel streaming output */
+export interface StreamBuffer<TMessageId = string | number> {
+	text: string;
+	messageId: TMessageId | null;
+	lastEdit: number;
+	timer?: ReturnType<typeof setTimeout>;
+	streamId?: string | null;
+}
+
 export interface StreamStats {
 	totalChunks: number;
 	totalBytes: number;

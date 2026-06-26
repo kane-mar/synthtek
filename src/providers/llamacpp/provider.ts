@@ -6,11 +6,11 @@
 import type {
 	ChatCompletionRequest,
 	ChatCompletionResponse,
-	LLMProvider,
 	ProviderConfig,
 	ProviderMessage,
 	StreamChunk,
 } from "../types.js";
+import { buildProviderConfig } from "../base-provider.js";
 
 const DEFAULT_CONFIG: Partial<ProviderConfig> = {
 	baseUrl: "http://localhost:8080/v1",
@@ -18,6 +18,7 @@ const DEFAULT_CONFIG: Partial<ProviderConfig> = {
 	timeout: 120_000,
 	retries: 2,
 	retryDelay: 1000,
+	apiKey: "llamacpp",
 };
 
 function toOpenAICompatibleMessages(messages: ProviderMessage[]): Array<{
@@ -34,21 +35,12 @@ function toOpenAICompatibleMessages(messages: ProviderMessage[]): Array<{
 	}));
 }
 
-export class LlamaCppProvider implements LLMProvider {
+export class LlamaCppProvider {
 	readonly name = "llamacpp";
 	private config: Required<ProviderConfig>;
 
 	constructor(config: ProviderConfig) {
-		this.config = {
-			provider: "llamacpp",
-			apiKey: config.apiKey || "llamacpp",
-			baseUrl: config.baseUrl ?? (DEFAULT_CONFIG.baseUrl as string),
-			model: config.model || (DEFAULT_CONFIG.model as string),
-			timeout: config.timeout || (DEFAULT_CONFIG.timeout as number),
-			retries: config.retries ?? (DEFAULT_CONFIG.retries as number),
-			retryDelay: config.retryDelay || (DEFAULT_CONFIG.retryDelay as number),
-			headers: config.headers || {},
-		};
+		this.config = buildProviderConfig(config, DEFAULT_CONFIG, "llamacpp");
 	}
 
 	getConfig(): ProviderConfig {

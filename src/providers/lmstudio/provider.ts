@@ -4,13 +4,15 @@
  */
 
 import type {
+	LLMProvider,
 	ChatCompletionRequest,
 	ChatCompletionResponse,
-	LLMProvider,
+	
 	ProviderConfig,
 	ProviderMessage,
 	StreamChunk,
 } from "../types.js";
+import { buildProviderConfig } from "../base-provider.js";
 
 const DEFAULT_CONFIG: Partial<ProviderConfig> = {
 	baseUrl: "http://localhost:1234/v1",
@@ -40,16 +42,7 @@ export class LMStudioProvider implements LLMProvider {
 	private config: Required<ProviderConfig>;
 
 	constructor(config: ProviderConfig) {
-		this.config = {
-			provider: "lmstudio",
-			apiKey: config.apiKey || "lmstudio", // LM Studio doesn't require an API key
-			baseUrl: config.baseUrl ?? (DEFAULT_CONFIG.baseUrl as string),
-			model: config.model || (DEFAULT_CONFIG.model as string),
-			timeout: config.timeout || (DEFAULT_CONFIG.timeout as number),
-			retries: config.retries ?? (DEFAULT_CONFIG.retries as number),
-			retryDelay: config.retryDelay || (DEFAULT_CONFIG.retryDelay as number),
-			headers: config.headers || {},
-		};
+		this.config = buildProviderConfig(config, DEFAULT_CONFIG, "lmstudio");
 	}
 
 	getConfig(): ProviderConfig {

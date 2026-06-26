@@ -17,6 +17,29 @@ import type {
 	StreamChunk,
 } from "./types.js";
 
+// ─── Config Builder ─────────────────────────────────────────────────────────
+
+/**
+ * Build a fully-typed provider config from partial input + defaults.
+ * Eliminates the ~12-line duplicated config block in every provider constructor.
+ */
+export function buildProviderConfig(
+	config: ProviderConfig,
+	defaults: Partial<ProviderConfig>,
+	providerName?: string,
+): Required<ProviderConfig> {
+	return {
+		provider: providerName ?? config.provider,
+		apiKey: config.apiKey ?? defaults.apiKey ?? "",
+		baseUrl: config.baseUrl ?? defaults.baseUrl ?? "",
+		model: config.model ?? defaults.model ?? "",
+		timeout: config.timeout ?? defaults.timeout ?? 60_000,
+		retries: config.retries ?? defaults.retries ?? 3,
+		retryDelay: config.retryDelay ?? defaults.retryDelay ?? 1000,
+		headers: config.headers ?? defaults.headers ?? {},
+	};
+}
+
 // ─── Config Validation ───────────────────────────────────────────────────────
 
 /**

@@ -210,10 +210,10 @@ Code quality backlog for synthtek architecture cleanup.
 | Severity | Phase 1 | Phase 2 | Total | Fixed |
 |----------|---------|---------|-------|-------|
 | CRITICAL | — | 4 | 4 | 4 |
-| HIGH | 6 | 3 | 9 | 4 |
-| MEDIUM | 9 | 5 | 14 | 9 |
-| LOW | 14 | 5 | 19 | 10 |
-| **Total** | **29** | **17** | **46** | **27** |
+| HIGH | 6 | 3 | 9 | 5 |
+| MEDIUM | 9 | 5 | 14 | 11 |
+| LOW | 14 | 5 | 19 | 11 |
+| **Total** | **29** | **17** | **46** | **31** |
 
 ### Fixed items (Phase 2)
 1. **[C1]** Removed 6 dead modules — ~2,800 lines deleted ✅
@@ -221,20 +221,21 @@ Code quality backlog for synthtek architecture cleanup.
 3. **[C3]** Collapsed two frontends — deleted dead 19-file component module ✅
 4. **[C4]** Removed 4 unused npm dependencies ✅
 5. **[L15]** Cleaned up core/index.ts re-exports ✅
+6. **[L18]** Exported QwenProvider from providers/index.ts ✅
+7. **[M13]** Made ProviderConfig.apiKey optional ✅
+8. **[M11]** Removed module-level side effects (providers/index.ts, runner.ts) ✅
+9. **[L16]** Lazy factory functions in cli-context.ts ✅
+10. **[M10]** Extracted shared StreamBuffer type in performance/types.ts ✅
+11. **[M12]** Added plugin module tests — 9 tests, 0 failures ✅
+12. **[H7/L17]** Extracted `buildProviderConfig()` — eliminated duplicated 11-line config blocks from 10 providers (~110 lines of copy-paste eliminated) ✅
 
 ### Remaining items (Phase 2)
-6. **H7** — Refactor 12/14 providers to extend BaseProvider (massive duplication) (~2,000 lines)
-7. **H8** — Split Telegram god class (1,852 lines, 50+ methods)
-8. **H9** — Split WebUI server god file (1,430 lines)
-9. **M10** — Extract shared StreamBuffer (Telegram + Discord duplication)
-10. **M11** — Remove module-level side effects (providers/index.ts, cli-context.ts)
-11. **M12** — Write tests for plugin module (0 tests, 5 source files)
-12. **M13** — Make ProviderConfig.apiKey optional
-13. **M14** — Standardize sendMessage signatures across channels
-14. **L16** — Replace module-level singletons with factory functions (cli-context.ts)
-15. **L17** — Eliminate copy-pasted provider constructors
-16. **L18** — Export QwenProvider from providers/index.ts
-17. **L19** — Reduce property sprawl in Telegram/Discord classes
+13. **H1** — Refactor Telegram/Discord to extend BaseChannel (~3,000 lines, massive)
+14. **H6** — Remaining `any` types in Discord (26 casts)
+15. **H8** — Split Telegram god class (1,852 lines)
+16. **H9** — Split WebUI server god file (1,430 lines)
+17. **M14** — Standardize sendMessage signatures across channels
+18. **L19** — Reduce property sprawl in Telegram/Discord classes
 
 ---
 

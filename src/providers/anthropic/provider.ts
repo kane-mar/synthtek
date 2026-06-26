@@ -11,6 +11,7 @@ import type {
 	ProviderMessage,
 	StreamChunk,
 } from "../types.js";
+import { buildProviderConfig } from "../base-provider.js";
 
 const DEFAULT_CONFIG: Partial<ProviderConfig> = {
 	baseUrl: "https://api.anthropic.com/v1",
@@ -186,16 +187,7 @@ export class AnthropicProvider implements LLMProvider {
 	private thinkingBudget: number;
 
 	constructor(config: ProviderConfig) {
-		this.config = {
-			provider: "anthropic",
-			apiKey: config.apiKey,
-			baseUrl: config.baseUrl ?? (DEFAULT_CONFIG.baseUrl as string),
-			model: config.model || (DEFAULT_CONFIG.model as string),
-			timeout: config.timeout || (DEFAULT_CONFIG.timeout as number),
-			retries: config.retries ?? (DEFAULT_CONFIG.retries as number),
-			retryDelay: config.retryDelay || (DEFAULT_CONFIG.retryDelay as number),
-			headers: config.headers || {},
-		};
+		this.config = buildProviderConfig(config, DEFAULT_CONFIG, "anthropic");
 		this.promptCaching = (config.promptCaching as boolean) ?? false;
 		this.adaptiveThinking = (config.adaptiveThinking as boolean) ?? false;
 		this.extendedThinking = (config.extendedThinking as boolean) ?? false;

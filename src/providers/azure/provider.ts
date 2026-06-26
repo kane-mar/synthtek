@@ -12,6 +12,7 @@ import type {
 	ProviderMessage,
 	StreamChunk,
 } from "../types.js";
+import { buildProviderConfig } from "../base-provider.js";
 
 const DEFAULT_CONFIG: Partial<ProviderConfig> = {
 	baseUrl: "https://openai.azure.com",
@@ -55,16 +56,7 @@ export class AzureOpenAIProvider implements LLMProvider {
 	private apiVersion: string;
 
 	constructor(config: ProviderConfig) {
-		this.config = {
-			provider: "azure",
-			apiKey: config.apiKey,
-			baseUrl: config.baseUrl ?? (DEFAULT_CONFIG.baseUrl as string),
-			model: config.model || (DEFAULT_CONFIG.model as string),
-			timeout: config.timeout || (DEFAULT_CONFIG.timeout as number),
-			retries: config.retries ?? (DEFAULT_CONFIG.retries as number),
-			retryDelay: config.retryDelay || (DEFAULT_CONFIG.retryDelay as number),
-			headers: config.headers || {},
-		};
+		this.config = buildProviderConfig(config, DEFAULT_CONFIG, "azure");
 		// Azure uses deployment name instead of model in the URL
 		this.deployment = (config.deployment as string) || this.config.model;
 		this.apiVersion = (config.apiVersion as string) || AZURE_API_VERSION;
