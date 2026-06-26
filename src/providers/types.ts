@@ -141,8 +141,8 @@ export interface LLMProvider {
 export interface ProviderConfig {
 	/** Provider name */
 	provider: string;
-	/** API key */
-	apiKey: string;
+	/** API key (required for cloud providers, optional for local) */
+	apiKey?: string;
 	/** Base URL (for custom endpoints) */
 	baseUrl?: string;
 	/** Default model */

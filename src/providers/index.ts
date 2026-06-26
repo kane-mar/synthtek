@@ -84,5 +84,5 @@ export function registerDefaultProviders(): void {
 	}
 }
 
-// Auto-register on import
-registerDefaultProviders();
+// Auto-registration removed — call registerDefaultProviders() explicitly
+// from your application entry point or runner constructor.

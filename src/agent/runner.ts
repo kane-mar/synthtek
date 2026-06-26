@@ -14,6 +14,14 @@ import type {
 	TelegramConfig,
 	TelegramMessage,
 } from "../channels/telegram/types.js";
+
+/** Common message shape shared across all channel message types */
+export interface ChannelMessage {
+	text?: unknown;
+	content?: unknown;
+	body?: unknown;
+}
+
 import { getSystemPrompt } from "../config/agent-config.js";
 import { SimpleLogger } from "../core/logger.js";
 import type { ChannelConfigs } from "../messaging/channel-configs.js";
@@ -480,7 +488,7 @@ export class AgentRunner {
 	/** Wire a generic BaseChannel to ChatService */
 	private async wireBaseChannel(
 		channel: {
-			onMessage: (handler: (msg: any) => Promise<void>) => void;
+			onMessage: (handler: (msg: ChannelMessage) => Promise<void>) => void;
 			connect: () => Promise<void>;
 			disconnect: () => Promise<void>;
 			sendMessage: (options: any) => Promise<unknown>;
@@ -490,8 +498,8 @@ export class AgentRunner {
 		// Track for lifecycle management
 		this.activeChannels.add(channel as { disconnect: () => Promise<void> });
 
-		channel.onMessage(async (msg: any) => {
-			const content = msg.text ?? msg.content ?? "";
+		channel.onMessage(async (msg: ChannelMessage) => {
+			const content = String(msg.text ?? msg.content ?? "");
 			if (!content) return;
 			await this.handleChannelMessage(content, channelName, async (text) => {
 				try {

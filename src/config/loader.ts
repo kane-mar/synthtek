@@ -52,7 +52,7 @@ function providerConfigFromEnv(): ProviderConfig | undefined {
 	if (!provider) return undefined;
 
 	return {
-		provider: provider as any,
+		provider: provider as import("../providers/types.js").ProviderType,
 		apiKey: getEnv("SYNTHTEK_API_KEY", "") ?? "",
 		baseUrl: getEnv("SYNTHTEK_BASE_URL"),
 		model: getEnv("SYNTHTEK_MODEL"),
@@ -84,7 +84,10 @@ function loopConfigFromEnv(): AgentLoopConfig | undefined {
 	return {
 		systemPrompt,
 		maxToolCalls: getEnvNumber("SYNTHTEK_MAX_TOOL_CALLS", 20) ?? 20,
-		responseFormat: (getEnv("SYNTHTEK_RESPONSE_FORMAT") as any) ?? "markdown",
+		responseFormat:
+			(getEnv(
+				"SYNTHTEK_RESPONSE_FORMAT",
+			) as import("../config/schema.js").ResponseFormat) ?? "markdown",
 		model: getEnv("SYNTHTEK_MODEL"),
 		maxTokens: getEnvNumber("SYNTHTEK_MAX_TOKENS"),
 		temperature: getEnvNumber("SYNTHTEK_TEMPERATURE"),

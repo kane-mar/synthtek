@@ -8,7 +8,7 @@
     "synthtek": "dist/src/cli.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/webui/frontend.html dist/src/webui/frontend.html",
     "start": "node dist/src/cli.js",
     "dev": "node --enable-source-maps src/cli.ts",
     "test": "npm run build && node --test --test-concurrency=4 --test-skip-pattern='/webui-e2e-playwright/' dist/tests/**/*.test.js",
@@ -34,7 +34,6 @@
     "node": ">=20.0.0"
   },
 	"dependencies": {
-		"@modelcontextprotocol/sdk": "^1.29.0",
 		"commander": "^12.0.0",
 		"discord.js": "^14.26.3",
 		"glob": "^10.3.10"

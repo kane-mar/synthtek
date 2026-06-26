@@ -406,13 +406,13 @@ describe("SlackChannel", () => {
 				ts: "1234567890.123456",
 				user: "U123456",
 				text: "Edited text",
-				edited: 1234567891,
+				edited: { ts: "1234567891.000001", user: "U123456" },
 				channel_type: "channel",
 			});
 
 			ok(received);
 			equal(received.isEdited, true);
-			equal(received.editedTs, "1234567891");
+			equal(received.editedTs, "1234567891.000001");
 		});
 
 		it("handles messages with files", async () => {

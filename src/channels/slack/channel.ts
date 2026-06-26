@@ -9,9 +9,14 @@ import type {
 	SlackBlockMessage,
 	SlackChannelInfo,
 	SlackConfig,
+	SlackEvent,
+	SlackEventFile,
 	SlackFile,
+	SlackListedChannel,
 	SlackMessage,
 	SlackReaction,
+	SlackReactionItem,
+	SlackSectionBlock,
 	SlackSendOptions,
 	SlackTeamInfo,
 	SlackUploadOptions,
@@ -22,9 +27,9 @@ import type {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Convert a Slack event message to our unified format */
-function parseMessage(event: any): SlackMessage {
+function parseMessage(event: SlackEvent): SlackMessage {
 	const isBotMessage = !!(event.bot_id || event.type === "bot_message");
-	const files = (event.files || []).map((f: any) => ({
+	const files = (event.files || []).map((f: SlackEventFile) => ({
 		id: f.id,
 		name: f.name || "",
 		mimetype: f.mimetype || "",
@@ -33,19 +38,19 @@ function parseMessage(event: any): SlackMessage {
 	}));
 
 	const imageUrls = files
-		.filter((f: any) => f.mimetype.startsWith("image/"))
-		.map((f: any) => f.url);
+		.filter((f) => f.mimetype.startsWith("image/"))
+		.map((f) => f.url);
 
 	return {
-		messageId: event.ts,
-		channelId: event.channel,
+		messageId: event.ts || "",
+		channelId: event.channel || "",
 		threadTs: event.thread_ts || undefined,
 		fromId: event.user || event.bot_id || "",
 		fromUsername: event.user || undefined,
 		fromName: event.username || undefined,
 		text: event.text || "",
 		isBotMessage,
-		ts: event.ts,
+		ts: event.ts || "",
 		messageType: event.type as SlackMessage["messageType"],
 		files,
 		imageUrls,
@@ -53,7 +58,11 @@ function parseMessage(event: any): SlackMessage {
 		parentUserId: event.parent_user_id || undefined,
 		channelType: event.channel_type || "unknown",
 		isEdited: !!event.edited,
-		editedTs: event.edited ? String(event.edited) : undefined,
+		editedTs: event.edited
+			? typeof event.edited === "object"
+				? event.edited.ts
+				: String(event.edited)
+			: undefined,
 	};
 }
 
@@ -184,7 +193,7 @@ export class SlackChannel extends BaseChannel<SlackConfig, SlackMessage> {
 	}
 
 	/** Process an incoming Slack event */
-	async processEvent(event: any): Promise<void> {
+	async processEvent(event: SlackEvent): Promise<void> {
 		if (event.type !== "message") return;
 		if (event.subtype && event.subtype !== "thread_broadcast") return;
 
@@ -196,18 +205,54 @@ export class SlackChannel extends BaseChannel<SlackConfig, SlackMessage> {
 	}
 
 	/** Send a message to a channel */
+	/**
+	 * Send a message to a Slack channel.
+	 * Supports both positional (channelId, text, opts) and object ({ channelId, text, ...opts }) signatures.
+	 */
 	async sendMessage(
-		channelId: string,
-		text: string,
+		channelIdOrOptions:
+			| string
+			| {
+					channelId: string;
+					text: string;
+					replyToMessageId?: string;
+					threadTs?: string;
+					replyBroadcast?: boolean;
+					unfurlLinks?: boolean;
+					unfurlMedia?: boolean;
+					channel?: string;
+					mrkdwn?: boolean;
+			  },
+		text?: string,
 		options?: SlackSendOptions,
 	): Promise<string[]> {
+		// Normalize arguments: support both positional and object signatures
+		const channelId: string =
+			typeof channelIdOrOptions === "object"
+				? channelIdOrOptions.channelId
+				: channelIdOrOptions;
+		const messageText: string =
+			typeof channelIdOrOptions === "object" ? channelIdOrOptions.text : text!;
+		const mergedOptions: SlackSendOptions =
+			typeof channelIdOrOptions === "object"
+				? {
+						replyToMessageId: channelIdOrOptions.replyToMessageId,
+						threadTs: channelIdOrOptions.threadTs,
+						replyBroadcast: channelIdOrOptions.replyBroadcast,
+						unfurlLinks: channelIdOrOptions.unfurlLinks,
+						unfurlMedia: channelIdOrOptions.unfurlMedia,
+						channel: channelIdOrOptions.channel,
+						mrkdwn: channelIdOrOptions.mrkdwn,
+					}
+				: (options ?? {});
+
 		const sentIds: string[] = [];
-		const chunks = splitMessage(text);
+		const chunks = splitMessage(messageText);
 
 		for (const chunk of chunks) {
-			const blockMsg = buildBlockMessage(chunk, options);
+			const blockMsg = buildBlockMessage(chunk, mergedOptions);
 			const result = await this.apiCall("chat.postMessage", "POST", {
-				channel: options?.channel || channelId,
+				channel: mergedOptions?.channel || channelId,
 				...blockMsg,
 			});
 
@@ -225,7 +270,8 @@ export class SlackChannel extends BaseChannel<SlackConfig, SlackMessage> {
 		options?: SlackSendOptions,
 	): Promise<string> {
 		const fallbackText =
-			(blocks as any).find((b: any) => b.type === "section")?.text?.text || "";
+			(blocks as SlackSectionBlock[]).find((b) => b.type === "section")?.text
+				?.text || "";
 
 		const result = await this.apiCall("chat.postMessage", "POST", {
 			channel: options?.channel || channelId,
@@ -312,7 +358,7 @@ export class SlackChannel extends BaseChannel<SlackConfig, SlackMessage> {
 			timestamp,
 		});
 
-		return (result.items?.[0]?.reactions || []).map((r: any) => ({
+		return (result.items?.[0]?.reactions || []).map((r: SlackReactionItem) => ({
 			name: r.name,
 			count: r.users?.length || 0,
 			users: r.users || [],
@@ -399,7 +445,7 @@ export class SlackChannel extends BaseChannel<SlackConfig, SlackMessage> {
 		});
 
 		return {
-			channels: result.channels.map((ch: any) => ({
+			channels: result.channels.map((ch: SlackListedChannel) => ({
 				id: ch.id,
 				name: ch.name || "",
 				type: ch.is_im

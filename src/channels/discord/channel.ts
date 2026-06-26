@@ -145,9 +145,11 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 	private presenceInterval: ReturnType<typeof setInterval> | undefined;
 
 	// Advanced state
-	private streamBuffers = new Map<string, DiscordStreamBuffer>();
-	private typingIntervals = new Map<string, ReturnType<typeof setInterval>>();
-	private mediaSent = 0;
+	private runtime: {
+		streamBuffers: Map<string, DiscordStreamBuffer>;
+		typingIntervals: Map<string, ReturnType<typeof setInterval>>;
+		mediaSent: number;
+	} = { streamBuffers: new Map(), typingIntervals: new Map(), mediaSent: 0 };
 
 	constructor(config: DiscordConfig) {
 		super(config);
@@ -288,25 +290,25 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 
 			// Forward to message handler
 			this.dispatchMessage({
-					messageId: interaction.id,
-					channelId: interaction.channelId,
-					guildId: interaction.guildId,
-					fromId: userId,
-					fromUsername: interaction.user?.username ?? "unknown",
-					text: `/${command} ${interaction.options?.getString("query") ?? ""}`,
-					isEdited: false,
-					createdAt: Date.now(),
-					attachments: [],
-					embeds: [],
-					mentionedUserIds: [],
-					mentionedRoleIds: [],
-					channelType: interaction.channel?.type ?? 0,
-					messageType: 0,
-					hasComponents: false,
-					emoji: [],
-					reactionCount: 0,
-					isSystem: false,
-				});
+				messageId: interaction.id,
+				channelId: interaction.channelId,
+				guildId: interaction.guildId,
+				fromId: userId,
+				fromUsername: interaction.user?.username ?? "unknown",
+				text: `/${command} ${interaction.options?.getString("query") ?? ""}`,
+				isEdited: false,
+				createdAt: Date.now(),
+				attachments: [],
+				embeds: [],
+				mentionedUserIds: [],
+				mentionedRoleIds: [],
+				channelType: interaction.channel?.type ?? 0,
+				messageType: 0,
+				hasComponents: false,
+				emoji: [],
+				reactionCount: 0,
+				isSystem: false,
+			});
 		});
 
 		// Handle button interactions
@@ -315,25 +317,25 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 
 			const customId = interaction.customId;
 			this.dispatchMessage({
-					messageId: interaction.id,
-					channelId: interaction.channelId,
-					guildId: interaction.guildId,
-					fromId: interaction.user?.id,
-					fromUsername: interaction.user?.username ?? "unknown",
-					text: `button:${customId}`,
-					isEdited: false,
-					createdAt: Date.now(),
-					attachments: [],
-					embeds: [],
-					mentionedUserIds: [],
-					mentionedRoleIds: [],
-					channelType: interaction.channel?.type ?? 0,
-					messageType: 0,
-					hasComponents: false,
-					emoji: [],
-					reactionCount: 0,
-					isSystem: false,
-				});
+				messageId: interaction.id,
+				channelId: interaction.channelId,
+				guildId: interaction.guildId,
+				fromId: interaction.user?.id,
+				fromUsername: interaction.user?.username ?? "unknown",
+				text: `button:${customId}`,
+				isEdited: false,
+				createdAt: Date.now(),
+				attachments: [],
+				embeds: [],
+				mentionedUserIds: [],
+				mentionedRoleIds: [],
+				channelType: interaction.channel?.type ?? 0,
+				messageType: 0,
+				hasComponents: false,
+				emoji: [],
+				reactionCount: 0,
+				isSystem: false,
+			});
 		});
 
 		this.client.on("error", (error: Error) => {
@@ -424,7 +426,8 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		if (!this.client.user) return;
 
 		this.client.user.setPresence({
-			status: this.config.presenceStatus as import("discord.js").ClientPresenceStatus,
+			status: this.config
+				.presenceStatus as import("discord.js").ClientPresenceStatus,
 			activities: [
 				{
 					name: this.config.presenceActivity,
@@ -442,7 +445,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		this.onMessage(async (msg) => {
 			await onMessage(msg);
 		});
-		if (onError) this.onError(event => onError(event.error));
+		if (onError) this.onError((event) => onError(event.error));
 		await this.client.login(this.config.token);
 	}
 
@@ -459,10 +462,10 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 	/** Disconnect from Discord */
 	async disconnect(): Promise<void> {
 		// Cancel all typing indicators
-		for (const interval of this.typingIntervals.values()) {
+		for (const interval of this.runtime.typingIntervals.values()) {
 			clearInterval(interval);
 		}
-		this.typingIntervals.clear();
+		this.runtime.typingIntervals.clear();
 
 		if (this.presenceInterval) {
 			clearInterval(this.presenceInterval);
@@ -475,7 +478,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 
 	/** Start a streaming session for a channel */
 	startStream(channelId: string, messageId: string, streamId: string): void {
-		this.streamBuffers.set(channelId, {
+		this.runtime.streamBuffers.set(channelId, {
 			text: "",
 			messageId,
 			lastEdit: Date.now(),
@@ -485,7 +488,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 
 	/** Push text to a streaming session (progressive editing) */
 	async pushStreamText(channelId: string, text: string): Promise<void> {
-		const buf = this.streamBuffers.get(channelId);
+		const buf = this.runtime.streamBuffers.get(channelId);
 		if (!buf?.messageId) return;
 
 		buf.text += text;
@@ -508,7 +511,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 
 	/** Finalize a streaming session */
 	async finalizeStream(channelId: string): Promise<void> {
-		const buf = this.streamBuffers.get(channelId);
+		const buf = this.runtime.streamBuffers.get(channelId);
 		if (!buf?.messageId) return;
 
 		// Final edit to ensure complete text is shown
@@ -522,17 +525,17 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 			// Ignore final edit errors
 		}
 
-		this.streamBuffers.delete(channelId);
+		this.runtime.streamBuffers.delete(channelId);
 	}
 
 	/** Cancel a streaming session */
 	cancelStream(channelId: string): void {
-		this.streamBuffers.delete(channelId);
+		this.runtime.streamBuffers.delete(channelId);
 	}
 
 	/** Get active stream count */
 	getActiveStreamCount(): number {
-		return this.streamBuffers.size;
+		return this.runtime.streamBuffers.size;
 	}
 
 	// ─── Typing with Auto-Refresh ────────────────────────────────────────────
@@ -556,15 +559,15 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 				this.stopTyping(channelId);
 			}
 		}, this.config.typingInterval);
-		this.typingIntervals.set(channelId, interval);
+		this.runtime.typingIntervals.set(channelId, interval);
 	}
 
 	/** Stop typing indicator for a channel */
 	stopTyping(channelId: string): void {
-		const interval = this.typingIntervals.get(channelId);
+		const interval = this.runtime.typingIntervals.get(channelId);
 		if (interval) {
 			clearInterval(interval);
-			this.typingIntervals.delete(channelId);
+			this.runtime.typingIntervals.delete(channelId);
 		}
 	}
 
@@ -598,7 +601,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 
 				const attachment = new AttachmentBuilder(mediaPath);
 				await (ch as any).send({ files: [attachment] });
-				this.mediaSent++;
+				this.runtime.mediaSent++;
 			} catch (error) {
 				const filename = mediaPath.split("/").pop() ?? mediaPath;
 				console.error(`[Discord] Failed to send media ${mediaPath}:`, error);
@@ -678,9 +681,9 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 			messagesSent: baseStats.messagesSent,
 			errors: baseStats.errors,
 			lastActivity: baseStats.lastActivity,
-			mediaSent: this.mediaSent,
-			activeStreams: this.streamBuffers.size,
-			activeTyping: this.typingIntervals.size,
+			mediaSent: this.runtime.mediaSent,
+			activeStreams: this.runtime.streamBuffers.size,
+			activeTyping: this.runtime.typingIntervals.size,
 			connectedGuilds: this.client.guilds.cache.size,
 			connectedChannels: this.client.channels.cache.size,
 		};
@@ -692,31 +695,71 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 	}
 
 	/** Send a text message */
+	/**
+	 * Send a message to a Discord channel.
+	 * Supports both positional (channelId, text, opts) and object ({ channelId, text, ...opts }) signatures.
+	 */
 	async sendMessage(
-		channelId: string,
-		text: string,
+		channelIdOrOptions:
+			| string
+			| {
+					channelId: string;
+					text: string;
+					embed?: DiscordEmbed;
+					mentionAuthor?: boolean;
+					inThread?: boolean;
+					threadId?: string;
+					allowedMentions?: DiscordSendOptions["allowedMentions"];
+					components?: unknown[];
+					files?: Array<{ data: Buffer | string; name: string }>;
+					tts?: boolean;
+					stickerIds?: string[];
+			  },
+		text?: string,
 		options?: DiscordSendOptions,
 	): Promise<{ messageId: string }> {
+		// Normalize arguments: support both (channelId, text, opts?) and ({ channelId, text, ...opts })
+		const channelId: string =
+			typeof channelIdOrOptions === "object"
+				? channelIdOrOptions.channelId
+				: channelIdOrOptions;
+		const messageText: string =
+			typeof channelIdOrOptions === "object" ? channelIdOrOptions.text : text!;
+		const mergedOptions: DiscordSendOptions =
+			typeof channelIdOrOptions === "object"
+				? {
+						embed: channelIdOrOptions.embed,
+						mentionAuthor: channelIdOrOptions.mentionAuthor,
+						inThread: channelIdOrOptions.inThread,
+						threadId: channelIdOrOptions.threadId,
+						allowedMentions: channelIdOrOptions.allowedMentions,
+						components: channelIdOrOptions.components,
+						files: channelIdOrOptions.files,
+						tts: channelIdOrOptions.tts,
+						stickerIds: channelIdOrOptions.stickerIds,
+					}
+				: (options ?? {});
+
 		const ch = await this.getChannel(channelId);
 		if (!ch) throw new Error(`Channel ${channelId} not found`);
 
 		const sendOptions: Record<string, unknown> = {};
 
-		if (options?.mentionAuthor) {
+		if (mergedOptions?.mentionAuthor) {
 			sendOptions.allowedMentions = {
 				parse: ["users"],
 				users: [this.botUser.id],
 			};
 		}
 
-		if (options?.embed) {
-			const embed = buildEmbed(options.embed);
+		if (mergedOptions?.embed) {
+			const embed = buildEmbed(mergedOptions.embed);
 			return (ch as any).send({
-				content: text,
+				content: messageText,
 				...sendOptions,
 				embeds: [embed],
-				components: options.components ?? [],
-				files: options?.files?.map(
+				components: mergedOptions.components ?? [],
+				files: mergedOptions?.files?.map(
 					(f) => new AttachmentBuilder(f.data, { name: f.name }),
 				),
 				flags: options?.inThread ? [MessageFlags.HasThread] : undefined,
@@ -921,20 +964,21 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 					channel.type === ChannelType.PrivateThread ||
 					channel.type === ChannelType.DM)
 			) {
-				return channel as TextChannel
-				| NewsChannel
-				| VoiceChannel
-				| StageChannel
-				| ForumChannel
-				| MediaChannel
-				| ThreadChannel
-				| DMChannel;
+				return channel as
+					| TextChannel
+					| NewsChannel
+					| VoiceChannel
+					| StageChannel
+					| ForumChannel
+					| MediaChannel
+					| ThreadChannel
+					| DMChannel;
+			}
+			return null;
+		} catch {
+			return null;
 		}
-		return null;
-	} catch {
-		return null;
 	}
-}
 
 	/** Get channel info */
 	async getChannelInfo(channelId: string): Promise<DiscordChannelInfo | null> {
@@ -943,9 +987,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 
 		const info: DiscordChannelInfo = {
 			id: channel.id,
-			name: "name" in channel
-				? (channel as { name: string }).name
-				: "Unknown",
+			name: "name" in channel ? (channel as { name: string }).name : "Unknown",
 			type: channel.type,
 		};
 
@@ -1006,10 +1048,20 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		const channel = await this.getChannel(channelId);
 		if (!channel) return false;
 
-		const me = (channel as { guild?: { members?: { me?: { permissions: { has: (perm: bigint) => boolean } } } } }).guild?.members?.me;
+		const me = (
+			channel as {
+				guild?: {
+					members?: {
+						me?: { permissions: { has: (perm: bigint) => boolean } };
+					};
+				};
+			}
+		).guild?.members?.me;
 		if (!me) return false;
 
-		const permBit = (PermissionsBitField.Flags as Record<string, bigint>)[permission];
+		const permBit = (PermissionsBitField.Flags as Record<string, bigint>)[
+			permission
+		];
 		if (!permBit) return false;
 
 		return me.permissions.has(permBit);
@@ -1022,7 +1074,15 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 			return this.defaultPermissions();
 		}
 
-		const me = (channel as { guild?: { members?: { me?: { permissions: { has: (perm: bigint) => boolean } } } } }).guild?.members?.me;
+		const me = (
+			channel as {
+				guild?: {
+					members?: {
+						me?: { permissions: { has: (perm: bigint) => boolean } };
+					};
+				};
+			}
+		).guild?.members?.me;
 		if (!me) return this.defaultPermissions();
 
 		const perms = me.permissions;
@@ -1161,7 +1221,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		return this.client.isReady();
 	}
 
-	// ── Private helpers ────────────────────────────────────────────────────────
+	// ─── Private Helpers ────────────────────────────────────────────────────────
 
 	private startPresence(): void {
 		this.presenceInterval = setInterval(() => {

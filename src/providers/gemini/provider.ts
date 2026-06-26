@@ -3,15 +3,14 @@
  * Uses Google's chat completions format at https://generativelanguage.googleapis.com/v1beta
  */
 
+import { BaseProvider } from "../base-provider.js";
 import type {
-	LLMProvider,
 	ChatCompletionRequest,
 	ChatCompletionResponse,
 	ProviderConfig,
 	ProviderMessage,
 	StreamChunk,
 } from "../types.js";
-import { buildProviderConfig } from "../base-provider.js";
 
 const DEFAULT_CONFIG: Partial<ProviderConfig> = {
 	baseUrl: "https://generativelanguage.googleapis.com/v1beta",
@@ -57,16 +56,9 @@ function toGeminiMessages(
 	return geminiMessages;
 }
 
-export class GeminiProvider implements LLMProvider {
-	readonly name = "gemini";
-	private config: Required<ProviderConfig>;
-
+export class GeminiProvider extends BaseProvider {
 	constructor(config: ProviderConfig) {
-		this.config = buildProviderConfig(config, DEFAULT_CONFIG, "gemini");
-	}
-
-	getConfig(): ProviderConfig {
-		return { ...this.config };
+		super(config, DEFAULT_CONFIG);
 	}
 
 	async listModels(): Promise<string[]> {
@@ -286,31 +278,4 @@ export class GeminiProvider implements LLMProvider {
 	}
 
 	// ── Private helpers ──────────────────────────────────────────────────────
-
-	private async fetchWithRetry(
-		url: string,
-		options: RequestInit,
-		retryCount = 0,
-	): Promise<Response> {
-		try {
-			const controller = new AbortController();
-			const timeout = setTimeout(() => controller.abort(), this.config.timeout);
-
-			const response = await fetch(url, {
-				...options,
-				signal: controller.signal,
-			});
-
-			clearTimeout(timeout);
-			return response;
-		} catch (error) {
-			if (retryCount < (this.config.retries ?? 3)) {
-				await new Promise((resolve) =>
-					setTimeout(resolve, this.config.retryDelay ?? 1000),
-				);
-				return this.fetchWithRetry(url, options, retryCount + 1);
-			}
-			throw error;
-		}
-	}
 }

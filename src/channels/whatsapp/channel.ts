@@ -19,6 +19,7 @@ const DEFAULT_API_VERSION = "v18.0";
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_DELAY = 1000;
 
+// ─── Constants ─────────────────────────────────────────────────────────────
 export class WhatsAppChannel extends BaseChannel<
 	WhatsAppConfig,
 	WhatsAppMessage
@@ -40,6 +41,7 @@ export class WhatsAppChannel extends BaseChannel<
 		});
 	}
 
+	// ─── Lifecycle ─────────────────────────────────────────────────────────────
 	async connect(): Promise<void> {
 		try {
 			await this.verifyPhoneNumber();
@@ -64,6 +66,7 @@ export class WhatsAppChannel extends BaseChannel<
 		await this.request("GET", `/${config.apiVersion}/${config.phoneNumberId}`);
 	}
 
+	// ─── Message Sending ─────────────────────────────────────────────────────
 	async sendMessage(options: WhatsAppSendOptions): Promise<WhatsAppSendResult> {
 		if (!this.isConnected()) {
 			return { success: false, error: "WhatsApp channel is not connected" };
@@ -276,6 +279,7 @@ export class WhatsAppChannel extends BaseChannel<
 		});
 	}
 
+	// ─── Health & Stats ─────────────────────────────────────────────────────────
 	getHealthStatus(): WhatsAppHealthStatus {
 		const stats = this.getStats();
 		return {

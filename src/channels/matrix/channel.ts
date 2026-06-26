@@ -20,6 +20,7 @@ const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_DELAY = 1000;
 const SYNC_TIMEOUT_MS = 30000;
 
+// ─── Constants ─────────────────────────────────────────────────────────────
 export class MatrixChannel extends BaseChannel<MatrixConfig, MatrixMessage> {
 	private syncToken: string | undefined;
 	private rooms: Map<string, MatrixRoomInfo> = new Map();
@@ -38,6 +39,8 @@ export class MatrixChannel extends BaseChannel<MatrixConfig, MatrixMessage> {
 	}
 
 	/** Connect to Matrix homeserver */
+
+	// ─── Lifecycle ─────────────────────────────────────────────────────────────
 	async connect(): Promise<void> {
 		try {
 			await this.verifyToken();
@@ -65,6 +68,8 @@ export class MatrixChannel extends BaseChannel<MatrixConfig, MatrixMessage> {
 	}
 
 	/** Send a text message to a room */
+
+	// ─── Message Sending ─────────────────────────────────────────────────────
 	async sendMessage(options: MatrixSendOptions): Promise<string> {
 		if (!this.isConnected()) {
 			throw new Error("Matrix channel is not connected");
@@ -312,6 +317,8 @@ export class MatrixChannel extends BaseChannel<MatrixConfig, MatrixMessage> {
 	}
 
 	/** Get health status */
+
+	// ─── Health & Stats ─────────────────────────────────────────────────────────
 	getHealthStatus(): MatrixHealthStatus {
 		const stats = this.getStats();
 		return {

@@ -15,6 +15,7 @@ const API_BASE = "https://api.sgroup.qq.com";
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_DELAY = 1000;
 
+// ─── Constants ─────────────────────────────────────────────────────────────
 export class QQChannel extends BaseChannel<QQConfig, QQMessage> {
 	private wsStatus: QQHealthStatus["wsStatus"] = "disconnected";
 	private accessToken: string | undefined;
@@ -30,6 +31,7 @@ export class QQChannel extends BaseChannel<QQConfig, QQMessage> {
 		});
 	}
 
+	// ─── Lifecycle ─────────────────────────────────────────────────────────────
 	async connect(): Promise<void> {
 		try {
 			await this.authenticate();
@@ -67,6 +69,7 @@ export class QQChannel extends BaseChannel<QQConfig, QQMessage> {
 			Date.now() + ((data.expires_in as number) ?? 14400) * 1000;
 	}
 
+	// ─── Message Sending ─────────────────────────────────────────────────────
 	async sendMessage(options: QQSendOptions): Promise<string> {
 		if (!this.isConnected()) {
 			throw new Error("QQ channel is not connected");
@@ -120,6 +123,7 @@ export class QQChannel extends BaseChannel<QQConfig, QQMessage> {
 		this.wsStatus = "connected";
 	}
 
+	// ─── Health & Stats ─────────────────────────────────────────────────────────
 	getHealthStatus(): QQHealthStatus {
 		return {
 			...this.getStats(),

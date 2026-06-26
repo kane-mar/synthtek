@@ -2,6 +2,23 @@
  * Telegram Channel — Bot API integration for synthtek
  */
 
+import { BaseChannel } from "../base-channel.js";
+import { TelegramApiClient } from "./api.js";
+import {
+	extractCommand,
+	getMediaType,
+	isCommand,
+	isRemoteMediaUrl,
+	MEDIA_SEND_METHODS,
+	markdownToTelegramHtml,
+	mentionsBot,
+	parseMessage,
+	sleep,
+	splitMessage,
+	TELEGRAM_MAX_MESSAGE_LEN,
+	toolHintToTelegramBlockquote,
+	validateUrlTarget,
+} from "./format.js";
 import type {
 	TelegramBotCommand,
 	TelegramCallbackQuery,
@@ -18,25 +35,6 @@ import type {
 	TelegramStreamBuffer,
 	TelegramUserInfo,
 } from "./types.js";
-
-import { BaseChannel } from "../base-channel.js";
-
-import { TelegramApiClient } from "./api.js";
-import {
-	TELEGRAM_MAX_MESSAGE_LEN,
-	MEDIA_SEND_METHODS,
-	toolHintToTelegramBlockquote,
-	markdownToTelegramHtml,
-	validateUrlTarget,
-	getMediaType,
-	isRemoteMediaUrl,
-	parseMessage,
-	splitMessage,
-	isCommand,
-	extractCommand,
-	mentionsBot,
-	sleep,
-} from "./format.js";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -62,19 +60,23 @@ const BOT_COMMANDS: TelegramBotCommand[] = [
 	{ command: "help", description: "Show available commands" },
 ];
 
-export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage> {
+export class TelegramChannel extends BaseChannel<
+	TelegramConfig,
+	TelegramMessage
+> {
 	protected config: Required<TelegramConfig>;
 	private api: TelegramApiClient;
-	private botUsername?: string;
-	private botId?: number;
-	private lastUpdateId = 0;
-	private polling = false;
-	private pollingInterval?: ReturnType<typeof setInterval>;
+	private botInfo: { username?: string; id?: number } = {};
+	private pollingState: {
+		lastUpdateId: number;
+		active: boolean;
+		interval?: ReturnType<typeof setInterval>;
+		reconnectAttempts: number;
+	} = { lastUpdateId: 0, active: false, reconnectAttempts: 0 };
 	private typingTimeout = new Map<
 		string | number,
 		ReturnType<typeof setTimeout>
 	>();
-	private reconnectAttempts = 0;
 
 	// Advanced state
 	private streamBuffers = new Map<number | string, TelegramStreamBuffer>();
@@ -82,14 +84,10 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		number | string,
 		ReturnType<typeof setInterval>
 	>();
-	private mediaGroupBuffers = new Map<
-		number | string,
-		TelegramMediaGroupBuffer
-	>();
-	private mediaGroupTimeouts = new Map<
-		number | string,
-		ReturnType<typeof setTimeout>
-	>();
+	private mediaGroupState: {
+		buffers: Map<number | string, TelegramMediaGroupBuffer>;
+		timeouts: Map<number | string, ReturnType<typeof setTimeout>>;
+	} = { buffers: new Map(), timeouts: new Map() };
 	private messageThreads = new Map<string, number>(); // "chatId:replyToMsgId" -> threadId
 	private chatIds = new Map<string, number>(); // senderId -> chatId for replies
 	private mediaSent = 0;
@@ -132,15 +130,15 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		this.onMessage(async (msg) => {
 			await onMessage(msg);
 		});
-		if (onError) this.onError(event => onError(event.error));
+		if (onError) this.onError((event) => onError(event.error));
 		await this.connect();
 	}
 
-	// ── BaseChannel Lifecycle ─────────────────────────────────────────────────
+	// ─── BaseChannel Lifecycle ─────────────────────────────────────────────────
 
 	/** Connect to Telegram — starts long polling */
 	async connect(): Promise<void> {
-		this.polling = true;
+		this.pollingState.active = true;
 		await this.getBotInfo();
 		await this.registerBotCommands();
 		this.pollingLoop();
@@ -153,7 +151,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 
 	/** Disconnect from Telegram — stops polling */
 	async disconnect(): Promise<void> {
-		this.polling = false;
+		this.pollingState.active = false;
 
 		// Cancel all typing indicators
 		for (const chatId of this.typingTasks.keys()) {
@@ -161,15 +159,15 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		}
 
 		// Cancel all media group timeouts
-		for (const timeout of this.mediaGroupTimeouts.values()) {
+		for (const timeout of this.mediaGroupState.timeouts.values()) {
 			clearTimeout(timeout);
 		}
-		this.mediaGroupTimeouts.clear();
-		this.mediaGroupBuffers.clear();
+		this.mediaGroupState.timeouts.clear();
+		this.mediaGroupState.buffers.clear();
 
-		if (this.pollingInterval) {
-			clearInterval(this.pollingInterval);
-			this.pollingInterval = undefined;
+		if (this.pollingState.interval) {
+			clearInterval(this.pollingState.interval);
+			this.pollingState.interval = undefined;
 		}
 	}
 
@@ -211,7 +209,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		// Group policy
 		if (this.config.groupPolicy === "open") return true;
 		if (this.config.groupPolicy === "mention") {
-			return mentionsBot(text, this.botUsername);
+			return mentionsBot(text, this.botInfo.username);
 		}
 
 		return true;
@@ -229,50 +227,86 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 			throw new Error(`Failed to get bot info: ${JSON.stringify(data)}`);
 		}
 
-		this.botUsername = data.result.username;
-		this.botId = data.result.id;
+		this.botInfo.username = data.result.username;
+		this.botInfo.id = data.result.id;
 		return data.result;
 	}
 
 	/** Get the bot's username */
 	async getBotUsername(): Promise<string> {
-		if (this.botUsername) return this.botUsername;
+		if (this.botInfo.username) return this.botInfo.username;
 		const info = await this.getBotInfo();
 		return info.username;
 	}
 
 	/** Get the bot's ID */
 	async getBotId(): Promise<number | undefined> {
-		if (this.botId) return this.botId;
+		if (this.botInfo.id) return this.botInfo.id;
 		const info = await this.getBotInfo();
 		return info.id;
 	}
 
 	// ─── Message Sending ─────────────────────────────────────────────────────
 
-	/** Send a text message with retry logic */
+	/**
+	 * Send a text message.
+	 * Supports both positional and object-style signatures.
+	 */
 	async sendMessage(
-		chatId: number | string,
-		text: string,
+		chatIdOrOptions:
+			| number
+			| string
+			| {
+					chatId: number | string;
+					text: string;
+					replyToMessageId?: number;
+					disablePreviewLinks?: boolean;
+					parseMode?: "HTML" | "Markdown" | "MarkdownV2";
+					protectContent?: boolean;
+					messageThreadId?: number;
+					disableNotification?: boolean;
+					allowSendingWithoutReply?: boolean;
+			  },
+		text?: string,
 		options?: TelegramSendOptions,
 	): Promise<Array<{ messageId: number }>> {
-		const chunks = splitMessage(text, this.config.maxMessageLength);
+		// Normalize arguments: support both (chatId, text, opts?) and ({ chatId, text, ...opts })
+		const chatId: number | string =
+			typeof chatIdOrOptions === "object"
+				? chatIdOrOptions.chatId
+				: chatIdOrOptions;
+		const messageText: string =
+			typeof chatIdOrOptions === "object" ? chatIdOrOptions.text : text!;
+		const mergedOptions: TelegramSendOptions =
+			typeof chatIdOrOptions === "object"
+				? {
+						replyToMessageId: chatIdOrOptions.replyToMessageId,
+						disablePreviewLinks: chatIdOrOptions.disablePreviewLinks,
+						parseMode: chatIdOrOptions.parseMode,
+						protectContent: chatIdOrOptions.protectContent,
+						messageThreadId: chatIdOrOptions.messageThreadId,
+						disableNotification: chatIdOrOptions.disableNotification,
+						allowSendingWithoutReply: chatIdOrOptions.allowSendingWithoutReply,
+					}
+				: (options ?? {});
+
+		const chunks = splitMessage(messageText, this.config.maxMessageLength);
 		const results: Array<{ messageId: number }> = [];
 
 		for (let i = 0; i < chunks.length; i++) {
 			const response = await this.api.apiCallRaw("sendMessage", {
 				chat_id: chatId,
 				text: chunks[i],
-				parse_mode: options?.parseMode,
-				disable_web_page_preview: options?.disablePreviewLinks,
-				protect_content: options?.protectContent,
-				disable_notification: options?.disableNotification,
-				allow_sending_without_reply: options?.allowSendingWithoutReply,
-				...(options?.replyToMessageId !== undefined && i === 0
-					? { reply_to_message_id: options.replyToMessageId }
+				parse_mode: mergedOptions?.parseMode,
+				disable_web_page_preview: mergedOptions?.disablePreviewLinks,
+				protect_content: mergedOptions?.protectContent,
+				disable_notification: mergedOptions?.disableNotification,
+				allow_sending_without_reply: mergedOptions?.allowSendingWithoutReply,
+				...(mergedOptions?.replyToMessageId !== undefined && i === 0
+					? { reply_to_message_id: mergedOptions.replyToMessageId }
 					: {}),
-				...(options?.messageThreadId !== undefined && i === 0
-					? { message_thread_id: options.messageThreadId }
+				...(mergedOptions?.messageThreadId !== undefined && i === 0
+					? { message_thread_id: mergedOptions.messageThreadId }
 					: {}),
 			});
 
@@ -546,10 +580,10 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 				formData.append("message_thread_id", String(options.messageThreadId));
 			}
 
-			const response = await fetch(
-				this.api.getApiUrl(method),
-				{ method: "POST", body: formData },
-			);
+			const response = await fetch(this.api.getApiUrl(method), {
+				method: "POST",
+				body: formData,
+			});
 			const data = (await response.json()) as {
 				ok: boolean;
 				result?: { message_id: number };
@@ -704,7 +738,10 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		// Set up auto-refresh interval
 		const interval = setInterval(async () => {
 			try {
-				await this.api.apiCallRaw("sendChatAction", { chat_id: chatId, action });
+				await this.api.apiCallRaw("sendChatAction", {
+					chat_id: chatId,
+					action,
+				});
 			} catch {
 				// Ignore errors in typing refresh
 				this.stopTyping(chatId);
@@ -955,7 +992,9 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 
 	/** Leave a chat */
 	async leaveChat(chatId: number | string): Promise<boolean> {
-		const response = await this.api.apiCallRaw("leaveChat", { chat_id: chatId });
+		const response = await this.api.apiCallRaw("leaveChat", {
+			chat_id: chatId,
+		});
 		const data = (await response.json()) as { ok: boolean };
 		return data.ok;
 	}
@@ -1063,7 +1102,9 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		if (!data.ok) return null;
 
 		// Also get user info via getChat
-		const chatResponse = await this.api.apiCallRaw("getChat", { chat_id: userId });
+		const chatResponse = await this.api.apiCallRaw("getChat", {
+			chat_id: userId,
+		});
 		const chatData = (await chatResponse.json()) as {
 			ok: boolean;
 			result?: any;
@@ -1228,8 +1269,8 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		const baseStats = super.getStats();
 		return {
 			connected: baseStats.connected,
-			polling: this.polling,
-			lastUpdateId: this.lastUpdateId,
+			polling: this.pollingState.active,
+			lastUpdateId: this.pollingState.lastUpdateId,
 			messagesReceived: baseStats.messagesReceived,
 			messagesSent: baseStats.messagesSent,
 			errors: baseStats.errors,
@@ -1241,20 +1282,24 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		};
 	}
 
-	// ── Private helpers ────────────────────────────────────────────────────────
+	// ─── Private Helpers ────────────────────────────────────────────────────────
 
 	private async pollingLoop(): Promise<void> {
-		while (this.polling && this.isConnected()) {
+		while (this.pollingState.active && this.isConnected()) {
 			try {
-				const response = await this.api.apiCallRaw("getUpdates", { offset: String(this.lastUpdateId + 1), timeout: String(this.config.pollingTimeout), limit: "100" });
+				const response = await this.api.apiCallRaw("getUpdates", {
+					offset: String(this.pollingState.lastUpdateId + 1),
+					timeout: String(this.config.pollingTimeout),
+					limit: "100",
+				});
 				const data = (await response.json()) as { ok: boolean; result: any[] };
 				if (!data.ok) continue;
 				const updates = data.result;
 
 				for (const update of updates) {
 					// Skip old updates
-					if (update.update_id <= this.lastUpdateId) continue;
-					this.lastUpdateId = update.update_id;
+					if (update.update_id <= this.pollingState.lastUpdateId) continue;
+					this.pollingState.lastUpdateId = update.update_id;
 
 					// Handle callback queries
 					if (update.callback_query) {
@@ -1327,17 +1372,19 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 					await this.dispatchMessage(message);
 				}
 			} catch (error) {
-				this.reconnectAttempts++;
+				this.pollingState.reconnectAttempts++;
 				console.error(
-					`[Telegram] Polling error (attempt ${this.reconnectAttempts}):`,
+					`[Telegram] Polling error (attempt ${this.pollingState.reconnectAttempts}):`,
 					error,
 				);
 
-			this.emitError(error instanceof Error ? error : new Error(String(error)));
+				this.emitError(
+					error instanceof Error ? error : new Error(String(error)),
+				);
 
-			// Wait before retrying with exponential backoff
+				// Wait before retrying with exponential backoff
 				const delay = Math.min(
-					this.config.retryDelay * 1.5 ** this.reconnectAttempts,
+					this.config.retryDelay * 1.5 ** this.pollingState.reconnectAttempts,
 					60000,
 				);
 				await sleep(delay);
@@ -1399,7 +1446,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 	private async handleMediaMessage(message: TelegramMessage): Promise<void> {
 		// Buffer media for potential group/album
 		const bufferKey = message.chatId;
-		const existing = this.mediaGroupBuffers.get(bufferKey);
+		const existing = this.mediaGroupState.buffers.get(bufferKey);
 
 		if (existing) {
 			existing.items.push({
@@ -1422,11 +1469,11 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 			chatId: message.chatId,
 			timeout: MEDIA_GROUP_BUFFER_MS,
 		};
-		this.mediaGroupBuffers.set(bufferKey, buffer);
+		this.mediaGroupState.buffers.set(bufferKey, buffer);
 
 		// Set timeout to flush buffer
 		const timeout = setTimeout(async () => {
-			const buf = this.mediaGroupBuffers.get(bufferKey);
+			const buf = this.mediaGroupState.buffers.get(bufferKey);
 			if (buf && buf.items.length > 0) {
 				try {
 					await this.api.apiCallRaw("sendMediaGroup", {
@@ -1437,8 +1484,8 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 					console.error("[Telegram] Failed to send media group:", err);
 				}
 			}
-			this.mediaGroupBuffers.delete(bufferKey);
+			this.mediaGroupState.buffers.delete(bufferKey);
 		}, MEDIA_GROUP_BUFFER_MS);
-		this.mediaGroupTimeouts.set(bufferKey, timeout);
+		this.mediaGroupState.timeouts.set(bufferKey, timeout);
 	}
 }

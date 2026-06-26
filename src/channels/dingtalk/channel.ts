@@ -34,6 +34,8 @@ export class DingTalkChannel extends BaseChannel<
 		});
 	}
 
+	// ─── Lifecycle ─────────────────────────────────────────────────────────────
+
 	async connect(): Promise<void> {
 		try {
 			await this.authenticate();
@@ -49,6 +51,8 @@ export class DingTalkChannel extends BaseChannel<
 		this.markDisconnected();
 		this.accessToken = undefined;
 	}
+
+	// ─── Authentication ────────────────────────────────────────────────────────
 
 	private async authenticate(): Promise<void> {
 		const config = this.getConfig();

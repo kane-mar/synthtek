@@ -31,7 +31,7 @@ export class WeChatChannel {
 		this.config = config;
 	}
 
-	// ── Message Parsing ────────────────────────────────────────────────────────
+	// ─── Message Parsing ────────────────────────────────────────────────────────
 
 	parseMessage(raw: WeChatRawMessage): WeChatMessage {
 		this.messagesReceived++;
@@ -87,7 +87,7 @@ export class WeChatChannel {
 		}
 	}
 
-	// ── Message Building ───────────────────────────────────────────────────────
+	// ─── Message Building ───────────────────────────────────────────────────────
 
 	buildPayload(
 		userId: string,
@@ -125,7 +125,7 @@ export class WeChatChannel {
 		return payload;
 	}
 
-	// ── Long Message Splitting ─────────────────────────────────────────────────
+	// ─── Long Message Splitting ─────────────────────────────────────────────────
 
 	splitMessage(text: string): string[] {
 		if (text.length <= MAX_MESSAGE_LENGTH) {
@@ -158,7 +158,7 @@ export class WeChatChannel {
 		return chunks;
 	}
 
-	// ── Typing Indicator ───────────────────────────────────────────────────────
+	// ─── Typing Indicator ───────────────────────────────────────────────────────
 
 	async sendTypingIndicator(userId: string): Promise<void> {
 		// WeChat doesn't have a native typing indicator API
@@ -167,13 +167,13 @@ export class WeChatChannel {
 		void userId;
 	}
 
-	// ── QR Code Login ──────────────────────────────────────────────────────────
+	// ─── QR Code Login ──────────────────────────────────────────────────────────
 
 	generateQRCodeUrl(): string {
 		return `https://open.weixin.qq.com/connect/qrconnect?appid=${this.config.appId}&redirect_uri=${encodeURIComponent(this.config.webhookUrl ?? "http://localhost/callback")}&response_type=code&scope=snsapi_base&state=wechat_login#wechat_redirect`;
 	}
 
-	// ── Health & Stats ─────────────────────────────────────────────────────────
+	// ─── Health & Stats ─────────────────────────────────────────────────────────
 
 	healthCheck(): WeChatHealthStatus {
 		return {
@@ -192,7 +192,7 @@ export class WeChatChannel {
 		};
 	}
 
-	// ── Connection Management ──────────────────────────────────────────────────
+	// ─── Connection Management ──────────────────────────────────────────────────
 
 	async connect(): Promise<void> {
 		this.status = "connecting";

@@ -6,7 +6,7 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": ["**", "!!**/dist", "!!tests/e2e/test-results/**"]
+		"includes": ["**", "!!**/dist", "!!tests/e2e/test-results/**", "!!src/webui/frontend.html"]
 	},
 	"formatter": {
 		"enabled": true,
@@ -21,6 +21,12 @@
 			},
 			"style": {
 				"noNonNullAssertion": "off"
+			},
+			"complexity": {
+				"noImportantStyles": "off"
+			},
+			"correctness": {
+				"noInvalidBuiltinInstantiation": "off"
 			}
 		}
 	},

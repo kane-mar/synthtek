@@ -229,3 +229,65 @@ export interface SlackUploadProgress {
 	total: number;
 	percent: number;
 }
+
+// ─── Slack Event Types ───────────────────────────────────────────────────────
+
+/** A file attachment within a Slack event */
+export interface SlackEventFile {
+	id: string;
+	name: string;
+	mimetype: string;
+	size: number;
+	url_private: string;
+	permalink?: string;
+}
+
+/** A Slack event from the Events API */
+export interface SlackEvent {
+	type: string;
+	subtype?: string;
+	ts?: string;
+	channel?: string;
+	user?: string;
+	bot_id?: string;
+	username?: string;
+	text?: string;
+	files?: SlackEventFile[];
+	thread_ts?: string;
+	reply_to?: string;
+	parent_user_id?: string;
+	channel_type?: string;
+	edited?: { ts: string; user: string };
+	event_ts?: string;
+}
+
+/** A Slack reaction item from reactions.get */
+export interface SlackReactionItem {
+	name: string;
+	users?: string[];
+	count?: number;
+}
+
+/** A Slack channel from conversations.list */
+export interface SlackListedChannel {
+	id: string;
+	name?: string;
+	is_im?: boolean;
+	is_mpim?: boolean;
+	is_channel?: boolean;
+	is_group?: boolean;
+	is_archived?: boolean;
+	is_private?: boolean;
+	name_normalized?: string;
+	created?: number;
+	creator?: string;
+}
+
+/** A section block in Slack Block Kit */
+export interface SlackSectionBlock {
+	type: "section";
+	text?: { type: string; text: string };
+	block_id?: string;
+	fields?: Array<{ type: string; text: string }>;
+	accessory?: Record<string, unknown>;
+}

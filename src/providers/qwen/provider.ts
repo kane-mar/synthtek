@@ -3,16 +3,14 @@
  * Qwen exposes an OpenAI-compatible API at https://dashscope.aliyuncs.com/compatible-mode/v1
  */
 
+import { BaseProvider } from "../base-provider.js";
 import type {
-	LLMProvider,
 	ChatCompletionRequest,
 	ChatCompletionResponse,
-	
 	ProviderConfig,
 	ProviderMessage,
 	StreamChunk,
 } from "../types.js";
-import { buildProviderConfig } from "../base-provider.js";
 
 const DEFAULT_CONFIG: Partial<ProviderConfig> = {
 	baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -44,16 +42,9 @@ const COST_PER_1M: Record<string, { input: number; output: number }> = {
 	"qwen-turbo": { input: 0.3, output: 0.6 },
 };
 
-export class QwenProvider implements LLMProvider {
-	readonly name = "qwen";
-	private config: Required<ProviderConfig>;
-
+export class QwenProvider extends BaseProvider {
 	constructor(config: ProviderConfig) {
-		this.config = buildProviderConfig(config, DEFAULT_CONFIG, "qwen");
-	}
-
-	getConfig(): ProviderConfig {
-		return { ...this.config };
+		super(config, DEFAULT_CONFIG);
 	}
 
 	async listModels(): Promise<string[]> {
@@ -251,95 +242,8 @@ export class QwenProvider implements LLMProvider {
 			throw new Error(`Qwen API error (${response.status}): ${errorText}`);
 		}
 
-		const reader = response.body?.getReader();
-		if (!reader) {
-			throw new Error("No response body reader");
-		}
-
-		const decoder = new TextDecoder();
-		let buffer = "";
-
-		try {
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-
-				buffer += decoder.decode(value, { stream: true });
-				const lines = buffer.split("\n");
-				buffer = lines.pop() || "";
-
-				for (const line of lines) {
-					if (!line.startsWith("data: ")) continue;
-					const data = line.slice(6);
-					if (data === "[DONE]") {
-						yield { delta: "", done: true };
-						break;
-					}
-
-					try {
-						const parsed = JSON.parse(data) as {
-							choices: Array<{
-								delta: { content?: string; role?: string };
-								finish_reason: string | null;
-							}>;
-							usage?: {
-								prompt_tokens: number;
-								completion_tokens: number;
-								total_tokens: number;
-							};
-						};
-
-						const delta = parsed.choices?.[0]?.delta;
-						if (delta?.content) {
-							yield {
-								delta: delta.content,
-								done: false,
-								model,
-								usage: parsed.usage
-									? {
-											promptTokens: parsed.usage.prompt_tokens,
-											completionTokens: parsed.usage.completion_tokens,
-											totalTokens: parsed.usage.total_tokens,
-										}
-									: undefined,
-							};
-						}
-					} catch {
-						// Skip invalid JSON
-					}
-				}
-			}
-		} finally {
-			reader.releaseLock();
-		}
+		yield* this.parseSSEStream(response, model);
 	}
 
 	// ── Private helpers ──────────────────────────────────────────────────────
-
-	private async fetchWithRetry(
-		url: string,
-		options: RequestInit,
-		retryCount = 0,
-	): Promise<Response> {
-		try {
-			const controller = new AbortController();
-			const timeout = setTimeout(() => controller.abort(), this.config.timeout);
-
-			const response = await fetch(url, {
-				...options,
-				signal: controller.signal,
-			});
-
-			clearTimeout(timeout);
-			return response;
-		} catch (error) {
-			if (retryCount < (this.config.retries ?? 3)) {
-				await new Promise((resolve) =>
-					setTimeout(resolve, this.config.retryDelay ?? 1000),
-				);
-				return this.fetchWithRetry(url, options, retryCount + 1);
-			}
-			throw error;
-		}
-	}
 }

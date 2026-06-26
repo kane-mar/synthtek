@@ -378,3 +378,62 @@ export interface TelegramStats {
 	/** Connected chat count */
 	connectedChats: number;
 }
+
+/** Generic Telegram Bot API response wrapper */
+export interface TelegramApiResponse<T = unknown> {
+	ok: boolean;
+	description?: string;
+	result?: T;
+	error_code?: number;
+}
+
+/** Update result from getUpdates */
+export type TelegramUpdatesResult = TelegramUpdate[];
+
+/** Photo sizes within a message */
+export interface TelegramPhotoSize {
+	file_id: string;
+	file_unique_id: string;
+	width: number;
+	height: number;
+	file_size?: number;
+}
+
+/** Chat member status */
+export type TelegramChatMemberStatus =
+	| "creator"
+	| "administrator"
+	| "member"
+	| "restricted"
+	| "left"
+	| "kicked";
+
+/** Chat member info */
+export interface TelegramChatMember {
+	status: TelegramChatMemberStatus;
+	user: {
+		id: number;
+		is_bot: boolean;
+		first_name: string;
+		last_name?: string;
+		username?: string;
+		language_code?: string;
+	};
+	is_anonymous?: boolean;
+	can_be_edited?: boolean;
+	custom_title?: string;
+	permissions?: Record<string, boolean>;
+	timed_until?: number;
+}
+
+/** Webhook info */
+export interface TelegramWebhookInfo {
+	url: string;
+	has_custom_certificate: boolean;
+	pending_update_count: number;
+	ip_address?: string;
+	last_error_date?: number;
+	last_error_message?: string;
+	max_connections?: number;
+	allowed_updates?: string[];
+}

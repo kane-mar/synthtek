@@ -5,8 +5,8 @@
 
 import { equal, ok, rejects } from "node:assert";
 import { afterEach, beforeEach, describe, it } from "node:test";
-import { DiscordChannel } from "../../src/channels/discord/channel.js";
 import { BaseChannel } from "../../src/channels/base-channel.js";
+import { DiscordChannel } from "../../src/channels/discord/channel.js";
 
 // ─── Test doubles ────────────────────────────────────────────────────────────
 

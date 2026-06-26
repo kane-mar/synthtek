@@ -4,15 +4,14 @@
  * Base URL format: https://{resource}.openai.azure.com/openai/deployments/{deployment}
  */
 
+import { BaseProvider } from "../base-provider.js";
 import type {
 	ChatCompletionRequest,
 	ChatCompletionResponse,
-	LLMProvider,
 	ProviderConfig,
 	ProviderMessage,
 	StreamChunk,
 } from "../types.js";
-import { buildProviderConfig } from "../base-provider.js";
 
 const DEFAULT_CONFIG: Partial<ProviderConfig> = {
 	baseUrl: "https://openai.azure.com",
@@ -49,21 +48,15 @@ const COST_PER_1M: Record<string, { input: number; output: number }> = {
 	"gpt-35-turbo": { input: 0.5, output: 1.5 },
 };
 
-export class AzureOpenAIProvider implements LLMProvider {
-	readonly name = "azure";
-	private config: Required<ProviderConfig>;
+export class AzureOpenAIProvider extends BaseProvider {
 	private deployment: string;
 	private apiVersion: string;
 
 	constructor(config: ProviderConfig) {
-		this.config = buildProviderConfig(config, DEFAULT_CONFIG, "azure");
+		super(config, DEFAULT_CONFIG);
 		// Azure uses deployment name instead of model in the URL
 		this.deployment = (config.deployment as string) || this.config.model;
 		this.apiVersion = (config.apiVersion as string) || AZURE_API_VERSION;
-	}
-
-	getConfig(): ProviderConfig {
-		return { ...this.config };
 	}
 
 	async listModels(): Promise<string[]> {
@@ -264,67 +257,7 @@ export class AzureOpenAIProvider implements LLMProvider {
 			);
 		}
 
-		const reader = response.body?.getReader();
-		if (!reader) {
-			throw new Error("No response body reader");
-		}
-
-		const decoder = new TextDecoder();
-		let buffer = "";
-
-		try {
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-
-				buffer += decoder.decode(value, { stream: true });
-				const lines = buffer.split("\n");
-				buffer = lines.pop() || "";
-
-				for (const line of lines) {
-					if (!line.startsWith("data: ")) continue;
-					const data = line.slice(6);
-					if (data === "[DONE]") {
-						yield { delta: "", done: true };
-						break;
-					}
-
-					try {
-						const parsed = JSON.parse(data) as {
-							choices: Array<{
-								delta: { content?: string; role?: string };
-								finish_reason: string | null;
-							}>;
-							usage?: {
-								prompt_tokens: number;
-								completion_tokens: number;
-								total_tokens: number;
-							};
-						};
-
-						const delta = parsed.choices?.[0]?.delta;
-						if (delta?.content) {
-							yield {
-								delta: delta.content,
-								done: false,
-								model,
-								usage: parsed.usage
-									? {
-											promptTokens: parsed.usage.prompt_tokens,
-											completionTokens: parsed.usage.completion_tokens,
-											totalTokens: parsed.usage.total_tokens,
-										}
-									: undefined,
-							};
-						}
-					} catch {
-						// Skip invalid JSON
-					}
-				}
-			}
-		} finally {
-			reader.releaseLock();
-		}
+		yield* this.parseSSEStream(response, model);
 	}
 
 	// ── Private helpers ──────────────────────────────────────────────────────
@@ -338,32 +271,5 @@ export class AzureOpenAIProvider implements LLMProvider {
 	/** Get the chat completions URL with deployment */
 	private getChatUrl(): string {
 		return `${this.getBaseUrl()}/openai/deployments/${this.deployment}/chat/completions`;
-	}
-
-	private async fetchWithRetry(
-		url: string,
-		options: RequestInit,
-		retryCount = 0,
-	): Promise<Response> {
-		try {
-			const controller = new AbortController();
-			const timeout = setTimeout(() => controller.abort(), this.config.timeout);
-
-			const response = await fetch(url, {
-				...options,
-				signal: controller.signal,
-			});
-
-			clearTimeout(timeout);
-			return response;
-		} catch (error) {
-			if (retryCount < (this.config.retries ?? 3)) {
-				await new Promise((resolve) =>
-					setTimeout(resolve, this.config.retryDelay ?? 1000),
-				);
-				return this.fetchWithRetry(url, options, retryCount + 1);
-			}
-			throw error;
-		}
 	}
 }

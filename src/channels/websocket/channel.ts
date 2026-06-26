@@ -62,7 +62,7 @@ export class WebSocketChannel {
 		return this._config.authRequired ?? false;
 	}
 
-	// ── Session Management ───────────────────────────────────────────────────
+	// ─── Session Management ───────────────────────────────────────────────────
 
 	createSession(): WebSocketSession {
 		sessionCounter++;
@@ -85,7 +85,7 @@ export class WebSocketChannel {
 		return this._sessions.delete(sessionId);
 	}
 
-	// ── Client Management ────────────────────────────────────────────────────
+	// ─── Client Management ────────────────────────────────────────────────────
 
 	registerClient(sessionId: string): WebSocketClient {
 		clientCounter++;
@@ -108,7 +108,7 @@ export class WebSocketChannel {
 		return Array.from(this._clients.values());
 	}
 
-	// ── Message Handling ─────────────────────────────────────────────────────
+	// ─── Message Handling ─────────────────────────────────────────────────────
 
 	canHandleMessage(message: unknown): boolean {
 		if (typeof message !== "object" || message === null) return false;
@@ -135,14 +135,14 @@ export class WebSocketChannel {
 		}
 	}
 
-	// ── Authentication ───────────────────────────────────────────────────────
+	// ─── Authentication ───────────────────────────────────────────────────────
 
 	validateToken(token: string): boolean {
 		if (!this._config.authRequired) return true;
 		return token === this._config.authToken;
 	}
 
-	// ── Broadcasting ─────────────────────────────────────────────────────────
+	// ─── Broadcasting ─────────────────────────────────────────────────────────
 
 	broadcast(message: WebSocketMessage): void {
 		// In a real implementation, this would send to all connected WebSocket clients
@@ -159,7 +159,7 @@ export class WebSocketChannel {
 		return true;
 	}
 
-	// ── Lifecycle ────────────────────────────────────────────────────────────
+	// ─── Lifecycle ────────────────────────────────────────────────────────────
 
 	async start(): Promise<void> {
 		this._running = true;

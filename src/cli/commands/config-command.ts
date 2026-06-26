@@ -44,7 +44,11 @@ export function registerConfigCommand(program: Command): void {
 						process.exit(1);
 						return;
 					}
-					config.set(key as any, value as any);
+					// User-provided keys are dynamic strings — cast safely
+					config.set(
+						key as keyof import("../../core/types.js").AgentConfig,
+						value,
+					);
 					logger.info(`Config set: ${key} = ${value}`);
 				}),
 		);

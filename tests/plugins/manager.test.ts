@@ -8,8 +8,8 @@
  * - Discovery and loading
  */
 import assert from "node:assert";
-import { describe, it, mock } from "node:test";
 import { EventEmitter } from "node:events";
+import { describe, it, mock } from "node:test";
 
 function makeLogger() {
 	return {
@@ -40,7 +40,11 @@ function makePlugin(name: string, overrides = {}) {
 async function createManager() {
 	const { PluginManager } = await import("../../src/plugins/manager.js");
 	return new PluginManager({
-		config: { directories: ["./plugins"], overrides: {}, validateConfig: false },
+		config: {
+			directories: ["./plugins"],
+			overrides: {},
+			validateConfig: false,
+		},
 		globalLogger: makeLogger() as any,
 		globalEvents: new EventEmitter(),
 	});
@@ -119,9 +123,7 @@ describe("PluginManager", () => {
 
 describe("PluginDiscoverer", () => {
 	it("discovers plugins from directory", async () => {
-		const { PluginDiscoverer } = await import(
-			"../../src/plugins/discovery.js"
-		);
+		const { PluginDiscoverer } = await import("../../src/plugins/discovery.js");
 		const discoverer = new PluginDiscoverer({
 			directories: ["./plugins"],
 			overrides: {},

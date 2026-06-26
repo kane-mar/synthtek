@@ -4,8 +4,8 @@
  * Extracted from server.ts for modularity (H9).
  */
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { join } from "node:path";
 
 // ─── MIME Types ─────────────────────────────────────────────────────────────
 
@@ -42,10 +42,7 @@ export function sendJson(
 /**
  * Send a file response.
  */
-export function sendFile(
-	res: ServerResponse,
-	filePath: string,
-): void {
+export function sendFile(res: ServerResponse, filePath: string): void {
 	try {
 		const content = readFileSync(filePath);
 		const ext = join(".", filePath.split(".").pop() || "");

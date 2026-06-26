@@ -5,8 +5,8 @@
 
 import { equal, ok, rejects } from "node:assert";
 import { afterEach, beforeEach, describe, it } from "node:test";
-import { TelegramChannel } from "../../src/channels/telegram/channel.js";
 import { BaseChannel } from "../../src/channels/base-channel.js";
+import { TelegramChannel } from "../../src/channels/telegram/channel.js";
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -97,10 +97,7 @@ describe("TelegramChannel", () => {
 		});
 
 		it("throws when sending to invalid chat (no real token)", async () => {
-			await rejects(
-				channel.sendMessage(12345, "Hello!"),
-				/Telegram API error/,
-			);
+			await rejects(channel.sendMessage(12345, "Hello!"), /Telegram API error/);
 		});
 	});
 

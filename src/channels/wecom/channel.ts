@@ -17,6 +17,7 @@ const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_DELAY = 1000;
 const DEFAULT_TOKEN_TTL = 7000;
 
+// ─── Constants ─────────────────────────────────────────────────────────────
 export class WeComChannel extends BaseChannel<WeComConfig, WeComMessage> {
 	private accessToken: string | undefined;
 	private tokenExpiry: number | undefined;
@@ -31,6 +32,7 @@ export class WeComChannel extends BaseChannel<WeComConfig, WeComMessage> {
 		});
 	}
 
+	// ─── Lifecycle ─────────────────────────────────────────────────────────────
 	async connect(): Promise<void> {
 		try {
 			await this.authenticate();
@@ -66,6 +68,7 @@ export class WeComChannel extends BaseChannel<WeComConfig, WeComMessage> {
 			Date.now() + ((data.expires_in as number) ?? config.tokenTtl!) * 1000;
 	}
 
+	// ─── Message Sending ─────────────────────────────────────────────────────
 	async sendMessage(options: WeComSendOptions): Promise<WeComSendResult> {
 		if (!this.isConnected()) {
 			return {
@@ -151,6 +154,7 @@ export class WeComChannel extends BaseChannel<WeComConfig, WeComMessage> {
 		}
 	}
 
+	// ─── Health & Stats ─────────────────────────────────────────────────────────
 	getHealthStatus(): WeComHealthStatus {
 		const stats = this.getStats();
 		return {

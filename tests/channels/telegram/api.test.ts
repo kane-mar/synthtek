@@ -23,10 +23,7 @@ describe("TelegramApiClient", () => {
 
 	it("throws for invalid token", async () => {
 		const client = new TelegramApiClient({ token: "" });
-		await rejects(
-			client.apiCall("getMe"),
-			/Telegram API error/,
-		);
+		await rejects(client.apiCall("getMe"), /Telegram API error/);
 	});
 
 	it("formats API URL correctly", () => {
@@ -35,7 +32,10 @@ describe("TelegramApiClient", () => {
 		const url = (client as any).getApiUrl("getMe");
 		ok(url.includes("test-token-12345"), "URL should contain token");
 		ok(url.includes("getMe"), "URL should contain method name");
-		ok(url.startsWith("https://api.telegram.org/bot"), "URL should start with API base");
+		ok(
+			url.startsWith("https://api.telegram.org/bot"),
+			"URL should start with API base",
+		);
 	});
 
 	it("supports different HTTP methods for API calls", () => {

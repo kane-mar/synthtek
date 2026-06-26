@@ -21,6 +21,7 @@ const DEFAULT_API_BASE_GLOBAL = "https://open.larksuite.com";
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_DELAY = 1000;
 
+// ─── Constants ─────────────────────────────────────────────────────────────
 export class FeishuChannel extends BaseChannel<FeishuConfig, FeishuMessage> {
 	private accessToken: string | undefined;
 	private tokenExpiry: number | undefined;
@@ -37,6 +38,7 @@ export class FeishuChannel extends BaseChannel<FeishuConfig, FeishuMessage> {
 		});
 	}
 
+	// ─── Lifecycle ─────────────────────────────────────────────────────────────
 	async connect(): Promise<void> {
 		try {
 			await this.authenticate();
@@ -85,6 +87,7 @@ export class FeishuChannel extends BaseChannel<FeishuConfig, FeishuMessage> {
 		this.tokenExpiry = Date.now() + ((data.expire as number) ?? 7200) * 1000;
 	}
 
+	// ─── Message Sending ─────────────────────────────────────────────────────
 	async sendMessage(options: FeishuSendOptions): Promise<string> {
 		if (!this.isConnected()) {
 			throw new Error("Feishu channel is not connected");
@@ -296,6 +299,7 @@ export class FeishuChannel extends BaseChannel<FeishuConfig, FeishuMessage> {
 		}
 	}
 
+	// ─── Health & Stats ─────────────────────────────────────────────────────────
 	getHealthStatus(): FeishuHealthStatus {
 		const stats = this.getStats();
 		return {

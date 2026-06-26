@@ -95,9 +95,10 @@ export class TelegramApiClient {
 			try {
 				const response = await this.executeCallRaw(method, body);
 				return response.json() as Promise<T>;
-			} catch (error: any) {
+			} catch (error: unknown) {
+				const err = error instanceof Error ? error : new Error(String(error));
 				const isRateLimited =
-					error.message?.includes("429") || error.message?.includes("flood");
+					err.message.includes("429") || err.message.includes("flood");
 				if (isRateLimited && attempt < maxRetries) {
 					const delay = this.config.retryDelay * 2 ** (attempt - 1);
 					console.warn(
@@ -107,7 +108,7 @@ export class TelegramApiClient {
 					continue;
 				}
 				const isTimeout =
-					error.name === "AbortError" || error.message?.includes("timeout");
+					err.name === "AbortError" || err.message.includes("timeout");
 				if (isTimeout && attempt < maxRetries) {
 					const delay = this.config.retryDelay * 2 ** (attempt - 1);
 					console.warn(

@@ -2,16 +2,15 @@
  * Anthropic Provider — Claude models with streaming, prompt caching, and adaptive thinking
  */
 
+import { BaseProvider } from "../base-provider.js";
 import type {
 	ChatCompletionRequest,
 	ChatCompletionResponse,
 	ContentPart,
-	LLMProvider,
 	ProviderConfig,
 	ProviderMessage,
 	StreamChunk,
 } from "../types.js";
-import { buildProviderConfig } from "../base-provider.js";
 
 const DEFAULT_CONFIG: Partial<ProviderConfig> = {
 	baseUrl: "https://api.anthropic.com/v1",
@@ -178,24 +177,18 @@ const COST_PER_1M: Record<string, { input: number; output: number }> = {
 	"claude-3-5-sonnet-20241022": { input: 3, output: 15 },
 };
 
-export class AnthropicProvider implements LLMProvider {
-	readonly name = "anthropic";
-	private config: Required<ProviderConfig>;
+export class AnthropicProvider extends BaseProvider {
 	private promptCaching: boolean;
 	private adaptiveThinking: boolean;
 	private extendedThinking: boolean;
 	private thinkingBudget: number;
 
 	constructor(config: ProviderConfig) {
-		this.config = buildProviderConfig(config, DEFAULT_CONFIG, "anthropic");
+		super(config, DEFAULT_CONFIG);
 		this.promptCaching = (config.promptCaching as boolean) ?? false;
 		this.adaptiveThinking = (config.adaptiveThinking as boolean) ?? false;
 		this.extendedThinking = (config.extendedThinking as boolean) ?? false;
 		this.thinkingBudget = (config.thinkingBudget as number) ?? 1024;
-	}
-
-	getConfig(): ProviderConfig {
-		return { ...this.config };
 	}
 
 	async listModels(): Promise<string[]> {
@@ -493,31 +486,4 @@ export class AnthropicProvider implements LLMProvider {
 	}
 
 	// ── Private helpers ──────────────────────────────────────────────────────
-
-	private async fetchWithRetry(
-		url: string,
-		options: RequestInit,
-		retryCount = 0,
-	): Promise<Response> {
-		try {
-			const controller = new AbortController();
-			const timeout = setTimeout(() => controller.abort(), this.config.timeout);
-
-			const response = await fetch(url, {
-				...options,
-				signal: controller.signal,
-			});
-
-			clearTimeout(timeout);
-			return response;
-		} catch (error) {
-			if (retryCount < (this.config.retries ?? 3)) {
-				await new Promise((resolve) =>
-					setTimeout(resolve, this.config.retryDelay ?? 1000),
-				);
-				return this.fetchWithRetry(url, options, retryCount + 1);
-			}
-			throw error;
-		}
-	}
 }

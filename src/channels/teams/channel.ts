@@ -20,6 +20,7 @@ const TOKEN_API_BASE = "https://login.microsoftonline.com";
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_DELAY = 1000;
 
+// ─── Constants ─────────────────────────────────────────────────────────────
 export class TeamsChannel extends BaseChannel<TeamsConfig, TeamsMessage> {
 	private authenticated = false;
 	private accessToken: string | undefined;
@@ -39,6 +40,8 @@ export class TeamsChannel extends BaseChannel<TeamsConfig, TeamsMessage> {
 	}
 
 	/** Connect and authenticate */
+
+	// ─── Lifecycle ─────────────────────────────────────────────────────────────
 	async connect(): Promise<void> {
 		try {
 			await this.authenticate();
@@ -121,6 +124,8 @@ export class TeamsChannel extends BaseChannel<TeamsConfig, TeamsMessage> {
 	}
 
 	/** Send a message */
+
+	// ─── Message Sending ─────────────────────────────────────────────────────
 	async sendMessage(options: TeamsSendOptions): Promise<string> {
 		if (!this.isConnected() || !this.authenticated) {
 			throw new Error("Teams channel is not connected or not authenticated");
@@ -320,6 +325,8 @@ export class TeamsChannel extends BaseChannel<TeamsConfig, TeamsMessage> {
 	}
 
 	/** Get health status */
+
+	// ─── Health & Stats ─────────────────────────────────────────────────────────
 	getHealthStatus(): TeamsHealthStatus {
 		const stats = this.getStats();
 		return {

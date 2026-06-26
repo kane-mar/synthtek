@@ -3,10 +3,10 @@
  * DeepSeek exposes an OpenAI-compatible API at https://api.deepseek.com/v1
  */
 
+import { BaseProvider } from "../base-provider.js";
 import type {
 	ChatCompletionRequest,
 	ChatCompletionResponse,
-	LLMProvider,
 	ProviderConfig,
 	ProviderMessage,
 	StreamChunk,
@@ -41,25 +41,9 @@ const COST_PER_1M: Record<string, { input: number; output: number }> = {
 	"deepseek-reasoner": { input: 0.55, output: 2.19 },
 };
 
-export class DeepSeekProvider implements LLMProvider {
-	readonly name = "deepseek";
-	private config: Required<ProviderConfig>;
-
+export class DeepSeekProvider extends BaseProvider {
 	constructor(config: ProviderConfig) {
-		this.config = {
-			provider: "deepseek",
-			apiKey: config.apiKey,
-			baseUrl: config.baseUrl ?? (DEFAULT_CONFIG.baseUrl as string),
-			model: config.model || (DEFAULT_CONFIG.model as string),
-			timeout: config.timeout || (DEFAULT_CONFIG.timeout as number),
-			retries: config.retries ?? (DEFAULT_CONFIG.retries as number),
-			retryDelay: config.retryDelay || (DEFAULT_CONFIG.retryDelay as number),
-			headers: config.headers || {},
-		};
-	}
-
-	getConfig(): ProviderConfig {
-		return { ...this.config };
+		super(config, DEFAULT_CONFIG);
 	}
 
 	async listModels(): Promise<string[]> {
@@ -264,95 +248,6 @@ export class DeepSeekProvider implements LLMProvider {
 			throw new Error(`DeepSeek API error (${response.status}): ${errorText}`);
 		}
 
-		const reader = response.body?.getReader();
-		if (!reader) {
-			throw new Error("No response body reader");
-		}
-
-		const decoder = new TextDecoder();
-		let buffer = "";
-
-		try {
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-
-				buffer += decoder.decode(value, { stream: true });
-				const lines = buffer.split("\n");
-				buffer = lines.pop() || "";
-
-				for (const line of lines) {
-					if (!line.startsWith("data: ")) continue;
-					const data = line.slice(6);
-					if (data === "[DONE]") {
-						yield { delta: "", done: true };
-						break;
-					}
-
-					try {
-						const parsed = JSON.parse(data) as {
-							choices: Array<{
-								delta: { content?: string; role?: string };
-								finish_reason: string | null;
-							}>;
-							usage?: {
-								prompt_tokens: number;
-								completion_tokens: number;
-								total_tokens: number;
-							};
-						};
-
-						const delta = parsed.choices?.[0]?.delta;
-						if (delta?.content) {
-							yield {
-								delta: delta.content,
-								done: false,
-								model,
-								usage: parsed.usage
-									? {
-											promptTokens: parsed.usage.prompt_tokens,
-											completionTokens: parsed.usage.completion_tokens,
-											totalTokens: parsed.usage.total_tokens,
-										}
-									: undefined,
-							};
-						}
-					} catch {
-						// Skip invalid JSON
-					}
-				}
-			}
-		} finally {
-			reader.releaseLock();
-		}
-	}
-
-	// ── Private helpers ──────────────────────────────────────────────────────
-
-	private async fetchWithRetry(
-		url: string,
-		options: RequestInit,
-		retryCount = 0,
-	): Promise<Response> {
-		try {
-			const controller = new AbortController();
-			const timeout = setTimeout(() => controller.abort(), this.config.timeout);
-
-			const response = await fetch(url, {
-				...options,
-				signal: controller.signal,
-			});
-
-			clearTimeout(timeout);
-			return response;
-		} catch (error) {
-			if (retryCount < (this.config.retries ?? 3)) {
-				await new Promise((resolve) =>
-					setTimeout(resolve, this.config.retryDelay ?? 1000),
-				);
-				return this.fetchWithRetry(url, options, retryCount + 1);
-			}
-			throw error;
-		}
+		yield* this.parseSSEStream(response, model);
 	}
 }

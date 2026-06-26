@@ -21,6 +21,7 @@ const DEFAULT_POLLING_INTERVAL = 30000;
 const DEFAULT_MAX_EMAILS = 50;
 const DEFAULT_MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
+// ─── Constants ─────────────────────────────────────────────────────────────
 export class EmailChannel extends BaseChannel<EmailConfig, EmailMessage> {
 	private smtpConnected = false;
 	private imapConnected = false;
@@ -48,6 +49,8 @@ export class EmailChannel extends BaseChannel<EmailConfig, EmailMessage> {
 	}
 
 	/** Connect to SMTP and IMAP servers */
+
+	// ─── Lifecycle ─────────────────────────────────────────────────────────────
 	async connect(): Promise<void> {
 		await Promise.all([this.connectSMTP(), this.connectIMAP()]);
 		if (this.smtpConnected && this.imapConnected) {
@@ -127,7 +130,24 @@ export class EmailChannel extends BaseChannel<EmailConfig, EmailMessage> {
 		return this.smtpConnected && this.imapConnected;
 	}
 
+	/**
+	 * Send a message (standardized method name — delegates to sendEmail).
+	 * Supports both { subject, to, text, ... } and EmailSendOptions.
+	 */
+	async sendMessage(
+		options: EmailSendOptions & {
+			subject: string;
+			to: string | string[];
+			text?: string;
+			html?: string;
+		},
+	): Promise<EmailSendResult> {
+		return this.sendEmail(options);
+	}
+
 	/** Send an email */
+
+	// ─── Message Sending ─────────────────────────────────────────────────────
 	async sendEmail(options: EmailSendOptions): Promise<EmailSendResult> {
 		if (!this.smtpConnected) {
 			return { success: false, error: "SMTP not connected" };
@@ -314,6 +334,8 @@ export class EmailChannel extends BaseChannel<EmailConfig, EmailMessage> {
 	}
 
 	/** Get health status */
+
+	// ─── Health & Stats ─────────────────────────────────────────────────────────
 	getHealthStatus(): EmailHealthStatus {
 		const stats = this.getStats();
 		return {
