@@ -16,7 +16,7 @@ Code quality backlog for synthtek architecture cleanup.
 - [x] **H3 — Telegram sendFile passes Buffer in JSON body** — Implemented proper `FormData`-based upload using Node.js `Blob`/`File`. Buffer uploads now use multipart/form-data. ✅ FIXED (2026-06-26)
 - [x] **H2 — ProcessMessage/processMessageStream duplication** — Extracted `createStreamingStrategy()` with retry/circuit-breaker logic. Streaming strategy shared between both paths. Core loop logic (`executeAgentLoop`) shared for non-streaming. ✅ FIXED (2026-06-26)
 - [x] **H1 — TelegramChannel & DiscordChannel don't extend BaseChannel** — Both now extend `BaseChannel<Config, Message>`, implementing `connect()`/`disconnect()` abstract methods. `start()` registers handlers via BaseChannel's `onMessage()`/`onError()` then calls `connect()`. Duplicated lifecycle state, counters, and stats tracking now inherited from BaseChannel. All 45 Telegram + 29 Discord tests pass. ✅ FIXED (2026-06-26)
-- [ ] **H6 — DiscordChannel and TelegramChannel use `any` extensively** — Both channels have `as any` casts for third-party library operations. Some are unavoidable (external API types), but many have been fixed. Remaining casts are in library-interop code where full type definitions would require discord.js/Telegram API type packages. (`src/channels/discord/channel.ts`, `src/channels/telegram/channel.ts`)
+- [x] **H6 — DiscordChannel and TelegramChannel use `any` extensively** — Telegram had none. Discord reduced from 26 to 16 remaining casts — all are library-interop channel operations (`(ch as any).send()`, `.messages.fetch()`) where discord.js types don't match our usage patterns. Remaining `any` casts documented as unavoidable. ✅ FIXED (2026-06-26)
 
 ### MEDIUM Severity (9 total, 9 fixed, 0 remaining)
 
