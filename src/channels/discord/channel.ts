@@ -424,7 +424,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		if (!this.client.user) return;
 
 		this.client.user.setPresence({
-			status: this.config.presenceStatus as any,
+			status: this.config.presenceStatus as import("discord.js").ClientPresenceStatus,
 			activities: [
 				{
 					name: this.config.presenceActivity,
@@ -921,13 +921,20 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 					channel.type === ChannelType.PrivateThread ||
 					channel.type === ChannelType.DM)
 			) {
-				return channel as any;
-			}
-			return null;
-		} catch {
-			return null;
+				return channel as TextChannel
+				| NewsChannel
+				| VoiceChannel
+				| StageChannel
+				| ForumChannel
+				| MediaChannel
+				| ThreadChannel
+				| DMChannel;
 		}
+		return null;
+	} catch {
+		return null;
 	}
+}
 
 	/** Get channel info */
 	async getChannelInfo(channelId: string): Promise<DiscordChannelInfo | null> {
@@ -936,13 +943,15 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 
 		const info: DiscordChannelInfo = {
 			id: channel.id,
-			name: "name" in channel ? (channel as any).name : "Unknown",
+			name: "name" in channel
+				? (channel as { name: string }).name
+				: "Unknown",
 			type: channel.type,
 		};
 
-		if ("topic" in channel) info.topic = (channel as any).topic;
-		if ("guildId" in channel && (channel as any).guildId)
-			info.guildId = (channel as any).guildId;
+		if ("topic" in channel) info.topic = (channel as { topic?: string }).topic;
+		if ("guildId" in channel && (channel as { guildId?: string }).guildId)
+			info.guildId = (channel as { guildId?: string }).guildId;
 
 		return info;
 	}
@@ -997,10 +1006,10 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		const channel = await this.getChannel(channelId);
 		if (!channel) return false;
 
-		const me = (channel as any).guild?.members?.me;
+		const me = (channel as { guild?: { members?: { me?: { permissions: { has: (perm: bigint) => boolean } } } } }).guild?.members?.me;
 		if (!me) return false;
 
-		const permBit = (PermissionsBitField.Flags as any)[permission];
+		const permBit = (PermissionsBitField.Flags as Record<string, bigint>)[permission];
 		if (!permBit) return false;
 
 		return me.permissions.has(permBit);
@@ -1013,11 +1022,11 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 			return this.defaultPermissions();
 		}
 
-		const me = (channel as any).guild?.members?.me;
+		const me = (channel as { guild?: { members?: { me?: { permissions: { has: (perm: bigint) => boolean } } } } }).guild?.members?.me;
 		if (!me) return this.defaultPermissions();
 
 		const perms = me.permissions;
-		const flags = PermissionsBitField.Flags as any;
+		const flags = PermissionsBitField.Flags as Record<string, bigint>;
 
 		return {
 			createInstantInvite: perms.has(flags.CreateInstantInvite),
