@@ -230,4 +230,22 @@ export class ProviderManager {
 	getPresets(): Record<ProviderType, Partial<LLMProviderConfig>> {
 		return PROVIDER_PRESETS;
 	}
+
+	/**
+	 * Get an active provider by ID, or the first active provider.
+	 * Returns null if no active providers are configured.
+	 */
+	getActiveProvider(providerId?: string): LLMProviderConfig | null {
+		this.ensureLoaded();
+		const all = Array.from(this.providers.values());
+		const active = all.filter((p) => p.status === "active");
+
+		if (active.length === 0) return null;
+
+		if (providerId) {
+			return active.find((p) => p.id === providerId) ?? null;
+		}
+
+		return active[0] ?? null;
+	}
 }

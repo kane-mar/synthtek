@@ -124,37 +124,55 @@ export class ChatService {
 
 		try {
 			// ── Resolve provider ──────────────────────────────────────────
-			const providers = this.providerManager.list();
-			const activeProviders = providers.filter((p) => p.status === "active");
-
-			if (activeProviders.length === 0) {
-				const error =
-					"No active LLM providers configured. Go to Settings to add one.";
-				this.setError(error);
-				return { content: "", error };
-			}
-
 			let provider: { id: string; name: string; type: string } | undefined;
-			if (request.providerId) {
-				// Support both `find()` and manual lookup
-				if (this.providerManager.find) {
-					provider = this.providerManager.find(request.providerId) ?? undefined;
-				} else {
-					provider = activeProviders.find((p) => p.id === request.providerId);
-				}
-				if (!provider) {
-					const error = "Specified provider not found or inactive";
+
+			if (this.providerManager.getActiveProvider) {
+				const active = this.providerManager.getActiveProvider(
+					request.providerId,
+				);
+				if (!active) {
+					const error = request.providerId
+						? "Specified provider not found or inactive"
+						: "No active LLM providers configured. Go to Settings to add one.";
 					this.setError(error);
 					return { content: "", error };
 				}
+				provider = active;
 			} else {
-				provider = activeProviders[0];
-			}
+				// Fallback for minimal ProviderManagerLike without getActiveProvider
+				const allProviders = this.providerManager.list();
+				const activeProviders = allProviders.filter(
+					(p) => p.status === "active",
+				);
 
-			if (!provider) {
-				const error = "No provider available";
-				this.setError(error);
-				return { content: "", error };
+				if (activeProviders.length === 0) {
+					const error =
+						"No active LLM providers configured. Go to Settings to add one.";
+					this.setError(error);
+					return { content: "", error };
+				}
+
+				if (request.providerId) {
+					if (this.providerManager.find) {
+						provider =
+							this.providerManager.find(request.providerId) ?? undefined;
+					} else {
+						provider = activeProviders.find((p) => p.id === request.providerId);
+					}
+					if (!provider) {
+						const error = "Specified provider not found or inactive";
+						this.setError(error);
+						return { content: "", error };
+					}
+				} else {
+					provider = activeProviders[0];
+				}
+
+				if (!provider) {
+					const error = "No provider available";
+					this.setError(error);
+					return { content: "", error };
+				}
 			}
 
 			// ── Build messages ────────────────────────────────────────────

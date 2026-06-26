@@ -27,6 +27,16 @@ const STREAM_EDIT_INTERVAL_MS = 600;
 const TYPING_REFRESH_INTERVAL_MS = 4000;
 const MEDIA_GROUP_BUFFER_MS = 1000;
 
+/** Map Telegram media types to their send API method names */
+const MEDIA_SEND_METHODS: Record<string, string> = {
+	photo: "sendPhoto",
+	voice: "sendVoice",
+	audio: "sendAudio",
+	video: "sendVideo",
+	animation: "sendAnimation",
+	document: "sendDocument",
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Escape text for Telegram HTML parse mode */
@@ -63,11 +73,11 @@ function markdownToTelegramHtml(text: string): string {
 
 	// 1. Extract and protect code blocks
 	const codeBlocks: string[] = [];
-	const saveCodeBlock = (m: RegExpMatchArray): string => {
-		codeBlocks.push(m[1]);
+	const saveCodeBlock = (_match: string, code: string): string => {
+		codeBlocks.push(code);
 		return `\x00CB${codeBlocks.length - 1}\x00`;
 	};
-	let result = text.replace(/```[\w]*\n?([\s\S]*?)```/g, saveCodeBlock as any);
+	let result = text.replace(/```[\w]*\n?([\s\S]*?)```/g, saveCodeBlock);
 
 	// 1.5. Convert markdown tables to plain text (reuse code block placeholders)
 	const lines = result.split("\n");
@@ -93,11 +103,11 @@ function markdownToTelegramHtml(text: string): string {
 
 	// 2. Extract and protect inline code
 	const inlineCodes: string[] = [];
-	const saveInlineCode = (m: RegExpMatchArray): string => {
-		inlineCodes.push(m[1]);
+	const saveInlineCode = (_match: string, code: string): string => {
+		inlineCodes.push(code);
 		return `\x00IC${inlineCodes.length - 1}\x00`;
 	};
-	result = result.replace(/`([^`]+)`/g, saveInlineCode as any);
+	result = result.replace(/`([^`]+)`/g, saveInlineCode);
 
 	// 3. Headers # Title -> just the title text
 	result = result.replace(/^#{1,6}\s+(.+)$/gm, "$1");
@@ -180,7 +190,52 @@ function isRemoteMediaUrl(path: string): boolean {
 }
 
 /** Convert Telegram update to our message format */
-function parseMessage(update: any): TelegramMessage | null {
+/**
+ * Minimal Telegram API types for internal parsing.
+ * Full definitions ship with the Telegram Bot API types package.
+ */
+
+/** Minimal Telegram Update type for message parsing */
+interface TelegramUpdate {
+	message?: TelegramRawMessage;
+	edited_message?: TelegramRawMessage;
+	channel_post?: TelegramRawMessage;
+	edited_channel_post?: TelegramRawMessage;
+	callback_query?: {
+		id: string;
+		from: { id: number; username?: string };
+		message?: TelegramRawMessage;
+		data?: string;
+	};
+	inline_query?: unknown;
+}
+
+interface TelegramRawMessage {
+	message_id: number;
+	chat: { id: number; type?: string };
+	from?: { id: number; username?: string };
+	text?: string;
+	caption?: string;
+	entities?: Array<{ type: string; offset: number; length: number }>;
+	date: number;
+	photo?: Array<{ file_id: string }>;
+	document?: { file_id: string };
+	audio?: { file_id: string };
+	video?: { file_id: string };
+	voice?: { file_id: string };
+	sticker?: { file_id: string };
+	animation?: { file_id: string };
+	reply_to_message?: {
+		message_id: number;
+		from?: { id: number; username?: string };
+		text?: string;
+		date: number;
+	};
+	is_topic_message?: boolean;
+	message_thread_id?: number;
+}
+
+function parseMessage(update: TelegramUpdate): TelegramMessage | null {
 	const msg =
 		update.message ||
 		update.edited_message ||
@@ -634,46 +689,31 @@ export class TelegramChannel {
 			try {
 				const mediaType = getMediaType(mediaPath);
 
+				const sendMethod = MEDIA_SEND_METHODS[mediaType] ?? "sendDocument";
+				const mediaField = mediaType === "photo" ? "photo" : mediaType;
+
 				if (isRemoteMediaUrl(mediaPath)) {
 					const [ok, error] = validateUrlTarget(mediaPath);
 					if (!ok) {
 						throw new Error(`unsafe media URL: ${error}`);
 					}
-					await this.apiCallWithRetry(
-						mediaType === "photo"
-							? "sendPhoto"
-							: mediaType === "voice"
-								? "sendVoice"
-								: mediaType === "audio"
-									? "sendAudio"
-									: "sendDocument",
-						{
-							chat_id: chatId,
-							[mediaType === "photo" ? "photo" : mediaType]: mediaPath,
-							reply_parameters: replyParams,
-							...threadKwargs,
-						},
-					);
+					await this.apiCallWithRetry(sendMethod, {
+						chat_id: chatId,
+						[mediaField]: mediaPath,
+						reply_parameters: replyParams,
+						...threadKwargs,
+					});
 					this.mediaSent++;
 					continue;
 				}
 
 				// Local file - in production, use FormData
-				await this.apiCallWithRetry(
-					mediaType === "photo"
-						? "sendPhoto"
-						: mediaType === "voice"
-							? "sendVoice"
-							: mediaType === "audio"
-								? "sendAudio"
-								: "sendDocument",
-					{
-						chat_id: chatId,
-						[mediaType === "photo" ? "photo" : mediaType]: mediaPath,
-						reply_parameters: replyParams,
-						...threadKwargs,
-					},
-				);
+				await this.apiCallWithRetry(sendMethod, {
+					chat_id: chatId,
+					[mediaField]: mediaPath,
+					reply_parameters: replyParams,
+					...threadKwargs,
+				});
 				this.mediaSent++;
 			} catch (error) {
 				const filename = mediaPath.split("/").pop() ?? mediaPath;

@@ -467,7 +467,7 @@ export class AgentRunner {
 		config: import("../channels/slack/types.js").SlackConfig,
 	): Promise<void> {
 		const { SlackChannel } = await import("../channels/slack/channel.js");
-		this.slack = new SlackChannel(config) as any;
+		this.slack = new SlackChannel(config);
 		this.logger.info("Slack channel started");
 	}
 
@@ -617,8 +617,7 @@ export class AgentRunner {
 			messages: this.loop
 				.getContext()
 				.getFormattedMessages() as import("../providers/types.js").ProviderMessage[],
-			model:
-				this.config.model ?? (provider as any).getConfig?.().model ?? "default",
+			model: this.config.model ?? provider.getConfig().model ?? "default",
 			system: this.config.systemPrompt,
 		})) {
 			accumulated += chunk.delta;

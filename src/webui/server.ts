@@ -20,7 +20,6 @@ import type {
 import { WebUIBackend } from "./backend.js";
 import {
 	type CreateProviderRequest,
-	type LLMProviderConfig,
 	ProviderManager,
 	type UpdateProviderRequest,
 } from "./provider-manager.js";
@@ -583,7 +582,7 @@ function renderChat(el) {
     h = h.replace(/^- (.+)$/gm, '<li>$1</li>');
     h = h.replace(/((?:<li>.*<\\/li>)+)/g, '<ul>$1</ul>');
     // Ordered lists
-    h = h.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+    h = h.replace(/^d+. (.+)$/gm, '<li>$1</li>');
     h = h.replace(/((?:<li>.*<\\/li>)+)/g, '<ol>$1</ol>');
     // Horizontal rule
     h = h.replace(/^---+$/gm, '<hr>');
@@ -1347,28 +1346,17 @@ export class WebUIServer {
 		chatReq: ChatCompletionRequest & { providerId?: string },
 	): Promise<void> {
 		try {
-			// Find the provider to use
-			const providers = this.providerManager.list();
-			const activeProviders = providers.filter((p) => p.status === "active");
+			// Use shared provider resolution — same logic as ChatService
+			const provider = this.providerManager.getActiveProvider(
+				chatReq.providerId,
+			);
 
-			if (activeProviders.length === 0) {
-				return sendJson(res, 422, {
-					error:
-						"No active LLM providers configured. Go to Settings to add one.",
-				});
-			}
-
-			// Use specified provider or first active one
-			let provider: LLMProviderConfig | undefined;
-			if (chatReq.providerId) {
-				provider = activeProviders.find((p) => p.id === chatReq.providerId);
-				if (!provider) {
-					return sendJson(res, 404, {
-						error: "Specified provider not found or inactive",
-					});
-				}
-			} else {
-				provider = activeProviders[0];
+			if (!provider) {
+				const error = chatReq.providerId
+					? "Specified provider not found or inactive"
+					: "No active LLM providers configured. Go to Settings to add one.";
+				const status = chatReq.providerId ? 404 : 422;
+				return sendJson(res, status, { error });
 			}
 
 			// Create provider instance via registry

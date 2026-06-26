@@ -62,10 +62,11 @@ function toToolCalls(parsed: unknown, offset: number): ToolCall[] {
 			"name" in item &&
 			"arguments" in item
 		) {
+			const tool = item as { id?: string; name: unknown; arguments: unknown };
 			calls.push({
-				id: (item as any).id || `call_${Date.now()}_${offset + calls.length}`,
-				name: (item as any).name,
-				arguments: (item as any).arguments,
+				id: tool.id || `call_${Date.now()}_${offset + calls.length}`,
+				name: String(tool.name),
+				arguments: tool.arguments as Record<string, unknown>,
 			});
 		}
 	}
@@ -339,6 +340,67 @@ export class AgentLoop {
 	}
 
 	/**
+	 * Create a streaming LLM call strategy.
+	 * @param onChunk — called for each streaming chunk (allows yielding to caller)
+	 */
+	private createStreamingStrategy(
+		llmProvider: LLMProvider,
+		onChunk: (chunk: import("../providers/types.js").StreamChunk) => void,
+	): LlmCallStrategy {
+		return async (messages): Promise<LlmCallResult> => {
+			const retry = this.config.retry;
+			const maxRetries = retry?.maxRetries ?? 3;
+			let lastError: Error | null = null;
+
+			for (let attempt = 0; attempt <= maxRetries; attempt++) {
+				if (this.isCircuitBreakerOpen()) {
+					throw new Error(
+						"Circuit breaker is open — LLM calls are temporarily disabled",
+					);
+				}
+
+				try {
+					let content = "";
+					let tokens = 0;
+					let toolCalls: LlmCallResult["toolCalls"];
+
+					for await (const chunk of llmProvider.chatStream(
+						this.buildLlmRequest(llmProvider, messages),
+					)) {
+						onChunk(chunk);
+						if (!chunk.done) {
+							content += chunk.delta;
+						}
+						if (chunk.usage) {
+							tokens = chunk.usage.totalTokens;
+						}
+					}
+
+					this.recordSuccess();
+					return { content, tokens, toolCalls: toolCalls ?? [] };
+				} catch (error) {
+					lastError = error instanceof Error ? error : new Error(String(error));
+
+					if (!this.isRetryableError(lastError) || attempt === maxRetries) {
+						throw lastError;
+					}
+
+					this.events.emit("agent:retry", {
+						attempt: attempt + 1,
+						maxRetries,
+						error: lastError.message,
+						delay: this.getBackoffDelay(attempt),
+					});
+
+					await this.sleep(this.getBackoffDelay(attempt));
+				}
+			}
+
+			throw lastError ?? new Error("Streaming LLM call failed");
+		};
+	}
+
+	/**
 	 * Ensure context is healthy by compacting and trimming if needed.
 	 * Shared between streaming and non-streaming agent loops.
 	 */
@@ -603,6 +665,7 @@ export class AgentLoop {
 		const startTime = Date.now();
 		const errors: string[] = [];
 		let toolCallsMade = 0;
+		let totalTokens = 0;
 
 		// Update state
 		this.state = "processing";
@@ -620,7 +683,14 @@ export class AgentLoop {
 		// Main loop: iterate until LLM returns plain text (no tool calls)
 		let currentMessages = this.context.getFormattedMessages();
 		let responseContent = "";
-		let totalTokens = 0;
+
+		const strategy = this.createStreamingStrategy(llmProvider, (chunk) => {
+			// Yield chunks as they arrive from the streaming strategy
+			// Using a side channel since async generators can't yield from callbacks
+			pendingChunks.push(chunk);
+		});
+
+		const pendingChunks: StreamChunk[] = [];
 
 		while (toolCallsMade < this.config.maxToolCalls) {
 			// Context management (compaction + trimming)
@@ -632,9 +702,9 @@ export class AgentLoop {
 				await this.hooks.onBeforeLLMCall(currentMessages as AgentMessage[]);
 			}
 
-			// Call LLM with streaming and retry logic
-			let llmResponse: string = "";
-			let llmTokens: number = 0;
+			// Call LLM via streaming strategy
+			let llmResponse: string;
+			let llmTokens: number;
 			let nativeToolCalls:
 				| Array<{
 						id: string;
@@ -644,54 +714,21 @@ export class AgentLoop {
 				| undefined;
 
 			try {
-				const retry = this.config.retry;
-				const maxRetries = retry?.maxRetries ?? 3;
-				let lastError: Error | null = null;
+				// Clear pending chunks before each LLM call
+				pendingChunks.length = 0;
 
-				for (let attempt = 0; attempt <= maxRetries; attempt++) {
-					if (this.isCircuitBreakerOpen()) {
-						throw new Error(
-							"Circuit breaker is open — LLM calls are temporarily disabled",
-						);
-					}
+				const llmResult = await strategy(currentMessages);
 
-					try {
-						llmResponse = "";
-						nativeToolCalls = undefined;
-						llmTokens = 0;
-
-						for await (const chunk of llmProvider.chatStream(
-							this.buildLlmRequest(llmProvider, currentMessages),
-						)) {
-							yield chunk;
-							if (!chunk.done) {
-								llmResponse += chunk.delta;
-							}
-							if (chunk.usage) {
-								llmTokens = chunk.usage.totalTokens;
-							}
-						}
-
-						this.recordSuccess();
-						break;
-					} catch (error) {
-						lastError =
-							error instanceof Error ? error : new Error(String(error));
-
-						if (!this.isRetryableError(lastError) || attempt === maxRetries) {
-							throw lastError;
-						}
-
-						this.events.emit("agent:retry", {
-							attempt: attempt + 1,
-							maxRetries,
-							error: lastError.message,
-							delay: this.getBackoffDelay(attempt),
-						});
-
-						await this.sleep(this.getBackoffDelay(attempt));
+				// Yield all chunks that were collected during this LLM call
+				for (const chunk of pendingChunks.splice(0)) {
+					if (!chunk.done && chunk.delta) {
+						yield chunk;
 					}
 				}
+
+				llmResponse = llmResult.content;
+				llmTokens = llmResult.tokens;
+				nativeToolCalls = llmResult.toolCalls;
 			} catch (error) {
 				const errorMsg = error instanceof Error ? error.message : String(error);
 				errors.push(`LLM call failed after retries: ${errorMsg}`);
