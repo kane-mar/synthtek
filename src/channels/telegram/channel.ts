@@ -21,6 +21,7 @@ import type {
 
 import { BaseChannel } from "../base-channel.js";
 
+import { TelegramApiClient } from "./api.js";
 import {
 	TELEGRAM_MAX_MESSAGE_LEN,
 	MEDIA_SEND_METHODS,
@@ -37,27 +38,11 @@ import {
 	sleep,
 } from "./format.js";
 
-const API_BASE = "https://api.telegram.org/bot";
-const SEND_MAX_RETRIES = 3;
-const SEND_RETRY_BASE_DELAY_MS = 500;
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const STREAM_EDIT_INTERVAL_MS = 600;
 const TYPING_REFRESH_INTERVAL_MS = 4000;
 const MEDIA_GROUP_BUFFER_MS = 1000;
-
-/** Telegram API methods that support GET requests (read-only) */
-const GET_METHODS = new Set([
-	"getMe",
-	"getUpdates",
-	"getFile",
-	"getChat",
-	"getChatAdministrators",
-	"getChatMember",
-	"getChatMembersCount",
-	"getUserProfilePhotos",
-	"getWebhookInfo",
-	"getMyCommands",
-	"getBusinessConnection",
-]);
 
 // ─── Telegram Channel ────────────────────────────────────────────────────────
 
@@ -79,6 +64,7 @@ const BOT_COMMANDS: TelegramBotCommand[] = [
 
 export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage> {
 	protected config: Required<TelegramConfig>;
+	private api: TelegramApiClient;
 	private botUsername?: string;
 	private botId?: number;
 	private lastUpdateId = 0;
@@ -110,6 +96,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 
 	constructor(config: TelegramConfig) {
 		super(config);
+		this.api = new TelegramApiClient(config);
 		this.config = {
 			token: config.token,
 			webhookUrl: config.webhookUrl ?? "",
@@ -189,7 +176,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 	/** Register bot commands with Telegram */
 	private async registerBotCommands(): Promise<void> {
 		try {
-			await this.apiCall("setMyCommands", {
+			await this.api.apiCallRaw("setMyCommands", {
 				commands: BOT_COMMANDS,
 			});
 		} catch (error) {
@@ -232,7 +219,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 
 	/** Get the bot's info */
 	async getBotInfo(): Promise<{ username: string; id: number }> {
-		const response = await this.apiCall("getMe");
+		const response = await this.api.apiCallRaw("getMe");
 		const data = (await response.json()) as {
 			ok: boolean;
 			result: { username: string; id: number };
@@ -273,7 +260,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		const results: Array<{ messageId: number }> = [];
 
 		for (let i = 0; i < chunks.length; i++) {
-			const response = await this.apiCallWithRetry("sendMessage", {
+			const response = await this.api.apiCallRaw("sendMessage", {
 				chat_id: chatId,
 				text: chunks[i],
 				parse_mode: options?.parseMode,
@@ -317,7 +304,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 				? toolHintToTelegramBlockquote(text)
 				: markdownToTelegramHtml(text);
 
-			await this.apiCallWithRetry("sendMessage", {
+			await this.api.apiCallRaw("sendMessage", {
 				chat_id: chatId,
 				text: html,
 				parse_mode: "HTML",
@@ -338,7 +325,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 				error,
 			);
 			try {
-				await this.apiCallWithRetry("sendMessage", {
+				await this.api.apiCallRaw("sendMessage", {
 					chat_id: chatId,
 					text,
 					parse_mode: undefined,
@@ -414,7 +401,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 					if (!ok) {
 						throw new Error(`unsafe media URL: ${error}`);
 					}
-					await this.apiCallWithRetry(sendMethod, {
+					await this.api.apiCallRaw(sendMethod, {
 						chat_id: chatId,
 						[mediaField]: mediaPath,
 						reply_parameters: replyParams,
@@ -425,7 +412,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 				}
 
 				// Local file - in production, use FormData
-				await this.apiCallWithRetry(sendMethod, {
+				await this.api.apiCallRaw(sendMethod, {
 					chat_id: chatId,
 					[mediaField]: mediaPath,
 					reply_parameters: replyParams,
@@ -435,7 +422,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 			} catch (error) {
 				const filename = mediaPath.split("/").pop() ?? mediaPath;
 				console.error(`[Telegram] Failed to send media ${mediaPath}:`, error);
-				await this.apiCallWithRetry("sendMessage", {
+				await this.api.apiCallRaw("sendMessage", {
 					chat_id: chatId,
 					text: `[Failed to send: ${filename}]`,
 					reply_parameters: replyParams,
@@ -480,7 +467,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 			body.message_thread_id = options.messageThreadId;
 		}
 
-		const response = await this.apiCall(method, body);
+		const response = await this.api.apiCallRaw(method, body);
 		const data = (await response.json()) as {
 			ok: boolean;
 			result?: { message_id: number };
@@ -512,7 +499,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 			body.message_thread_id = options.messageThreadId;
 		}
 
-		const response = await this.apiCall("sendMediaAlbum", body);
+		const response = await this.api.apiCallRaw("sendMediaAlbum", body);
 		const data = (await response.json()) as {
 			ok: boolean;
 			result?: Array<{ message_id: number }>;
@@ -560,7 +547,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 			}
 
 			const response = await fetch(
-				`${API_BASE}${this.config.token}/${method}`,
+				this.api.getApiUrl(method),
 				{ method: "POST", body: formData },
 			);
 			const data = (await response.json()) as {
@@ -576,7 +563,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		// For string URLs, use the standard JSON API
 		body[fileType] = file.data;
 
-		const response = await this.apiCall(method, body);
+		const response = await this.api.apiCallRaw(method, body);
 		const data = (await response.json()) as {
 			ok: boolean;
 			result?: { message_id: number };
@@ -598,7 +585,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		text: string,
 		options?: TelegramSendOptions,
 	): Promise<{ messageId: number } | null> {
-		const response = await this.apiCall("editMessageText", {
+		const response = await this.api.apiCallRaw("editMessageText", {
 			chat_id: chatId,
 			message_id: messageId,
 			text,
@@ -624,7 +611,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		caption: string,
 		options?: TelegramSendOptions,
 	): Promise<{ messageId: number } | null> {
-		const response = await this.apiCall("editMessageCaption", {
+		const response = await this.api.apiCallRaw("editMessageCaption", {
 			chat_id: chatId,
 			message_id: messageId,
 			caption,
@@ -647,7 +634,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		chatId: number | string,
 		messageId: number,
 	): Promise<boolean> {
-		const response = await this.apiCall("deleteMessage", {
+		const response = await this.api.apiCallRaw("deleteMessage", {
 			chat_id: chatId,
 			message_id: messageId,
 		});
@@ -662,7 +649,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		messageId: number,
 		disableNotification?: boolean,
 	): Promise<boolean> {
-		const response = await this.apiCall("pinChatMessage", {
+		const response = await this.api.apiCallRaw("pinChatMessage", {
 			chat_id: chatId,
 			message_id: messageId,
 			disable_notification: disableNotification,
@@ -682,14 +669,14 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 			body.message_id = messageId;
 		}
 
-		const response = await this.apiCall("unpinChatMessage", body);
+		const response = await this.api.apiCallRaw("unpinChatMessage", body);
 		const data = (await response.json()) as { ok: boolean };
 		return data.ok;
 	}
 
 	/** Unpin all messages in a topic/chat */
 	async unpinAllMessages(chatId: number | string): Promise<boolean> {
-		const response = await this.apiCall("unpinAllChatMessages", {
+		const response = await this.api.apiCallRaw("unpinAllChatMessages", {
 			chat_id: chatId,
 		});
 		const data = (await response.json()) as { ok: boolean };
@@ -709,7 +696,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		// Clear previous typing interval for this chat
 		this.stopTyping(chatId);
 
-		await this.apiCall("sendChatAction", {
+		await this.api.apiCallRaw("sendChatAction", {
 			chat_id: chatId,
 			action,
 		});
@@ -717,7 +704,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		// Set up auto-refresh interval
 		const interval = setInterval(async () => {
 			try {
-				await this.apiCall("sendChatAction", { chat_id: chatId, action });
+				await this.api.apiCallRaw("sendChatAction", { chat_id: chatId, action });
 			} catch {
 				// Ignore errors in typing refresh
 				this.stopTyping(chatId);
@@ -776,7 +763,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		if (now - buf.lastEdit >= STREAM_EDIT_INTERVAL_MS) {
 			try {
 				const html = markdownToTelegramHtml(buf.text);
-				await this.apiCallWithRetry("editMessageText", {
+				await this.api.apiCallRaw("editMessageText", {
 					chat_id: chatId,
 					message_id: buf.messageId,
 					text: html,
@@ -797,7 +784,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		// Final edit to ensure complete text is shown
 		try {
 			const html = markdownToTelegramHtml(buf.text);
-			await this.apiCallWithRetry("editMessageText", {
+			await this.api.apiCallRaw("editMessageText", {
 				chat_id: chatId,
 				message_id: buf.messageId,
 				text: html,
@@ -826,7 +813,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		messageId: number,
 		emoji: string,
 	): Promise<boolean> {
-		const response = await this.apiCall("setMessageReaction", {
+		const response = await this.api.apiCallRaw("setMessageReaction", {
 			chat_id: chatId,
 			message_id: messageId,
 			reaction: JSON.stringify([{ type: "emoji", emoji }]),
@@ -841,7 +828,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		chatId: number | string,
 		messageId: number,
 	): Promise<boolean> {
-		const response = await this.apiCall("setMessageReaction", {
+		const response = await this.api.apiCallRaw("setMessageReaction", {
 			chat_id: chatId,
 			message_id: messageId,
 			reaction: JSON.stringify([]),
@@ -856,7 +843,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		chatId: number | string,
 		messageId: number,
 	): Promise<TelegramReaction[]> {
-		const response = await this.apiCall("getMessageReactions", {
+		const response = await this.api.apiCallRaw("getMessageReactions", {
 			chat_id: chatId,
 			message_id: messageId,
 		});
@@ -886,7 +873,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 	async getChatInfo(
 		chatId: number | string,
 	): Promise<TelegramChannelInfo | null> {
-		const response = await this.apiCall("getChat", { chat_id: chatId });
+		const response = await this.api.apiCallRaw("getChat", { chat_id: chatId });
 		const data = (await response.json()) as { ok: boolean; result?: any };
 
 		if (!data.ok || !data.result) return null;
@@ -931,7 +918,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 
 	/** Get chat administrators */
 	async getChatAdministrators(chatId: number | string): Promise<any[]> {
-		const response = await this.apiCall("getChatAdministrators", {
+		const response = await this.api.apiCallRaw("getChatAdministrators", {
 			chat_id: chatId,
 		});
 		const data = (await response.json()) as { ok: boolean; result?: any[] };
@@ -942,7 +929,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 
 	/** Get chat member count */
 	async getChatMemberCount(chatId: number | string): Promise<number> {
-		const response = await this.apiCall("getChatMembersCount", {
+		const response = await this.api.apiCallRaw("getChatMembersCount", {
 			chat_id: chatId,
 		});
 		const data = (await response.json()) as { ok: boolean; result?: number };
@@ -956,7 +943,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		chatId: number | string,
 		userId: number,
 	): Promise<any | null> {
-		const response = await this.apiCall("getChatMember", {
+		const response = await this.api.apiCallRaw("getChatMember", {
 			chat_id: chatId,
 			user_id: userId,
 		});
@@ -968,7 +955,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 
 	/** Leave a chat */
 	async leaveChat(chatId: number | string): Promise<boolean> {
-		const response = await this.apiCall("leaveChat", { chat_id: chatId });
+		const response = await this.api.apiCallRaw("leaveChat", { chat_id: chatId });
 		const data = (await response.json()) as { ok: boolean };
 		return data.ok;
 	}
@@ -984,7 +971,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 			body.until_date = untilDate;
 		}
 
-		const response = await this.apiCall("banChatMember", body);
+		const response = await this.api.apiCallRaw("banChatMember", body);
 		const data = (await response.json()) as { ok: boolean };
 		return data.ok;
 	}
@@ -1000,7 +987,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 			body.only_if_banned = onlyIfBanned;
 		}
 
-		const response = await this.apiCall("unbanChatMember", body);
+		const response = await this.api.apiCallRaw("unbanChatMember", body);
 		const data = (await response.json()) as { ok: boolean };
 		return data.ok;
 	}
@@ -1022,7 +1009,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 			body.until_date = untilDate;
 		}
 
-		const response = await this.apiCall("restrictChatMember", body);
+		const response = await this.api.apiCallRaw("restrictChatMember", body);
 		const data = (await response.json()) as { ok: boolean };
 		return data.ok;
 	}
@@ -1049,7 +1036,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 			canPinMessages?: boolean;
 		},
 	): Promise<boolean> {
-		const response = await this.apiCall("promoteChatMember", {
+		const response = await this.api.apiCallRaw("promoteChatMember", {
 			chat_id: chatId,
 			user_id: userId,
 			...permissions,
@@ -1063,7 +1050,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 
 	/** Get user profile info */
 	async getUserProfile(userId: number): Promise<TelegramUserInfo | null> {
-		const response = await this.apiCall("getUserProfilePhotos", {
+		const response = await this.api.apiCallRaw("getUserProfilePhotos", {
 			user_id: userId,
 			offset: 0,
 			limit: 1,
@@ -1076,7 +1063,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		if (!data.ok) return null;
 
 		// Also get user info via getChat
-		const chatResponse = await this.apiCall("getChat", { chat_id: userId });
+		const chatResponse = await this.api.apiCallRaw("getChat", { chat_id: userId });
 		const chatData = (await chatResponse.json()) as {
 			ok: boolean;
 			result?: any;
@@ -1120,14 +1107,14 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		if (maxConnections) body.max_connections = maxConnections;
 		if (allowedUpdatesStr) body.allowed_updates = allowedUpdatesStr;
 
-		const response = await this.apiCall("setWebhook", body);
+		const response = await this.api.apiCallRaw("setWebhook", body);
 		const data = (await response.json()) as { ok: boolean };
 		return data.ok;
 	}
 
 	/** Delete webhook (switch to polling) */
 	async deleteWebhook(): Promise<boolean> {
-		const response = await this.apiCall("deleteWebhook");
+		const response = await this.api.apiCallRaw("deleteWebhook");
 		const data = (await response.json()) as { ok: boolean };
 		return data.ok;
 	}
@@ -1140,7 +1127,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		lastErrorDate?: number;
 		errorMessage?: string;
 	} | null> {
-		const response = await this.apiCall("getWebhookInfo");
+		const response = await this.api.apiCallRaw("getWebhookInfo");
 		const data = (await response.json()) as { ok: boolean; result?: any };
 
 		if (!data.ok || !data.result) return null;
@@ -1158,7 +1145,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 
 	/** Get file download URL */
 	async getFileUrl(fileId: string): Promise<string> {
-		const response = await this.apiCall("getFile", { file_id: fileId });
+		const response = await this.api.apiCallRaw("getFile", { file_id: fileId });
 		const data = (await response.json()) as {
 			ok: boolean;
 			result?: { file_path: string };
@@ -1188,7 +1175,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		if (options?.disablePreviewLinks !== undefined)
 			body.disable_web_page_preview = options.disablePreviewLinks;
 
-		const response = await this.apiCall("copyMessage", body);
+		const response = await this.api.apiCallRaw("copyMessage", body);
 		const data = (await response.json()) as {
 			ok: boolean;
 			result?: { message_id: number };
@@ -1207,7 +1194,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 		toChatId: number | string,
 		messageId: number,
 	): Promise<{ messageId: number } | null> {
-		const response = await this.apiCall("forwardMessage", {
+		const response = await this.api.apiCallRaw("forwardMessage", {
 			from_chat_id: fromChatId,
 			to_chat_id: toChatId,
 			message_id: messageId,
@@ -1228,7 +1215,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 	/** Check if the channel is healthy */
 	async healthCheck(): Promise<boolean> {
 		try {
-			const response = await this.apiCall("getMe");
+			const response = await this.api.apiCallRaw("getMe");
 			const data = (await response.json()) as { ok: boolean };
 			return data.ok;
 		} catch {
@@ -1259,7 +1246,10 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 	private async pollingLoop(): Promise<void> {
 		while (this.polling && this.isConnected()) {
 			try {
-				const updates = await this.getUpdates();
+				const response = await this.api.apiCallRaw("getUpdates", { offset: String(this.lastUpdateId + 1), timeout: String(this.config.pollingTimeout), limit: "100" });
+				const data = (await response.json()) as { ok: boolean; result: any[] };
+				if (!data.ok) continue;
+				const updates = data.result;
 
 				for (const update of updates) {
 					// Skip old updates
@@ -1370,7 +1360,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 	): Promise<void> {
 		try {
 			// Answer callback query
-			await this.apiCall("answerCallbackQuery", {
+			await this.api.apiCallRaw("answerCallbackQuery", {
 				callback_query_id: query.id,
 			});
 
@@ -1395,7 +1385,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 	private async handleInlineQuery(query: TelegramInlineQuery): Promise<void> {
 		try {
 			// Default: return empty results (can be overridden)
-			await this.apiCall("answerInlineQuery", {
+			await this.api.apiCallRaw("answerInlineQuery", {
 				inline_query_id: query.id,
 				results: JSON.stringify([]),
 				cache_time: 0,
@@ -1439,7 +1429,7 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 			const buf = this.mediaGroupBuffers.get(bufferKey);
 			if (buf && buf.items.length > 0) {
 				try {
-					await this.apiCall("sendMediaGroup", {
+					await this.api.apiCallRaw("sendMediaGroup", {
 						chat_id: buf.chatId,
 						media: buf.items,
 					});
@@ -1450,98 +1440,5 @@ export class TelegramChannel extends BaseChannel<TelegramConfig, TelegramMessage
 			this.mediaGroupBuffers.delete(bufferKey);
 		}, MEDIA_GROUP_BUFFER_MS);
 		this.mediaGroupTimeouts.set(bufferKey, timeout);
-	}
-
-	private async getUpdates(): Promise<any[]> {
-		const params = new URLSearchParams({
-			offset: String(this.lastUpdateId + 1),
-			timeout: String(this.config.pollingTimeout),
-			limit: "100",
-		});
-
-		const response = await this.apiCall(`getUpdates?${params}`);
-		const data = (await response.json()) as { ok: boolean; result: any[] };
-
-		if (!data.ok) {
-			throw new Error(`Failed to get updates: ${JSON.stringify(data)}`);
-		}
-
-		return data.result;
-	}
-
-	/** API call with retry logic (exponential backoff) */
-	private async apiCallWithRetry(
-		method: string,
-		body?: Record<string, unknown>,
-	): Promise<Response> {
-		for (let attempt = 1; attempt <= SEND_MAX_RETRIES; attempt++) {
-			try {
-				return await this.apiCall(method, body);
-			} catch (error: any) {
-				// Check for rate limiting / flood control
-				const isRateLimited =
-					error.message?.includes("429") || error.message?.includes("flood");
-				if (isRateLimited && attempt < SEND_MAX_RETRIES) {
-					const delay = SEND_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
-					console.warn(
-						`[Telegram] Rate limited (attempt ${attempt}/${SEND_MAX_RETRIES}), retrying in ${delay}ms`,
-					);
-					await sleep(delay);
-					continue;
-				}
-				// Check for timeout
-				const isTimeout =
-					error.name === "AbortError" || error.message?.includes("timeout");
-				if (isTimeout && attempt < SEND_MAX_RETRIES) {
-					const delay = SEND_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
-					console.warn(
-						`[Telegram] Timeout (attempt ${attempt}/${SEND_MAX_RETRIES}), retrying in ${delay}ms`,
-					);
-					await sleep(delay);
-					continue;
-				}
-				throw error;
-			}
-		}
-		throw new Error(`Failed after ${SEND_MAX_RETRIES} retries`);
-	}
-
-	private async apiCall(
-		method: string,
-		body?: Record<string, unknown>,
-	): Promise<Response> {
-		const url = `${API_BASE}${this.config.token}/${method}`;
-
-		const controller = new AbortController();
-		const timeout = setTimeout(() => controller.abort(), 30_000);
-
-		try {
-			const isGetMethod = GET_METHODS.has(method);
-			const response = await fetch(
-				isGetMethod && body
-					? `${url}?${new URLSearchParams(
-							Object.entries(body).map(([k, v]) => [k, String(v)]),
-						)}`
-					: url,
-				{
-					method: isGetMethod ? "GET" : "POST",
-					headers: isGetMethod
-						? undefined
-						: { "Content-Type": "application/json" },
-					body: isGetMethod
-						? undefined
-						: body
-							? JSON.stringify(body)
-							: undefined,
-					signal: controller.signal,
-				},
-			);
-
-			clearTimeout(timeout);
-			return response;
-		} catch (error) {
-			clearTimeout(timeout);
-			throw error;
-		}
 	}
 }

@@ -99,7 +99,7 @@ describe("TelegramChannel", () => {
 		it("throws when sending to invalid chat (no real token)", async () => {
 			await rejects(
 				channel.sendMessage(12345, "Hello!"),
-				/Failed to send message|fetch failed|TypeError/,
+				/Telegram API error/,
 			);
 		});
 	});
