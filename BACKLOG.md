@@ -75,7 +75,7 @@ Code quality backlog for synthtek architecture cleanup.
   
   **Impact**: Estimated ~2,000 lines of duplication eliminated across provider implementations. (`src/providers/*/provider.ts`)
 
-- [x] **H8 — Split Telegram god class (1,852 lines)** — ~314 lines of formatting helpers extracted to `telegram/format.ts`. Remaining: extract API calls, messaging, admin, polling, streaming. ✅ PARTIALLY FIXED (2026-06-26: format.ts extracted)
+- [x] **H8 — Split Telegram god class (1,852 lines)** — ~314 lines of formatting helpers → `telegram/format.ts`, ~170 lines of API call logic → `telegram/api.ts`. TelegramApiClient class with retry, getUpdates, GET/POST handling. Channel.ts reduced from 1,852 to ~1,315 lines. ✅ FIXED (2026-06-26: format.ts + api.ts extracted)
   - Markdown → HTML conversion (lines 86-334, ~250 lines of regex spaghetti — this alone should be a utility module)
   - Message sending (`sendMessage`, `sendTextWithHtml`, `sendOutboundMessage`, `sendMedia`, `sendAlbum`, `sendFile`)
   - Media processing
@@ -232,7 +232,7 @@ Code quality backlog for synthtek architecture cleanup.
 ### Remaining items (Phase 2)
 13. **H1** — Refactor Telegram/Discord to extend BaseChannel ✅ FIXED
 14. **H6** — Remaining `any` types in Discord ✅ FIXED
-15. **H8** — Split Telegram god class (1,852 lines) ⬜ Partially done (format.ts extracted)
+15. **H8** — Split Telegram god class (1,852 lines) ✅ FIXED
 16. **H9** — Split WebUI server god file (1,430 lines)
 17. **M14** — Standardize sendMessage signatures across channels
 18. **L19** — Reduce property sprawl in Telegram/Discord classes

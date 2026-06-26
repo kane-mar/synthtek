@@ -4,7 +4,7 @@
  * Wraps WebUIBackend with a real Node.js HTTP server and serves the frontend.
  */
 
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import {
 	createServer,
 	type IncomingMessage,
@@ -24,57 +24,13 @@ import {
 	type UpdateProviderRequest,
 } from "./provider-manager.js";
 import type { WebUIConfig } from "./types.js";
+import {
+	sendJson,
+	sendFile,
+	parseBody,
+} from "./helpers.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-// ── MIME types ──────────────────────────────────────────────────────────────
-
-const MIME_TYPES: Record<string, string> = {
-	".html": "text/html; charset=utf-8",
-	".css": "text/css; charset=utf-8",
-	".js": "application/javascript; charset=utf-8",
-	".json": "application/json; charset=utf-8",
-	".png": "image/png",
-	".jpg": "image/jpeg",
-	".svg": "image/svg+xml",
-	".ico": "image/x-icon",
-};
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function sendJson(res: ServerResponse, status: number, body: unknown): void {
-	const json = JSON.stringify(body);
-	res.writeHead(status, {
-		"Content-Type": "application/json",
-		"Access-Control-Allow-Origin": "*",
-		"Content-Length": Buffer.byteLength(json),
-	});
-	res.end(json);
-}
-
-function sendFile(res: ServerResponse, filePath: string): void {
-	try {
-		const content = readFileSync(filePath);
-		const ext = join(".", filePath.split(".").pop() || "");
-		const mime = MIME_TYPES[ext] || "application/octet-stream";
-		res.writeHead(200, {
-			"Content-Type": mime,
-			"Access-Control-Allow-Origin": "*",
-		});
-		res.end(content);
-	} catch {
-		res.writeHead(404, { "Content-Type": "text/plain" });
-		res.end("Not found");
-	}
-}
-
-function parseBody(req: IncomingMessage): Promise<string> {
-	return new Promise((resolve) => {
-		const chunks: Buffer[] = [];
-		req.on("data", (chunk) => chunks.push(chunk));
-		req.on("end", () => resolve(Buffer.concat(chunks).toString()));
-	});
-}
 
 // ── Frontend HTML ───────────────────────────────────────────────────────────
 
