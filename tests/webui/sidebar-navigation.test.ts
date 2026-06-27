@@ -331,8 +331,9 @@ describe("Page rendering content", () => {
 			ok(html.includes("renderSkills"), "renderSkills function exists");
 		});
 
-		it("should fetch /api/skills", () => {
-			ok(html.includes("/api/skills"), "skills page fetches skills endpoint");
+		it("should use the skills API endpoint", () => {
+			ok(html.includes("API}/skills") || html.includes("/api/skills"),
+				"skills page uses the skills API endpoint");
 		});
 	});
 
