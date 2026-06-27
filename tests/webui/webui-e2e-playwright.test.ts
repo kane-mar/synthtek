@@ -315,6 +315,137 @@ describe("Playwright E2E: System Config / Provider CRUD", () => {
 	});
 });
 
+// ── Provider Add + Delete (paired) ─────────────────────────────────────────
+
+describe("Playwright E2E: Provider Add + Delete (paired)", () => {
+	const TEST_PROVIDER_NAME = "E2E Provider Test";
+
+	it("should add an AI provider via the UI", async () => {
+		await navigateByUrl(page, "config");
+		await page.waitForTimeout(500);
+
+		// Click "Add Provider" button
+		const addBtn = page.locator('button:has-text("Add Provider")');
+		ok(await addBtn.isVisible(), "Add Provider button visible before adding");
+		await addBtn.click();
+		await page.waitForTimeout(300);
+
+		// Fill and submit the provider modal via page.evaluate
+		const addResult = await page.evaluate(async () => {
+			const modal = document.querySelector(".modal-overlay");
+			if (!modal) return { ok: false, error: "modal overlay not found" };
+
+			// Helper to set input value and dispatch events
+			const setVal = (id: string, val: string) => {
+				const el = document.getElementById(id) as HTMLInputElement | null;
+				if (!el) return false;
+				el.value = val;
+				el.dispatchEvent(new Event("input", { bubbles: true }));
+				return true;
+			};
+
+			setVal("prov-name", "E2E Provider Test");
+			setVal("prov-key", "sk-test-123456789");
+			setVal("prov-url", "https://api.test-provider.com/v1");
+			setVal("prov-models", "test-model-1, test-model-2");
+			setVal("prov-default", "test-model-1");
+			setVal("prov-temp", "0.5");
+			setVal("prov-maxtokens", "2048");
+			setVal("prov-timeout", "30000");
+
+			// Select the first type option (OpenAI, DeepSeek, etc.)
+			const typeSel = document.getElementById(
+				"prov-type",
+			) as HTMLSelectElement | null;
+			if (typeSel && typeSel.options.length > 0) {
+				typeSel.selectedIndex = 0;
+				typeSel.dispatchEvent(new Event("change", { bubbles: true }));
+			}
+
+			// Click Save
+			const saveBtn = document.getElementById(
+				"save-provider",
+			) as HTMLButtonElement | null;
+			if (!saveBtn) return { ok: false, error: "save button not found" };
+
+			// Small delay to let form settle, then click
+			await new Promise((r) => setTimeout(r, 100));
+			saveBtn.click();
+
+			// Wait for modal to close (save triggers re-render)
+			await new Promise((r) => setTimeout(r, 1500));
+
+			const modalStillOpen = !!document.querySelector(".modal-overlay");
+			return {
+				ok: !modalStillOpen,
+				error: modalStillOpen ? "modal remained open" : "",
+			};
+		});
+
+		ok(addResult.ok, addResult.error || "Provider should be added via modal");
+
+		// Wait for re-render and verify provider appears in table
+		await page.waitForTimeout(500);
+		const providerRow = page.locator(`td:has-text("${TEST_PROVIDER_NAME}")`);
+		ok(
+			await providerRow.isVisible().catch(() => false),
+			`Provider "${TEST_PROVIDER_NAME}" should appear in config table`,
+		);
+
+		// Capture the provider ID from the DOM for deletion test
+		const row = providerRow.locator("..");
+		const deleteBtnExists = await row
+			.locator('button[data-action="delete"]')
+			.isVisible()
+			.catch(() => false);
+		ok(deleteBtnExists, "Delete button should exist on the new provider row");
+	});
+
+	it("should delete the same provider via the UI", async () => {
+		await navigateByUrl(page, "config");
+		await page.waitForTimeout(500);
+
+		// Verify the provider is still there before deleting
+		const providerBefore = page.locator(`td:has-text("${TEST_PROVIDER_NAME}")`);
+		ok(
+			await providerBefore.isVisible().catch(() => false),
+			`Provider "${TEST_PROVIDER_NAME}" exists before deletion`,
+		);
+
+		// Set up dialog handler to accept the confirm() dialog
+		let dialogAccepted = false;
+		page.on("dialog", (dialog) => {
+			dialogAccepted = true;
+			dialog.accept();
+		});
+
+		// Click the Delete button on the provider's row
+		const deleteBtn = page.locator(
+			`tr:has(td:text("${TEST_PROVIDER_NAME}")) button[data-action="delete"]`,
+		);
+		ok(
+			await deleteBtn.isVisible().catch(() => false),
+			"Delete button is visible",
+		);
+		await deleteBtn.click();
+		await page.waitForTimeout(500);
+
+		// Verify confirm dialog was triggered
+		ok(dialogAccepted, "Confirm dialog should have been shown and accepted");
+
+		// Wait for re-render after deletion
+		await page.waitForTimeout(500);
+
+		// Verify the provider is gone
+		const providerAfter = page.locator(`td:has-text("${TEST_PROVIDER_NAME}")`);
+		const stillVisible = await providerAfter.isVisible().catch(() => false);
+		ok(
+			!stillVisible,
+			`Provider "${TEST_PROVIDER_NAME}" should be removed after deletion`,
+		);
+	});
+});
+
 // ── Cron Jobs Page ─────────────────────────────────────────────────────────
 
 describe("Playwright E2E: Cron Jobs Page", () => {
