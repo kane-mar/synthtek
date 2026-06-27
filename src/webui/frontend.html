@@ -363,12 +363,14 @@ async function renderPage(page) {
   }
 }
 
-// ── Dashboard ────────────────────────────────────────────────────────────
-// ── Chat ─────────────────────────────────────────────────────────────────
 // ── Analytics ───────────────────────────────────────────────────────────
 async function renderAnalytics(el) {
   let stats = {activeSessions:0,totalMessages:0,uptime:0};
-  try { stats = await fetchJSONGet(`${API}/stats`); } catch{}
+  let tokenUsage = [];
+  try {
+    stats = await fetchJSONGet(`${API}/stats`);
+    tokenUsage = await fetchJSONGet(`${API}/analytics/token-usage`);
+  } catch{}
 
   el.innerHTML = '<div class="page-header"><h2>Analytics</h2></div>' +
     '<div class="grid-3">' +
@@ -376,14 +378,113 @@ async function renderAnalytics(el) {
       statCard('Total Messages', stats.totalMessages) +
       statCard('Uptime', fmtDuration(stats.uptime||0)) +
     '</div>' +
-    '<div class="card"><h3>Quick Actions</h3><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
-      '<button class="btn btn-primary" onclick="navigate(\'chat\')">Open Chat</button>' +
-      '<button class="btn btn-ghost" onclick="navigate(\'config\')">System Config</button>' +
-    '</div></div>';
+    '<div class="card">' +
+      '<h3>Token Usage (24h)</h3>' +
+      '<div style="position:relative">' +
+        '<canvas id="token-chart" width="700" height="220" style="width:100%;height:220px;margin-top:8px"></canvas>' +
+        '<div id="chart-legend" style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--text-dim)"></div>' +
+      '</div>' +
+    '</div>';
+  
+  if (tokenUsage.length > 0) {
+    drawTokenChart(document.getElementById('token-chart'), tokenUsage);
+  }
 }
 
 function statCard(label, value) {
   return `<div class="card stat-card"><div class="value">${value}</div><div class="label">${label}</div></div>`;
+}
+
+function drawTokenChart(canvas, data) {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  const w = rect.width;
+  const h = rect.height;
+  const pad = { top: 16, right: 12, bottom: 24, left: 48 };
+
+  // Find max value
+  let maxVal = 0;
+  for (const d of data) {
+    const total = d.prompt + d.completion;
+    if (total > maxVal) maxVal = total;
+  }
+  if (maxVal === 0) maxVal = 100;
+
+  const chartW = w - pad.left - pad.right;
+  const chartH = h - pad.top - pad.bottom;
+  const barW = Math.max(4, Math.min(14, chartW / data.length - 2));
+  const gap = Math.max(1, (chartW - barW * data.length) / (data.length + 1));
+
+  // Clear
+  ctx.clearRect(0, 0, w, h);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,.06)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (chartH / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(w - pad.right, y);
+    ctx.stroke();
+    // Y-axis labels
+    const val = Math.round(maxVal - (maxVal / 4) * i);
+    ctx.fillStyle = 'rgba(255,255,255,.4)';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(formatTokens(val), pad.left - 6, y);
+  }
+
+  // Bars
+  for (let i = 0; i < data.length; i++) {
+    const d = data[i];
+    const x = pad.left + gap + i * (barW + gap);
+    const totalH = ((d.prompt + d.completion) / maxVal) * chartH;
+    const promptH = (d.prompt / maxVal) * chartH;
+    const completionH = (d.completion / maxVal) * chartH;
+
+    // Completion tokens (top, accent color)
+    if (d.completion > 0) {
+      ctx.fillStyle = 'rgba(99,102,241,.8)';
+      ctx.fillRect(x, pad.top + chartH - totalH, barW, completionH);
+    }
+
+    // Prompt tokens (bottom, green tint)
+    if (d.prompt > 0) {
+      ctx.fillStyle = 'rgba(34,197,94,.6)';
+      ctx.fillRect(x, pad.top + chartH - totalH + completionH, barW, promptH);
+    }
+
+    // Hour labels (every 3 hours)
+    if (i % 3 === 0 || i === data.length - 1) {
+      const label = d.hour.slice(11, 16); // "HH:00"
+      ctx.fillStyle = 'rgba(255,255,255,.35)';
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(label, x + barW / 2, h - pad.bottom + 4);
+    }
+  }
+
+  // Legend
+  const legend = document.getElementById('chart-legend');
+  if (legend) {
+    legend.innerHTML =
+      '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(99,102,241,.8);margin-right:4px;vertical-align:middle"></span>Completion</span>' +
+      '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(34,197,94,.6);margin-right:4px;vertical-align:middle"></span>Prompt</span>';
+  }
+}
+
+function formatTokens(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return String(n);
 }
 
 function fmtDuration(ms) {

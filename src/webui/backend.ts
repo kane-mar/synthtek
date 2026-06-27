@@ -215,6 +215,11 @@ export class WebUIBackend {
 			body: this.getAnalyticsSummary(),
 		}));
 
+		this.get("/api/analytics/token-usage", (_body, _params) => ({
+			status: 200,
+			body: this.analytics.getTokenUsageByHour(),
+		}));
+
 		this.get("/api/themes", (_body, _params) => ({
 			status: 200,
 			body: this.listThemes(),
