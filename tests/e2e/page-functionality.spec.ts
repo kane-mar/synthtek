@@ -4,7 +4,7 @@
  * Tests the core interactions on each page:
  * - Chat: send messages and see responses
  * - Config: switch between tabs (Providers, Themes, Channels)
- * - Tools: add/remove tools and filter by category
+ * - Skills: add/remove tools and filter by category
  * - Cron Jobs: add/remove cron jobs
  */
 
@@ -500,10 +500,10 @@ test.describe("Settings Page - Agent Config Tab", () => {
 	});
 });
 
-/* ── 3. Tools Page — Add & Remove ────────────────────────────────────── */
+/* ── 3. Skills Page — Add & Remove ──────────────────────────────────────── */
 
-test.describe("Tools Page - Add & Remove", () => {
-	test("tools page renders with default tools", async ({ page }) => {
+test.describe("Skills Page - Add & Remove", () => {
+	test("skills page renders with default tools", async ({ page }) => {
 		await page.goto(BASE_URL);
 		await waitForPage(page);
 		await page.click('#sidebar nav a[data-page="tools"]');

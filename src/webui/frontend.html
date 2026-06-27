@@ -202,7 +202,7 @@ blockquote{border-left:3px solid var(--accent);padding:4px 12px;margin:8px 0;col
     </a>
     <a href="#tools" data-page="tools">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-      Tools
+      Skills
     </a>
     <a href="#cron" data-page="cron">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -301,7 +301,7 @@ function pageFromHash() {
 function navigate(page) {
   _currentPage = page;
   document.querySelectorAll('#sidebar nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
-  const titles = {chat:'Chat',analytics:'Analytics',tools:'Tools',cron:'Cron Jobs',config:'System Config'};
+  const titles = {chat:'Chat',analytics:'Analytics',tools:'Skills',cron:'Cron Jobs',config:'System Config'};
   document.getElementById('page-title').textContent = titles[page] || page;
   // Set hash last so hashchange fires after DOM updates — but guard against
   // re-entry since hashchange will call navigate() again via the listener.
@@ -521,7 +521,7 @@ function renderChat(el) {
   }
 }
 
-// ── Tools ─────────────────────────────────────────────────────────────────
+// ── Skills ────────────────────────────────────────────────────────────────
 async function renderTools(el) {
   let tools = [];
   let activeFilter = 'all';
@@ -538,7 +538,7 @@ async function renderTools(el) {
   function render() {
     const cats = categories;
     el.innerHTML =
-      '<div class="page-header"><h2>Tools</h2><div style="display:flex;gap:8px;align-items:center">' +
+      '<div class="page-header"><h2>Skills</h2><div style="display:flex;gap:8px;align-items:center">' +
         '<span style="font-size:12px;color:var(--text-dim)">'+tools.length+' available</span>' +
         '<button class="btn btn-primary" id="add-tool-btn">+ Add Tool</button>' +
       '</div></div>' +

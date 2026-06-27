@@ -14,7 +14,7 @@ const BASE_URL = process.env.E2E_BASE_URL || "http://localhost:8080";
 const SIDEBAR_LINKS = [
 	{ page: "chat", label: "Chat", hash: "#chat" },
 	{ page: "analytics", label: "Analytics", hash: "#analytics" },
-	{ page: "tools", label: "Tools", hash: "#tools" },
+	{ page: "tools", label: "Skills", hash: "#tools" },
 	{ page: "cron", label: "Cron Jobs", hash: "#cron" },
 	{ page: "config", label: "System Config", hash: "#config" },
 ];
@@ -142,13 +142,13 @@ test.describe("Sidebar Navigation Content Rendering", () => {
 		await expect(page.locator("#send-btn")).toBeVisible();
 	});
 
-	test("Tools page renders tool cards", async ({ page }) => {
+	test("Skills page renders tool cards", async ({ page }) => {
 		await page.goto(BASE_URL);
 		await waitForPageReady(page);
 		await page.click('#sidebar nav a[data-page="tools"]');
 		await waitForPageReady(page);
 
-		// Tools page shows filter bar and grid
+		// Skills page shows filter bar and grid
 		await expect(page.locator(".filter-bar")).toBeVisible();
 		await expect(page.locator(".tool-grid")).toBeVisible();
 	});
