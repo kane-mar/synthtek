@@ -184,23 +184,6 @@ export class AnalyticsTracker {
 		};
 	}
 
-	/** Integrate session activity data into the summary */
-	setSessionActivity(
-		totalSessions: number,
-		activeSessions: number,
-		totalMessages: number,
-	): void {
-		// Session activity is set externally since the tracker doesn't own session data
-		void totalSessions;
-		void activeSessions;
-		void totalMessages;
-	}
-
-	/** Manual uptime setter */
-	setUptime(uptime: number): void {
-		void uptime;
-	}
-
 	/** Get token usage aggregated by hour for the last 24 hours */
 	getTokenUsageByHour(): {
 		hour: string;

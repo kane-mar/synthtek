@@ -24,7 +24,7 @@ const e2eWorkspace = mkdtempSync(join(tmpdir(), "synthtek-puppeteer-"));
 
 const SIDEBAR_LINKS = [
 	{ page: "chat", label: "Chat", hash: "#chat" },
-	{ page: "tools", label: "Tools", hash: "#tools" },
+	{ page: "tools", label: "Skills", hash: "#tools" },
 	{ page: "cron", label: "Cron Jobs", hash: "#cron" },
 	{ page: "config", label: "System Config", hash: "#config" },
 ];

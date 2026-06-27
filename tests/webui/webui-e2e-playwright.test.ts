@@ -139,21 +139,12 @@ describe("Playwright E2E: Analytics Page", () => {
 		);
 	});
 
-	it("should have Quick Actions buttons", async () => {
-		const openChatBtn = await page.locator('button:has-text("Open Chat")');
-		ok(await openChatBtn.isVisible(), "Open Chat button should be visible");
-		const sysConfigBtn = await page.locator('button:has-text("System Config")');
+	it("should render the token usage chart", async () => {
+		const canvas = page.locator("#token-chart");
 		ok(
-			await sysConfigBtn.isVisible(),
-			"System Config button should be visible",
+			await canvas.isVisible().catch(() => false),
+			"Token usage chart canvas should be visible",
 		);
-	});
-
-	it('should navigate to Chat via Quick Actions "Open Chat" button', async () => {
-		await page.click('button:has-text("Open Chat")');
-		await page.waitForTimeout(300);
-		const title = await page.locator("#page-title").textContent();
-		strictEqual(title, "Chat");
 	});
 
 	it("should navigate back to Analytics", async () => {
@@ -170,7 +161,7 @@ describe("Playwright E2E: Navigation", () => {
 		for (const [hash, expectedTitle] of [
 			["chat", "Chat"],
 			["analytics", "Analytics"],
-			["tools", "Tools"],
+			["tools", "Skills"],
 			["cron", "Cron Jobs"],
 			["config", "System Config"],
 		]) {
@@ -205,15 +196,15 @@ describe("Playwright E2E: Navigation", () => {
 		ok(chatContent !== analyticsContent, "Content should differ between pages");
 		await navigateByUrl(page, "tools");
 		const toolsContent = await page.locator("#content").innerHTML();
-		ok(analyticsContent !== toolsContent, "Analytics and tools should differ");
+		ok(analyticsContent !== toolsContent, "Analytics and skills should differ");
 	});
 
-	it("should render tools page with tool listing", async () => {
+	it("should render the skills page with skill listing", async () => {
 		await navigateByUrl(page, "tools");
 		const title = await page.locator("#page-title").textContent();
-		strictEqual(title, "Tools");
-		const toolCount = await page.locator(".tool-card").count();
-		ok(toolCount > 0, "Should show at least one tool");
+		strictEqual(title, "Skills");
+		const skillCount = await page.locator(".skill-card").count();
+		ok(skillCount > 0, "Should show at least one skill");
 	});
 
 	it("should render cron jobs page with empty state", async () => {
@@ -837,10 +828,10 @@ describe("Playwright E2E: Cron Job CRUD", () => {
 	});
 });
 
-// ── Tools Page Filtering ───────────────────────────────────────────────────
+// ── Skills Page Filtering ────────────────────────────────────────────────
 
-describe("Playwright E2E: Tools Page Filtering", () => {
-	it("should filter tools by category", async () => {
+describe("Playwright E2E: Skills Page Filtering", () => {
+	it("should filter skills by category", async () => {
 		await navigateByUrl(page, "tools");
 		await page.waitForTimeout(200);
 
@@ -851,7 +842,7 @@ describe("Playwright E2E: Tools Page Filtering", () => {
 			await page.waitForTimeout(200);
 
 			// Verify filtering worked (at least one card visible or empty state)
-			const cards = await page.locator(".tool-card").count();
+			const cards = await page.locator(".skill-card").count();
 			ok(cards >= 0, "Filter should not break page");
 		}
 	});

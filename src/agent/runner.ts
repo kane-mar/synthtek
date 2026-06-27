@@ -645,7 +645,7 @@ export class AgentRunner {
 		_fromUsername?: string,
 	): Promise<void> {
 		if (!this.chatService || !this.running) {
-			console.log("Agent is not running. Call start() first.");
+			this.logger.warn("Agent is not running. Call start() first.");
 			return;
 		}
 
@@ -655,11 +655,11 @@ export class AgentRunner {
 		});
 
 		if (result.error) {
-			console.error(`Error: ${result.error}`);
+			this.logger.error(`Error: ${result.error}`);
 			return;
 		}
 
-		console.log(result.content);
+		this.logger.info(result.content);
 	}
 
 	/** Process a message with streaming output (legacy — prefer processMessage) */
@@ -669,22 +669,7 @@ export class AgentRunner {
 		_fromId?: number,
 		_fromUsername?: string,
 	): Promise<void> {
-		if (!this.chatService || !this.running) {
-			console.log("Agent is not running. Call start() first.");
-			return;
-		}
-
-		const result = await this.chatService.sendMessage({
-			messages: [{ role: "user", content }],
-			system: this.config.systemPrompt ?? getSystemPrompt(),
-		});
-
-		if (result.error) {
-			console.error(`Error: ${result.error}`);
-			return;
-		}
-
-		console.log(result.content);
+		return this.processMessage(content, _chatId, _fromId, _fromUsername);
 	}
 
 	// ── Private helpers ──────────────────────────────────────────────────────
