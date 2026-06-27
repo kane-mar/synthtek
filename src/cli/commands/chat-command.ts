@@ -210,16 +210,12 @@ class ChatTUI {
 		cursorMove(barTop + 1, 1);
 		clearLine();
 		const spinner = this.isWaiting ? "⏳ " : "  ";
-		process.stdout.write(
-			color(`${spinner}${this.statusText}`, C.grey),
-		);
+		process.stdout.write(color(`${spinner}${this.statusText}`, C.grey));
 
 		// Row 3 of bar: secondary status (model info, grey)
 		cursorMove(barTop + 2, 1);
 		clearLine();
-		const modelInfo = this.model
-			? `Model: ${this.model}`
-			: "";
+		const modelInfo = this.model ? `Model: ${this.model}` : "";
 		const msgCount = this.history.length
 			? `Messages: ${Math.ceil(this.history.length / 2)}`
 			: "";
@@ -276,7 +272,7 @@ class ChatTUI {
 		const scrollBottom = Math.max(1, h - STATUS_ROWS);
 		// Move to the bottom of the scrollable region and write
 		cursorMove(scrollBottom, 1);
-		process.stdout.write(text + "\n");
+		process.stdout.write(`${text}\n`);
 		// After writing, the scroll region may have scrolled.
 		// Redraw the bottom bar so it's not clobbered.
 		this.drawBottomBar();
@@ -292,7 +288,10 @@ class ChatTUI {
 
 	// ── Keypress handling ──────────────────────────────────────────
 
-	private onKeypress(_str: string, key: { name?: string; ctrl?: boolean }): void {
+	private onKeypress(
+		_str: string,
+		key: { name?: string; ctrl?: boolean },
+	): void {
 		if (this.done) return;
 
 		// Ctrl+C
@@ -511,8 +510,7 @@ export function registerChatCommand(program: Command): void {
 					const chat = new ChatService(
 						{
 							list: () => providers,
-							find: (id: string) =>
-								providers.find((p) => p.id === id) || null,
+							find: (id: string) => providers.find((p) => p.id === id) || null,
 							getActiveProvider: (providerId?: string) => {
 								if (providerId) {
 									return providers.find((p) => p.id === providerId) ?? null;
