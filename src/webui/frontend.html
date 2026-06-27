@@ -70,6 +70,7 @@ tr:hover td{background:rgba(99,102,241,.03)}
 .status-active{background:var(--green)}
 .status-inactive{background:var(--text-dim)}
 .status-error{background:var(--red)}
+.status-warning{background:var(--yellow)}
 
 /* Tag / badge */
 .tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;gap:4px}
@@ -247,6 +248,9 @@ blockquote{border-left:3px solid var(--accent);padding:4px 12px;margin:8px 0;col
     </div>
     <div class="status-row">
       <span class="status-detail" id="status-detail"></span>
+    </div>
+    <div class="status-row" id="status-health-row" style="font-size:10px;opacity:.6;display:none">
+      <span id="status-health"></span>
     </div>
   </div>
 </div>
@@ -1237,6 +1241,8 @@ async function updateStatus() {
   const providerEl = document.getElementById('status-provider');
   const modelEl = document.getElementById('status-model');
   const detailEl = document.getElementById('status-detail');
+  const healthRow = document.getElementById('status-health-row');
+  const healthEl = document.getElementById('status-health');
 
   try {
     // Check health first
@@ -1247,27 +1253,54 @@ async function updateStatus() {
     let providers = [];
     try { providers = await fetchJSONGet(`${API}/providers`); } catch {}
 
+    // Fetch provider health stats
+    let providerHealth = {};
+    try { providerHealth = await fetchJSONGet(`${API}/analytics/provider-health`); } catch {}
+
     const active = Array.isArray(providers) ? providers.find(p => p.status === 'active') : null;
 
-    dot.style.background = 'var(--green)';
+    // Determine status dot color
+    const hasThrottle = Object.values(providerHealth).some(h => h.status === 'throttled');
+    const hasDegraded = Object.values(providerHealth).some(h => h.status === 'degraded');
+    if (hasThrottle) {
+      dot.style.background = 'var(--yellow)';
+    } else if (hasDegraded) {
+      dot.style.background = 'var(--red)';
+    } else {
+      dot.style.background = 'var(--green)';
+    }
 
     if (active) {
       providerEl.textContent = active.name || active.type;
       modelEl.textContent = active.defaultModel || '';
       const total = providers.length;
       detailEl.textContent = total > 1 ? `${total} providers configured` : '';
+
+      // Show health info for the active provider
+      const activeHealth = providerHealth[active.name || active.type];
+      if (activeHealth && (activeHealth.rateLimits1m > 0 || activeHealth.rateLimits5m > 0)) {
+        healthRow.style.display = '';
+        healthEl.textContent = `⚠️ ${activeHealth.rateLimits1m} rate-limit hit(s) this minute`;
+      } else if (activeHealth && activeHealth.requests1m > 0) {
+        healthRow.style.display = '';
+        healthEl.textContent = `${activeHealth.requests1m} req/min — ${activeHealth.requests5m} req/5min`;
+      } else {
+        healthRow.style.display = 'none';
+      }
     } else {
       providerEl.textContent = 'No active provider';
       modelEl.textContent = providers.length > 0
         ? `${providers.length} provider(s) configured (none active)`
         : 'Add a provider in System Config';
       detailEl.textContent = '';
+      healthRow.style.display = 'none';
     }
   } catch {
     dot.style.background = 'var(--red)';
     providerEl.textContent = 'Disconnected';
     modelEl.textContent = '';
     detailEl.textContent = '';
+    healthRow.style.display = 'none';
   }
 }
 

@@ -220,6 +220,11 @@ export class WebUIBackend {
 			body: this.analytics.getTokenUsageByHour(),
 		}));
 
+		this.get("/api/analytics/provider-health", (_body, _params) => ({
+			status: 200,
+			body: this.analytics.getProviderHealth(),
+		}));
+
 		this.get("/api/themes", (_body, _params) => ({
 			status: 200,
 			body: this.listThemes(),

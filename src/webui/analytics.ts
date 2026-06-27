@@ -237,4 +237,103 @@ export class AnalyticsTracker {
 			completion: data.completion,
 		}));
 	}
+
+	// ─── Provider Rate-Limit Monitoring ────────────────────────────────────
+
+	private providerEvents: Array<{
+		provider: string;
+		type: "success" | "error" | "rate_limit" | "timeout" | "network";
+		timestamp: number;
+	}> = [];
+
+	/**
+	 * Track a single provider request outcome.
+	 * Lightweight — just stores type, provider, and timestamp.
+	 */
+	trackProviderEvent(
+		provider: string,
+		type: "success" | "error" | "rate_limit" | "timeout" | "network",
+	): void {
+		this.providerEvents.push({ provider, type, timestamp: Date.now() });
+
+		// Keep only last 5000 events to avoid unbounded memory
+		if (this.providerEvents.length > 5000) {
+			this.providerEvents = this.providerEvents.slice(-5000);
+		}
+	}
+
+	/**
+	 * Get provider health status for the status bar.
+	 * Returns per-provider stats for the last 5 minutes.
+	 */
+	getProviderHealth(): Record<
+		string,
+		{
+			requests1m: number;
+			requests5m: number;
+			rateLimits1m: number;
+			rateLimits5m: number;
+			errorRate: number;
+			status: "healthy" | "degraded" | "throttled";
+		}
+	> {
+		const now = Date.now();
+		const oneMin = now - 60_000;
+		const fiveMin = now - 300_000;
+
+		const stats = new Map<
+			string,
+			{
+				total1m: number;
+				total5m: number;
+				rl1m: number;
+				rl5m: number;
+				errors5m: number;
+			}
+		>();
+
+		for (const ev of this.providerEvents) {
+			if (ev.timestamp < fiveMin) continue;
+			const s = stats.get(ev.provider) ?? {
+				total1m: 0,
+				total5m: 0,
+				rl1m: 0,
+				rl5m: 0,
+				errors5m: 0,
+			};
+
+			if (ev.timestamp >= oneMin) {
+				s.total1m++;
+				if (ev.type === "rate_limit") s.rl1m++;
+			}
+			s.total5m++;
+			if (ev.type === "rate_limit") s.rl5m++;
+			if (ev.type === "error" || ev.type === "rate_limit") s.errors5m++;
+			stats.set(ev.provider, s);
+		}
+
+		const result: Record<string, unknown> = {};
+		for (const [provider, s] of stats) {
+			const status =
+				s.rl1m > 0
+					? "throttled"
+					: s.errors5m > 0 && s.errors5m / s.total5m > 0.3
+						? "degraded"
+						: "healthy";
+			result[provider] = {
+				requests1m: s.total1m,
+				requests5m: s.total5m,
+				rateLimits1m: s.rl1m,
+				rateLimits5m: s.rl5m,
+				errorRate: s.total5m > 0 ? s.errors5m / s.total5m : 0,
+				status,
+			};
+		}
+		return result as Record<string, never>;
+	}
+
+	/** Clear all provider events (for testing) */
+	_clearProviderEvents(): void {
+		this.providerEvents = [];
+	}
 }
