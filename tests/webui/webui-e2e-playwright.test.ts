@@ -412,7 +412,9 @@ describe("Playwright E2E: Provider Add + Delete (paired)", () => {
 		let dialogAccepted = false;
 		const onDialog = (dialog: any) => {
 			dialogAccepted = true;
-			dialog.accept().catch(() => { /* ignore if dialog already handled */ });
+			dialog.accept().catch(() => {
+				/* ignore if dialog already handled */
+			});
 		};
 		page.on("dialog", onDialog);
 
@@ -435,7 +437,9 @@ describe("Playwright E2E: Provider Add + Delete (paired)", () => {
 			await page.waitForTimeout(500);
 
 			// Verify the provider is gone
-			const providerAfter = page.locator(`td:has-text("${TEST_PROVIDER_NAME}")`);
+			const providerAfter = page.locator(
+				`td:has-text("${TEST_PROVIDER_NAME}")`,
+			);
 			const stillVisible = await providerAfter.isVisible().catch(() => false);
 			ok(
 				!stillVisible,
