@@ -9,7 +9,7 @@ import type { AgentConfig, ConfigService } from "./types.js";
 const DEFAULT_CONFIG: AgentConfig = {
 	name: "synthtek",
 	version: "1.0.0",
-	workspace: process.cwd(),
+	workspace: process.env.SYNTHTEK_WORKSPACE || process.cwd(),
 	logLevel: "info",
 	maxExecTimeout: 60,
 	maxExecRetries: 3,
