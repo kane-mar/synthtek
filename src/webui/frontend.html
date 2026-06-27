@@ -341,8 +341,8 @@ async function renderAnalytics(el) {
       statCard('Uptime', fmtDuration(stats.uptime||0)) +
     '</div>' +
     '<div class="card"><h3>Quick Actions</h3><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
-      '<button class="btn btn-primary" onclick="navigate(\\'chat\\')">Open Chat</button>' +
-      '<button class="btn btn-ghost" onclick="navigate(\\'config\\')">System Config</button>' +
+      '<button class="btn btn-primary" onclick="navigate(\'chat\')">Open Chat</button>' +
+      '<button class="btn btn-ghost" onclick="navigate(\'config\')">System Config</button>' +
     '</div></div>';
 }
 
@@ -495,10 +495,10 @@ function renderChat(el) {
     h = h.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
     // Unordered lists
     h = h.replace(/^- (.+)$/gm, '<li>$1</li>');
-    h = h.replace(/((?:<li>.*<\\/li>)+)/g, '<ul>$1</ul>');
+    h = h.replace(/((?:<li>.*<\/li>)+)/g, '<ul>$1</ul>');
     // Ordered lists
     h = h.replace(/^d+. (.+)$/gm, '<li>$1</li>');
-    h = h.replace(/((?:<li>.*<\\/li>)+)/g, '<ol>$1</ol>');
+    h = h.replace(/((?:<li>.*<\/li>)+)/g, '<ol>$1</ol>');
     // Horizontal rule
     h = h.replace(/^---+$/gm, '<hr>');
     return h;
