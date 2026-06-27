@@ -21,6 +21,8 @@ import { FRONTEND_HTML } from "./frontend.js";
 import { parseBody, sendFile, sendJson } from "./helpers.js";
 import { ProviderManager } from "./provider-manager.js";
 import { handleProviderRoutes } from "./provider-routes.js";
+import { handleSkillRoutes } from "./skill-routes.js";
+import { SkillManager } from "./skill-manager.js";
 import type { WebUIConfig } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,16 +32,22 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export class WebUIServer {
 	private backend: WebUIBackend;
 	private providerManager: ProviderManager;
+	private skillManager: SkillManager;
 	private server: ReturnType<typeof createServer> | null = null;
 
 	constructor(private config: WebUIConfig) {
 		this.backend = new WebUIBackend(config);
 		const workspaceDir = process.env.SYNTHTEK_WORKSPACE || "/data";
-		// Ensure config dir exists
+		const configDir = join(workspaceDir, "config");
+		// Ensure dirs exist
 		try {
-			mkdirSync(join(workspaceDir, "config"), { recursive: true });
+			mkdirSync(configDir, { recursive: true });
 		} catch {}
 		this.providerManager = new ProviderManager(workspaceDir);
+		this.skillManager = new SkillManager(
+			join(workspaceDir, "skills"),
+			configDir,
+		);
 	}
 
 	async start(): Promise<void> {
@@ -86,6 +94,19 @@ export class WebUIServer {
 						body,
 						res,
 						this.providerManager,
+					)
+				) {
+					return;
+				}
+
+				// Skill routes
+				if (
+					handleSkillRoutes(
+						req.method!,
+						path,
+						body,
+						res,
+						this.skillManager,
 					)
 				) {
 					return;

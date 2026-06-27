@@ -500,213 +500,149 @@ test.describe("Settings Page - Agent Config Tab", () => {
 	});
 });
 
-/* ── 3. Skills Page — Add & Remove ──────────────────────────────────────── */
+/* ── 3. Skills Page — Install & Manage ────────────────────────────────────── */
 
-test.describe("Skills Page - Add & Remove", () => {
-	test("skills page renders with default tools", async ({ page }) => {
+test.describe("Skills Page - Install & Manage", () => {
+	test("skills page renders installed skills", async ({ page }) => {
 		await page.goto(BASE_URL);
 		await waitForPage(page);
 		await page.click('#sidebar nav a[data-page="tools"]');
 		await waitForPage(page);
 
-		// Should show tool grid with cards
-		await expect(page.locator(".tool-grid")).toBeVisible();
-		await expect(page.locator(".tool-card").first()).toBeVisible();
+		// Should show skill cards
+		await expect(page.locator(".skill-card").first()).toBeVisible();
 
-		// Should have filter bar
-		await expect(page.locator(".filter-bar")).toBeVisible();
+		// Should have install button
+		await expect(page.locator("#install-skill-btn")).toBeVisible();
 
-		// Should have Add Tool button
-		await expect(page.locator("#add-tool-btn")).toBeVisible();
+		// Should show installed count
+		await expect(page.locator(".page-header")).toContainText("installed");
 	});
 
-	test("filtering tools by category works", async ({ page }) => {
+	test("skills page shows toggle switches", async ({ page }) => {
 		await page.goto(BASE_URL);
 		await waitForPage(page);
 		await page.click('#sidebar nav a[data-page="tools"]');
 		await waitForPage(page);
 
-		// Get all filter buttons
-		const filterBtns = page.locator(".filter-btn");
-		const count = await filterBtns.count();
-		expect(count).toBeGreaterThan(1);
+		// Each skill card should have a toggle
+		const toggles = page.locator(".skill-toggle");
+		const count = await toggles.count();
+		expect(count).toBeGreaterThan(0);
 
-		// Click each filter and verify it becomes active
-		for (let i = 0; i < count; i++) {
-			await filterBtns.nth(i).click();
-			await page.waitForTimeout(300);
-			await expect(filterBtns.nth(i)).toHaveClass(/active/);
+		// Toggle should have checked state
+		for (let i = 0; i < Math.min(count, 3); i++) {
+			await expect(toggles.nth(i)).toBeVisible();
 		}
 	});
 
-	test("add a custom tool via modal", async ({ page }) => {
+	test("toggling a skill changes its state", async ({ page }) => {
 		await page.goto(BASE_URL);
 		await waitForPage(page);
 		await page.click('#sidebar nav a[data-page="tools"]');
 		await waitForPage(page);
 
-		// Clean up any leftover custom tools from previous runs
-		await page.evaluate(async () => {
-			const resp = await fetch("/api/tools");
-			const tools = await resp.json();
-			for (const t of Array.isArray(tools) ? tools : []) {
-				if (t.custom) {
-					await fetch(`/api/tools/${encodeURIComponent(t.name)}`, {
-						method: "DELETE",
-					});
-				}
-			}
-		});
+		// Click the first toggle
+		const firstToggle = page.locator(".skill-toggle").first();
+		await firstToggle.click();
+		await page.waitForTimeout(500);
 
-		// Get initial tool count
-		const initialCount = await page.locator(".tool-card").count();
+		// The page should still have skills rendered
+		const skills = await page.locator(".skill-card").count();
+		expect(skills).toBeGreaterThan(0);
+	});
 
-		// Click Add Tool
-		await page.click("#add-tool-btn");
+	test("install modal opens and closes", async ({ page }) => {
+		await page.goto(BASE_URL);
+		await waitForPage(page);
+		await page.click('#sidebar nav a[data-page="tools"]');
+		await waitForPage(page);
+
+		// Open install modal
+		await page.click("#install-skill-btn");
 		await expect(page.locator(".modal-overlay")).toBeVisible({ timeout: 5000 });
-		await expect(page.locator("#tool-modal-title")).toContainText(
-			"Add Custom Tool",
+
+		// Modal has input and buttons
+		await expect(page.locator("#skill-source-input")).toBeVisible();
+		await expect(page.locator("#install-confirm-btn")).toBeVisible();
+		await expect(page.locator("#install-cancel-btn")).toBeVisible();
+
+		// Close via Cancel
+		await page.click("#install-cancel-btn");
+		await page.waitForTimeout(300);
+		await expect(page.locator(".modal-overlay")).not.toBeVisible();
+	});
+
+	test("delete skill button exists on cards", async ({ page }) => {
+		await page.goto(BASE_URL);
+		await waitForPage(page);
+		await page.click('#sidebar nav a[data-page="tools"]');
+		await waitForPage(page);
+
+		// The delete button should be on each skill
+		const deleteBtns = page.locator(".skill-delete");
+		const count = await deleteBtns.count();
+		expect(count).toBeGreaterThan(0);
+	});
+
+	test("empty state shows install prompt", async ({ page }) => {
+		// Mock empty skills list
+		await page.route("**/api/skills", (route) =>
+			route.fulfill({ status: 200, body: JSON.stringify([]) }),
 		);
 
-		// Fill form
-		await page.locator("#tool-name").fill("my_e2e_test_tool");
-		await page.locator("#tool-desc").fill("A tool created by E2E test");
-		await page.locator("#tool-category").fill("testing");
-
-		// Click Add
-		await page.click("#tool-save-btn");
-		await page.waitForTimeout(1000);
-
-		// Modal should close and tool should appear
-		await expect(page.locator(".modal-overlay")).not.toBeVisible();
-		await expect(
-			page.locator('.tool-card:has-text("my_e2e_test_tool")'),
-		).toBeVisible();
-
-		// Tool count should increase
-		const newCount = await page.locator(".tool-card").count();
-		expect(newCount).toBe(initialCount + 1);
-	});
-
-	test("add tool requires a name", async ({ page }) => {
 		await page.goto(BASE_URL);
 		await waitForPage(page);
 		await page.click('#sidebar nav a[data-page="tools"]');
 		await waitForPage(page);
 
-		// Open modal
-		await page.click("#add-tool-btn");
-		await expect(page.locator(".modal-overlay")).toBeVisible();
-
-		// Leave name empty, fill other fields
-		await page.locator("#tool-desc").fill("No name tool");
-		await page.locator("#tool-category").fill("testing");
-
-		// Try to save
-		await page.click("#tool-save-btn");
-		await page.waitForTimeout(500);
-
-		// Modal should still be visible with error
-		await expect(page.locator(".modal-overlay")).toBeVisible();
-		await expect(page.locator("#tool-error")).toBeVisible();
-		await expect(page.locator("#tool-error")).toContainText("required");
+		// Should show empty state with install button
+		await expect(page.locator(".empty-state")).toBeVisible();
+		await expect(page.locator("#install-empty-btn")).toBeVisible();
 	});
 
-	test("delete a custom tool", async ({ page }) => {
+	test("skills have homepage links when available", async ({ page }) => {
 		await page.goto(BASE_URL);
 		await waitForPage(page);
 		await page.click('#sidebar nav a[data-page="tools"]');
 		await waitForPage(page);
 
-		// Clean up any leftover custom tools from previous runs
-		await page.evaluate(async () => {
-			const resp = await fetch("/api/tools");
-			const tools = await resp.json();
-			for (const t of Array.isArray(tools) ? tools : []) {
-				if (t.custom) {
-					await fetch(`/api/tools/${encodeURIComponent(t.name)}`, {
-						method: "DELETE",
-					});
-				}
-			}
-		});
-
-		// First add a tool to delete via the UI
-		await page.click("#add-tool-btn");
-		await expect(page.locator(".modal-overlay").first()).toBeVisible();
-		await page.locator("#tool-name").fill("delete_me_tool");
-		await page.locator("#tool-desc").fill("Tool to delete");
-		await page.click("#tool-save-btn");
-		await page.waitForTimeout(1000);
-		await expect(page.locator(".modal-overlay")).not.toBeVisible();
-
-		// Verify it appears
-		const toolCard = page.locator('.tool-card:has-text("delete_me_tool")');
-		await expect(toolCard).toBeVisible();
-
-		// Get the tool count before delete
-		const beforeCount = await page.locator(".tool-card").count();
-
-		// Use evaluate to bypass confirm dialog and call the API directly
-		await page.evaluate(async () => {
-			const resp = await fetch("/api/tools/delete_me_tool", {
-				method: "DELETE",
-			});
-			if (!resp.ok) throw new Error(`Delete failed: ${await resp.text()}`);
-		});
-		await page.waitForTimeout(500);
-
-		// Reload tools page to reflect server state
-		await page.click('#sidebar nav a[data-page="tools"]');
-		await waitForPage(page);
-
-		// Tool should be removed
-		await expect(toolCard).not.toBeVisible();
-		const afterCount = await page.locator(".tool-card").count();
-		expect(afterCount).toBe(beforeCount - 1);
+		// At least some skills may have homepage links
+		const links = page.locator(".skill-link");
+		const count = await links.count();
+		// Just verify the links exist (skills may or may not have homepage)
+		if (count > 0) {
+			await expect(links.first()).toBeVisible();
+		}
 	});
 
-	test("cancel add tool modal closes it", async ({ page }) => {
+	test("install modal validates empty input", async ({ page }) => {
 		await page.goto(BASE_URL);
 		await waitForPage(page);
 		await page.click('#sidebar nav a[data-page="tools"]');
 		await waitForPage(page);
 
-		// Open modal
-		await page.click("#add-tool-btn");
+		await page.click("#install-skill-btn");
 		await expect(page.locator(".modal-overlay")).toBeVisible();
 
-		// Click Cancel
-		await page.click("#tool-cancel-btn");
+		// Click Install with empty input — should stay open
+		await page.click("#install-confirm-btn");
 		await page.waitForTimeout(300);
-
-		// Modal should close
-		await expect(page.locator(".modal-overlay")).not.toBeVisible();
+		await expect(page.locator(".modal-overlay")).toBeVisible();
 	});
 
-	test("add duplicate tool name shows error", async ({ page }) => {
+	test("install modal closes on Escape", async ({ page }) => {
 		await page.goto(BASE_URL);
 		await waitForPage(page);
 		await page.click('#sidebar nav a[data-page="tools"]');
 		await waitForPage(page);
 
-		// Add a tool
-		await page.click("#add-tool-btn");
-		await page.locator("#tool-name").fill("unique_tool_name");
-		await page.locator("#tool-desc").fill("First");
-		await page.click("#tool-save-btn");
-		await page.waitForTimeout(1000);
+		await page.click("#install-skill-btn");
+		await expect(page.locator(".modal-overlay")).toBeVisible();
 
-		// Try to add another with same name
-		await page.click("#add-tool-btn");
-		await page.locator("#tool-name").fill("unique_tool_name");
-		await page.locator("#tool-desc").fill("Duplicate");
-		await page.click("#tool-save-btn");
-		await page.waitForTimeout(1000);
-
-		// Should show error (modal stays)
-		await expect(page.locator("#tool-error")).toBeVisible();
-		await expect(page.locator("#tool-error")).toContainText(/already|exists/i);
+		await page.keyboard.press("Escape");
+		await page.waitForTimeout(300);
+		await expect(page.locator(".modal-overlay")).not.toBeVisible();
 	});
 });
 

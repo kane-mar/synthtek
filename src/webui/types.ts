@@ -162,6 +162,18 @@ export interface ToolInfo {
 	custom?: boolean;
 }
 
+// ── Skills ──────────────────────────────────────────────────────────────────
+
+export interface SkillInfo {
+	name: string;
+	description: string;
+	homepage?: string;
+	emoji?: string;
+	enabled: boolean;
+	installedAt: number;
+	custom?: boolean;
+}
+
 // ── Cron Jobs ───────────────────────────────────────────────────────────────
 
 export interface CronJob {

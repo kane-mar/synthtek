@@ -109,6 +109,30 @@ select.form-input{appearance:auto;cursor:pointer}
 
 /* Empty state */
 .empty{text-align:center;padding:60px 20px;color:var(--text-dim)}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-dim)}
+.empty-state p{margin-bottom:16px}
+
+/* Skill Cards */
+.skill-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.skill-card{padding:16px}
+.skill-card.skill-disabled{opacity:.55}
+.skill-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.skill-emoji{font-size:24px;line-height:1;flex-shrink:0}
+.skill-info{flex:1;min-width:0}
+.skill-name{font-weight:600;font-size:14px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.skill-link{font-size:11px;color:var(--accent);text-decoration:none}
+.skill-link:hover{text-decoration:underline}
+.skill-desc{font-size:12px;color:var(--text-dim);line-height:1.5;margin:0 0 12px}
+.skill-actions{display:flex;gap:8px;justify-content:flex-end}
+
+/* Toggle Switch */
+.toggle-switch{position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0;cursor:pointer}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:var(--text-dim);border-radius:20px;transition:background .2s}
+.toggle-slider::before{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:3px;left:3px;transition:transform .2s}
+.toggle-switch input:checked+.toggle-slider{background:var(--accent)}
+.toggle-switch input:checked+.toggle-slider::before{transform:translateX(16px)}
+.toggle-switch input:focus-visible+.toggle-slider{outline:2px solid var(--accent);outline-offset:2px}
 .empty svg{width:40px;height:40px;margin-bottom:12px;opacity:.4}
 .empty h2{font-size:18px;font-weight:600;margin-bottom:4px;color:var(--text-dim)}
 .empty p{font-size:14px}
@@ -333,7 +357,7 @@ async function renderPage(page) {
   switch(page) {
     case 'chat': renderChat(c); break;
     case 'analytics': await renderAnalytics(c); break;
-    case 'tools': await renderTools(c); break;
+    case 'tools': await renderSkills(c); break;
     case 'cron': await renderCronJobs(c); break;
     case 'config': await renderConfig(c); break;
   }
@@ -522,78 +546,156 @@ function renderChat(el) {
 }
 
 // ── Skills ────────────────────────────────────────────────────────────────
-async function renderTools(el) {
-  let tools = [];
-  let activeFilter = 'all';
-  try { tools = await fetchJSONGet(`${API}/tools`); } catch{}
-
-  const categories = ['all', ...new Set(tools.map(t => t.category))];
-  const filtered = activeFilter === 'all' ? tools : tools.filter(t => t.category === activeFilter);
-
-  function toolTag(cat) {
-    const cls = `tag-${cat}`;
-    return `<span class="tag ${cls}">${cat}</span>`;
-  }
+async function renderSkills(el) {
+  let skills = [];
+  try { skills = await fetchJSONGet(`${API}/skills`); } catch {}
 
   function render() {
-    const cats = categories;
+    const installedCount = skills.length;
+    const enabledCount = skills.filter(s => s.enabled).length;
+
     el.innerHTML =
       '<div class="page-header"><h2>Skills</h2><div style="display:flex;gap:8px;align-items:center">' +
-        '<span style="font-size:12px;color:var(--text-dim)">'+tools.length+' available</span>' +
-        '<button class="btn btn-primary" id="add-tool-btn">+ Add Tool</button>' +
+        '<span style="font-size:12px;color:var(--text-dim)">'+installedCount+' installed ('+enabledCount+' active)</span>' +
+        '<button class="btn btn-primary" id="install-skill-btn">+ Install</button>' +
       '</div></div>' +
-      '<div class="filter-bar">' +
-        cats.map(c => `<button class="filter-btn${c===activeFilter?' active':''}" data-cat="${c}">${c==='all'?'All':c}</button>`).join('') +
-      '</div>' +
-      (filtered.length
-        ? '<div class="tool-grid">' +
-          filtered.map(t =>
-            '<div class="card tool-card">' +
-              '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
-                '<div>' +
-                  '<h4>'+esc(t.name)+'</h4>' +
-                  '<p>'+esc(t.description||'')+'</p>' +
-                  toolTag(t.category) +
+      (installedCount
+        ? '<div class="skill-grid">' +
+          skills.map(s =>
+            '<div class="card skill-card'+(s.enabled?'':' skill-disabled')+'" data-name="'+esc(s.name)+'">' +
+              '<div class="skill-header">' +
+                '<span class="skill-emoji">' + esc(s.emoji || '🧩') + '</span>' +
+                '<div class="skill-info">' +
+                  '<div class="skill-name">'+esc(s.name)+'</div>' +
+                  (s.homepage
+                    ? '<a class="skill-link" href="'+esc(s.homepage)+'" target="_blank" rel="noopener">↗ source</a>'
+                    : '') +
                 '</div>' +
-                '<button class="btn btn-danger btn-sm delete-tool" data-name="'+esc(t.name)+'" style="flex-shrink:0;margin-left:8px">Delete</button>' +
+                '<label class="toggle-switch" title="'+(s.enabled?'Disable':'Enable')+' skill">' +
+                  '<input type="checkbox" class="skill-toggle" data-name="'+esc(s.name)+'"'+(s.enabled?' checked':'')+'>' +
+                  '<span class="toggle-slider"></span>' +
+                '</label>' +
+              '</div>' +
+              '<p class="skill-desc">'+esc(s.description||'No description')+'</p>' +
+              '<div class="skill-actions">' +
+                '<button class="btn btn-danger btn-sm skill-delete" data-name="'+esc(s.name)+'">Delete</button>' +
               '</div>' +
             '</div>'
           ).join('') +
           '</div>'
-        : '<div class="empty"><p>No tools found in this category.</p></div>');
+        : '<div class="empty-state"><p>No skills installed yet.</p><button class="btn btn-primary" id="install-empty-btn">Install from Skills Gallery</button></div>');
   }
 
   // Remove old listener and attach fresh one
-  const handlerKey = '_toolsClickHandler';
+  const handlerKey = '_skillsClickHandler';
   if (el[handlerKey]) el.removeEventListener('click', el[handlerKey]);
   el[handlerKey] = (e) => {
-    const filterBtn = e.target.closest('.filter-btn');
-    if (filterBtn) {
-      activeFilter = filterBtn.dataset.cat;
-      render();
+    // Install button
+    const installBtn = e.target.closest('#install-skill-btn, #install-empty-btn');
+    if (installBtn) {
+      showInstallModal();
       return;
     }
 
-    const addBtn = e.target.closest('#add-tool-btn');
-    if (addBtn) {
-      showToolModal();
+    // Toggle switch
+    const toggle = e.target.closest('.skill-toggle');
+    if (toggle) {
+      const name = toggle.dataset.name;
+      const wasEnabled = toggle.checked;
+      // Optimistic toggle
+      toggle.checked = !wasEnabled;
+      fetchJSONPost(`${API}/skills/${encodeURIComponent(name)}/toggle`, {})
+        .then(skill => {
+          const idx = skills.findIndex(s => s.name === name);
+          if (idx !== -1) skills[idx].enabled = skill.enabled;
+          render();
+        })
+        .catch(() => { toggle.checked = wasEnabled; });
       return;
     }
 
-    const delBtn = e.target.closest('.delete-tool');
+    // Delete button
+    const delBtn = e.target.closest('.skill-delete');
     if (delBtn) {
       const name = delBtn.dataset.name;
-      if (!confirm(`Delete tool "${name}"?`)) return;
-      fetchJSONDelete(`${API}/tools/${encodeURIComponent(name)}`).then(() => {
-        tools = tools.filter(t => t.name !== name);
-        render();
-      }).catch(e => alert(`Failed to delete: ${e.message}`));
+      if (!confirm(`Delete skill "${name}"? This will remove all skill files from the system.`)) return;
+      fetchJSONDelete(`${API}/skills/${encodeURIComponent(name)}`)
+        .then(() => {
+          skills = skills.filter(s => s.name !== name);
+          render();
+        })
+        .catch(e => alert(`Failed to delete: ${e.message}`));
       return;
     }
   };
   el.addEventListener('click', el[handlerKey]);
 
   render();
+}
+
+// ── Install Skill Modal ────────────────────────────────────────────────────
+function showInstallModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML =
+    '<div class="modal">' +
+      '<div class="modal-header"><h3>Install Skill</h3><button class="btn btn-icon modal-close" id="modal-close-btn" aria-label="Close">&times;</button></div>' +
+      '<div class="modal-body">' +
+        '<p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">Enter a GitHub source or skills.sh URL:</p>' +
+        '<label for="skill-source-input" style="font-size:12px;font-weight:600;color:var(--text)">Source</label>' +
+        '<input class="form-input" id="skill-source-input" placeholder="e.g. vercel-labs/agent-skills/web-design-guidelines" style="margin-top:4px;width:100%">' +
+        '<p style="font-size:11px;color:var(--text-dim);margin-top:6px">Examples: <code>owner/repo</code> or <code>owner/repo@skill-name</code></p>' +
+        '<div id="install-status" style="font-size:13px;margin-top:8px;display:none"></div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-ghost" id="install-cancel-btn">Cancel</button>' +
+        '<button class="btn btn-primary" id="install-confirm-btn">Install</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  const input = overlay.querySelector('#skill-source-input');
+  const status = overlay.querySelector('#install-status');
+  const confirmBtn = overlay.querySelector('#install-confirm-btn');
+  const cancelBtn = overlay.querySelector('#install-cancel-btn');
+  const closeBtn = overlay.querySelector('#modal-close-btn');
+
+  function close() { overlay.remove(); }
+
+  closeBtn.onclick = close;
+  cancelBtn.onclick = close;
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+  confirmBtn.onclick = async () => {
+    const source = input.value.trim();
+    if (!source) { input.focus(); return; }
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Installing...';
+    status.style.display = 'block';
+    status.className = '';
+    status.textContent = 'Installing...';
+    try {
+      const result = await fetchJSONPost(`${API}/skills/install`, { source });
+      if (result.success) {
+        status.textContent = '✓ Installed successfully!';
+        status.style.color = 'var(--green)';
+        setTimeout(() => { close(); renderSkills(document.getElementById('content')); }, 1000);
+      } else {
+        status.textContent = '✗ ' + (result.error || 'Installation failed');
+        status.style.color = 'var(--red)';
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Install';
+      }
+    } catch (e) {
+      status.textContent = '✗ ' + e.message;
+      status.style.color = 'var(--red)';
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Install';
+    }
+  };
+
+  input.focus();
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') confirmBtn.click(); else if (e.key === 'Escape') close(); });
 }
 
 // ── Cron Jobs ────────────────────────────────────────────────────────────
@@ -691,50 +793,6 @@ function showCronModal() {
       await fetchJSONPost(`${API}/cron`, { schedule, message });
       overlay.remove();
       renderCronJobs(document.getElementById('content'));
-    } catch(e) {
-      errorEl.textContent = e.message; errorEl.classList.add('visible');
-    }
-  };
-}
-
-// ── Tool Modal ────────────────────────────────────────────────────────────
-function showToolModal() {
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.innerHTML =
-    '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="tool-modal-title">' +
-      '<h3 id="tool-modal-title">Add Custom Tool</h3>' +
-      '<div class="form-group"><label for="tool-name">Tool Name</label>' +
-        '<input id="tool-name" class="form-input" type="text" placeholder="my_custom_tool" autocomplete="off"></div>' +
-      '<div class="form-group"><label for="tool-desc">Description</label>' +
-        '<input id="tool-desc" class="form-input" type="text" placeholder="What this tool does" autocomplete="off"></div>' +
-      '<div class="form-group"><label for="tool-category">Category</label>' +
-        '<input id="tool-category" class="form-input" type="text" placeholder="custom" autocomplete="off" value="custom"></div>' +
-      '<div id="tool-error" class="inline-error" role="alert"></div>' +
-      '<div class="modal-actions">' +
-        '<button class="btn btn-primary" id="tool-save-btn">Add</button>' +
-        '<button class="btn btn-ghost" id="tool-cancel-btn">Cancel</button>' +
-      '</div>' +
-    '</div>';
-
-  document.body.appendChild(overlay);
-  overlay.querySelector('#tool-name').focus();
-
-  overlay.querySelector('#tool-cancel-btn').onclick = () => overlay.remove();
-  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
-
-  overlay.querySelector('#tool-save-btn').onclick = async () => {
-    const name = overlay.querySelector('#tool-name').value.trim();
-    const desc = overlay.querySelector('#tool-desc').value.trim();
-    const category = overlay.querySelector('#tool-category').value.trim();
-    const errorEl = overlay.querySelector('#tool-error');
-
-    if (!name) { errorEl.textContent = 'Tool name is required.'; errorEl.classList.add('visible'); return; }
-
-    try {
-      await fetchJSONPost(`${API}/tools`, { name, description: desc, category: category || 'custom' });
-      overlay.remove();
-      renderTools(document.getElementById('content'));
     } catch(e) {
       errorEl.textContent = e.message; errorEl.classList.add('visible');
     }

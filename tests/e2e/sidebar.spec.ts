@@ -142,15 +142,15 @@ test.describe("Sidebar Navigation Content Rendering", () => {
 		await expect(page.locator("#send-btn")).toBeVisible();
 	});
 
-	test("Skills page renders tool cards", async ({ page }) => {
+	test("Skills page renders skill cards", async ({ page }) => {
 		await page.goto(BASE_URL);
 		await waitForPageReady(page);
 		await page.click('#sidebar nav a[data-page="tools"]');
 		await waitForPageReady(page);
 
-		// Skills page shows filter bar and grid
-		await expect(page.locator(".filter-bar")).toBeVisible();
-		await expect(page.locator(".tool-grid")).toBeVisible();
+		// Skills page shows skill cards and install button
+		await expect(page.locator(".skill-card").first()).toBeVisible();
+		await expect(page.locator("#install-skill-btn")).toBeVisible();
 	});
 
 	test("Cron Jobs page renders cron content", async ({ page }) => {
