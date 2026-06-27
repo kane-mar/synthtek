@@ -332,8 +332,10 @@ describe("Page rendering content", () => {
 		});
 
 		it("should use the skills API endpoint", () => {
-			ok(html.includes("API}/skills") || html.includes("/api/skills"),
-				"skills page uses the skills API endpoint");
+			ok(
+				html.includes("API}/skills") || html.includes("/api/skills"),
+				"skills page uses the skills API endpoint",
+			);
 		});
 	});
 
