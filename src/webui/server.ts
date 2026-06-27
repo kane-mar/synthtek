@@ -13,6 +13,7 @@ import {
 } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { registerDefaultProviders } from "../providers/index.js";
 import { createAuthenticator } from "./auth.js";
 import { WebUIBackend } from "./backend.js";
 import { handleChatCompletion } from "./chat-handler.js";
@@ -20,7 +21,6 @@ import { FRONTEND_HTML } from "./frontend.js";
 import { parseBody, sendFile, sendJson } from "./helpers.js";
 import { ProviderManager } from "./provider-manager.js";
 import { handleProviderRoutes } from "./provider-routes.js";
-import { registerDefaultProviders } from "../providers/index.js";
 import type { WebUIConfig } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
