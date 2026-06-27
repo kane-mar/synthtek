@@ -21,8 +21,8 @@ import { FRONTEND_HTML } from "./frontend.js";
 import { parseBody, sendFile, sendJson } from "./helpers.js";
 import { ProviderManager } from "./provider-manager.js";
 import { handleProviderRoutes } from "./provider-routes.js";
-import { handleSkillRoutes } from "./skill-routes.js";
 import { SkillManager } from "./skill-manager.js";
+import { handleSkillRoutes } from "./skill-routes.js";
 import type { WebUIConfig } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -101,13 +101,7 @@ export class WebUIServer {
 
 				// Skill routes
 				if (
-					handleSkillRoutes(
-						req.method!,
-						path,
-						body,
-						res,
-						this.skillManager,
-					)
+					handleSkillRoutes(req.method!, path, body, res, this.skillManager)
 				) {
 					return;
 				}

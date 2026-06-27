@@ -9,8 +9,8 @@ import { execSync } from "node:child_process";
 import {
 	existsSync,
 	mkdirSync,
-	readFileSync,
 	readdirSync,
+	readFileSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -71,9 +71,12 @@ export class SkillManager {
 	 * Minimal YAML frontmatter parser for SKILL.md files.
 	 * Extracts only the fields we need: name, description, homepage, metadata.
 	 */
-	private parseFrontmatter(
-		content: string,
-	): { name: string; description: string; homepage?: string; emoji?: string } {
+	private parseFrontmatter(content: string): {
+		name: string;
+		description: string;
+		homepage?: string;
+		emoji?: string;
+	} {
 		const result = {
 			name: "",
 			description: "",
@@ -96,9 +99,7 @@ export class SkillManager {
 
 			const descMatch = line.match(/^description:\s*(.+)/);
 			if (descMatch) {
-				result.description = descMatch[1]
-					.trim()
-					.replace(/^["']|["']$/g, "");
+				result.description = descMatch[1].trim().replace(/^["']|["']$/g, "");
 				continue;
 			}
 
@@ -113,8 +114,7 @@ export class SkillManager {
 			if (metaMatch) {
 				try {
 					const meta = JSON.parse(metaMatch[1].trim());
-					result.emoji =
-						meta?.nanobot?.emoji || meta?.emoji || undefined;
+					result.emoji = meta?.nanobot?.emoji || meta?.emoji || undefined;
 				} catch {
 					// ignore parse errors
 				}
@@ -246,8 +246,7 @@ export class SkillManager {
 					return { success: true };
 				}
 			} catch (err: unknown) {
-				const message =
-					err instanceof Error ? err.message : "Unknown error";
+				const message = err instanceof Error ? err.message : "Unknown error";
 				return { success: false, error: message };
 			}
 		}

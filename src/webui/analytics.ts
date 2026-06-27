@@ -202,7 +202,11 @@ export class AnalyticsTracker {
 	}
 
 	/** Get token usage aggregated by hour for the last 24 hours */
-	getTokenUsageByHour(): { hour: string; prompt: number; completion: number }[] {
+	getTokenUsageByHour(): {
+		hour: string;
+		prompt: number;
+		completion: number;
+	}[] {
 		const now = Date.now();
 		const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
 
@@ -211,7 +215,7 @@ export class AnalyticsTracker {
 			new Map();
 		for (let i = 23; i >= 0; i--) {
 			const h = new Date(now - i * 60 * 60 * 1000);
-			const key = h.toISOString().slice(0, 13) + ":00"; // "2026-06-27T04:00"
+			const key = `${h.toISOString().slice(0, 13)}:00`; // "2026-06-27T04:00"
 			buckets.set(key, { prompt: 0, completion: 0 });
 		}
 
@@ -219,7 +223,7 @@ export class AnalyticsTracker {
 		for (const req of this.requests) {
 			if (req.timestamp < twentyFourHoursAgo) continue;
 			const d = new Date(req.timestamp);
-			const key = d.toISOString().slice(0, 13) + ":00";
+			const key = `${d.toISOString().slice(0, 13)}:00`;
 			if (buckets.has(key)) {
 				const b = buckets.get(key)!;
 				b.prompt += req.promptTokens;

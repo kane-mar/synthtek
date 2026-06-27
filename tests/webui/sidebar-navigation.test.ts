@@ -43,7 +43,7 @@ let server: WebUIServer;
 const SIDEBAR_LINKS = [
 	{ page: "chat", label: "Chat", hash: "#chat" },
 	{ page: "analytics", label: "Analytics", hash: "#analytics" },
-	{ page: "tools", label: "Tools", hash: "#tools" },
+	{ page: "tools", label: "Skills", hash: "#tools" },
 	{ page: "cron", label: "Cron Jobs", hash: "#cron" },
 	{ page: "config", label: "System Config", hash: "#config" },
 ];
@@ -326,13 +326,13 @@ describe("Page rendering content", () => {
 		});
 	});
 
-	describe("Tools page", () => {
-		it("should have renderTools function", () => {
-			ok(html.includes("renderTools"), "renderTools function exists");
+	describe("Skills page", () => {
+		it("should have renderSkills function", () => {
+			ok(html.includes("renderSkills"), "renderSkills function exists");
 		});
 
-		it("should fetch /api/tools", () => {
-			ok(html.includes("/tools"), "tools page fetches tools endpoint");
+		it("should fetch /api/skills", () => {
+			ok(html.includes("/api/skills"), "skills page fetches skills endpoint");
 		});
 	});
 

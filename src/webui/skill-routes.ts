@@ -18,19 +18,20 @@ export function handleSkillRoutes(
 ): boolean {
 	// GET /api/skills
 	if (method === "GET" && path === "/api/skills") {
-		const skills = skillManager.list();
-		return sendJson(res, 200, skills), true;
+		sendJson(res, 200, skillManager.list());
+		return true;
 	}
 
 	// POST /api/skills/install
 	if (method === "POST" && path === "/api/skills/install") {
 		const { source } = body as { source?: string };
 		if (!source || typeof source !== "string") {
-			return sendJson(res, 400, { error: "source is required" }), true;
+			sendJson(res, 400, { error: "source is required" });
+			return true;
 		}
 		const result = skillManager.install(source);
-		const status = result.success ? 200 : 500;
-		return sendJson(res, status, result), true;
+		sendJson(res, result.success ? 200 : 500, result);
+		return true;
 	}
 
 	// POST /api/skills/:name/toggle
@@ -39,9 +40,11 @@ export function handleSkillRoutes(
 		const name = decodeURIComponent(toggleMatch[1]);
 		const skill = skillManager.toggle(name);
 		if (!skill) {
-			return sendJson(res, 404, { error: `Skill "${name}" not found` }), true;
+			sendJson(res, 404, { error: `Skill "${name}" not found` });
+			return true;
 		}
-		return sendJson(res, 200, skill), true;
+		sendJson(res, 200, skill);
+		return true;
 	}
 
 	// DELETE /api/skills/:name
@@ -49,8 +52,8 @@ export function handleSkillRoutes(
 	if (deleteMatch && method === "DELETE") {
 		const name = decodeURIComponent(deleteMatch[1]);
 		const result = skillManager.delete(name);
-		const status = result.success ? 200 : 404;
-		return sendJson(res, status, result), true;
+		sendJson(res, result.success ? 200 : 404, result);
+		return true;
 	}
 
 	return false;
