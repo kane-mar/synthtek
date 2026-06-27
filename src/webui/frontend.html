@@ -27,8 +27,12 @@ a:hover{color:var(--accent-hover)}
 #sidebar nav a:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:var(--radius)}
 #sidebar nav a svg{width:16px;height:16px;flex-shrink:0;opacity:.7}
 #sidebar nav a.active svg{opacity:1}
-#sidebar .status-bar{padding:12px 20px;border-top:1px solid var(--border);font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:6px}
+#sidebar .status-bar{padding:10px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text-dim);display:flex;flex-direction:column;gap:3px}
+#sidebar .status-row{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden}
 #sidebar .status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+#sidebar .status-provider{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis}
+#sidebar .status-model{overflow:hidden;text-overflow:ellipsis}
+#sidebar .status-detail{font-size:10px;opacity:.7;overflow:hidden;text-overflow:ellipsis}
 
 /* Main */
 #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
@@ -209,9 +213,17 @@ blockquote{border-left:3px solid var(--accent);padding:4px 12px;margin:8px 0;col
       System Config
     </a>
   </nav>
-  <div class="status-bar">
-    <span class="status-dot" id="status-dot" role="status" aria-live="polite"></span>
-    <span id="status-text">Connecting…</span>
+  <div class="status-bar" id="status-bar">
+    <div class="status-row">
+      <span class="status-dot" id="status-dot" role="status" aria-live="polite"></span>
+      <span class="status-provider" id="status-provider">Connecting…</span>
+    </div>
+    <div class="status-row">
+      <span class="status-model" id="status-model"></span>
+    </div>
+    <div class="status-row">
+      <span class="status-detail" id="status-detail"></span>
+    </div>
   </div>
 </div>
 
@@ -1060,13 +1072,51 @@ async function deleteProvider(id) {
   renderConfig(document.getElementById('content'));
 }
 
+// ── Status Bar ──────────────────────────────────────────────────────────
+async function updateStatus() {
+  const dot = document.getElementById('status-dot');
+  const providerEl = document.getElementById('status-provider');
+  const modelEl = document.getElementById('status-model');
+  const detailEl = document.getElementById('status-detail');
+
+  try {
+    // Check health first
+    const health = await fetch(`${API}/health`);
+    if (!health.ok) throw new Error();
+
+    // Fetch providers
+    let providers = [];
+    try { providers = await fetchJSONGet(`${API}/providers`); } catch {}
+
+    const active = Array.isArray(providers) ? providers.find(p => p.status === 'active') : null;
+
+    dot.style.background = 'var(--green)';
+
+    if (active) {
+      providerEl.textContent = active.name || active.type;
+      modelEl.textContent = active.defaultModel || '';
+      const total = providers.length;
+      detailEl.textContent = total > 1 ? `${total} providers configured` : '';
+    } else {
+      providerEl.textContent = 'No active provider';
+      modelEl.textContent = providers.length > 0
+        ? `${providers.length} provider(s) configured (none active)`
+        : 'Add a provider in System Config';
+      detailEl.textContent = '';
+    }
+  } catch {
+    dot.style.background = 'var(--red)';
+    providerEl.textContent = 'Disconnected';
+    modelEl.textContent = '';
+    detailEl.textContent = '';
+  }
+}
+
 // ── Init ─────────────────────────────────────────────────────────────────
 (async () => {
-  try {
-    const r = await fetch(`${API}/health`);
-    if(r.ok) { document.getElementById('status-dot').style.background='var(--green)'; document.getElementById('status-text').textContent='Connected'; }
-    else throw new Error();
-  } catch { document.getElementById('status-dot').style.background='var(--red)'; document.getElementById('status-text').textContent='Disconnected'; }
+  await updateStatus();
+  // Refresh status every 30s
+  setInterval(updateStatus, 30000);
   navigate(pageFromHash());
 })().catch(e => console.error('Init error:', e));
 </script>
