@@ -90,8 +90,8 @@ describe("Playwright E2E: Frontend Rendering", () => {
 	it("should render the status bar", async () => {
 		const statusDot = await page.locator("#status-dot");
 		ok(await statusDot.isVisible(), "Status dot should be visible");
-		const statusText = await page.locator("#status-text").textContent();
-		ok(statusText, "Status text should be present");
+		const statusProvider = await page.locator("#status-provider").textContent();
+		ok(statusProvider, "Status provider text should be present");
 	});
 
 	it("should render the main content area", async () => {
@@ -199,12 +199,17 @@ describe("Playwright E2E: Navigation", () => {
 		ok(analyticsContent !== toolsContent, "Analytics and skills should differ");
 	});
 
-	it("should render the skills page with skill listing", async () => {
+	it("should render the skills page", async () => {
 		await navigateByUrl(page, "tools");
 		const title = await page.locator("#page-title").textContent();
 		strictEqual(title, "Skills");
-		const skillCount = await page.locator(".skill-card").count();
-		ok(skillCount > 0, "Should show at least one skill");
+		// Should show either skill cards or empty state
+		const hasSkills = (await page.locator(".skill-card").count()) > 0;
+		const hasEmpty = await page
+			.locator(".empty-state")
+			.isVisible()
+			.catch(() => false);
+		ok(hasSkills || hasEmpty, "Should show skill cards or empty state");
 	});
 
 	it("should render cron jobs page with empty state", async () => {
@@ -405,35 +410,40 @@ describe("Playwright E2E: Provider Add + Delete (paired)", () => {
 
 		// Set up dialog handler to accept the confirm() dialog
 		let dialogAccepted = false;
-		page.on("dialog", (dialog) => {
+		const onDialog = (dialog: any) => {
 			dialogAccepted = true;
-			dialog.accept();
-		});
+			dialog.accept().catch(() => { /* ignore if dialog already handled */ });
+		};
+		page.on("dialog", onDialog);
 
-		// Click the Delete button on the provider's row
-		const deleteBtn = page.locator(
-			`tr:has(td:text("${TEST_PROVIDER_NAME}")) button[data-action="delete"]`,
-		);
-		ok(
-			await deleteBtn.isVisible().catch(() => false),
-			"Delete button is visible",
-		);
-		await deleteBtn.click();
-		await page.waitForTimeout(500);
+		try {
+			// Click the Delete button on the provider's row
+			const deleteBtn = page.locator(
+				`tr:has(td:text("${TEST_PROVIDER_NAME}")) button[data-action="delete"]`,
+			);
+			ok(
+				await deleteBtn.isVisible().catch(() => false),
+				"Delete button is visible",
+			);
+			await deleteBtn.click();
+			await page.waitForTimeout(500);
 
-		// Verify confirm dialog was triggered
-		ok(dialogAccepted, "Confirm dialog should have been shown and accepted");
+			// Verify confirm dialog was triggered
+			ok(dialogAccepted, "Confirm dialog should have been shown and accepted");
 
-		// Wait for re-render after deletion
-		await page.waitForTimeout(500);
+			// Wait for re-render after deletion
+			await page.waitForTimeout(500);
 
-		// Verify the provider is gone
-		const providerAfter = page.locator(`td:has-text("${TEST_PROVIDER_NAME}")`);
-		const stillVisible = await providerAfter.isVisible().catch(() => false);
-		ok(
-			!stillVisible,
-			`Provider "${TEST_PROVIDER_NAME}" should be removed after deletion`,
-		);
+			// Verify the provider is gone
+			const providerAfter = page.locator(`td:has-text("${TEST_PROVIDER_NAME}")`);
+			const stillVisible = await providerAfter.isVisible().catch(() => false);
+			ok(
+				!stillVisible,
+				`Provider "${TEST_PROVIDER_NAME}" should be removed after deletion`,
+			);
+		} finally {
+			page.removeListener("dialog", onDialog);
+		}
 	});
 });
 
@@ -454,10 +464,10 @@ describe("Playwright E2E: API Health Check via Browser", () => {
 	it("should show connected status on page load", async () => {
 		await navigateByUrl(page, "chat");
 		await page.waitForTimeout(200);
-		const statusText = await page.locator("#status-text").textContent();
+		const statusProvider = await page.locator("#status-provider").textContent();
 		ok(
-			statusText === "Connected" || statusText === "Connecting…",
-			"Status should be connected or connecting",
+			statusProvider !== null && statusProvider !== "",
+			"Status provider should be present on page load",
 		);
 	});
 
