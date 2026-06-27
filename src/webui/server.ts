@@ -20,6 +20,7 @@ import { FRONTEND_HTML } from "./frontend.js";
 import { parseBody, sendFile, sendJson } from "./helpers.js";
 import { ProviderManager } from "./provider-manager.js";
 import { handleProviderRoutes } from "./provider-routes.js";
+import { registerDefaultProviders } from "../providers/index.js";
 import type { WebUIConfig } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -43,6 +44,7 @@ export class WebUIServer {
 
 	async start(): Promise<void> {
 		await this.backend.start();
+		registerDefaultProviders();
 
 		const auth = createAuthenticator({ apiKey: this.config.apiKey ?? "" });
 
