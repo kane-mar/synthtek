@@ -34,6 +34,19 @@ a:hover{color:var(--accent-hover)}
 #sidebar .status-model{overflow:hidden;text-overflow:ellipsis}
 #sidebar .status-detail{font-size:10px;opacity:.7;overflow:hidden;text-overflow:ellipsis}
 
+/* Conversation list in sidebar */
+.conv-section{border-top:1px solid var(--border);padding:6px 0;max-height:180px;overflow-y:auto}
+.conv-heading{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text-dim);padding:6px 20px 4px;cursor:pointer;display:flex;align-items:center;justify-content:space-between}
+.conv-heading:hover{color:var(--text)}
+.conv-item{display:flex;align-items:center;gap:8px;padding:5px 20px;font-size:12px;color:var(--text-dim);cursor:pointer;transition:background var(--transition),color var(--transition);border-left:2px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv-item:hover{color:var(--text);background:rgba(99,102,241,.06)}
+.conv-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(99,102,241,.1)}
+.conv-item .conv-dot{width:5px;height:5px;border-radius:50%;background:var(--text-dim);flex-shrink:0}
+.conv-item.active .conv-dot{background:var(--accent)}
+.conv-item .conv-title{overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.conv-item .conv-msgs{font-size:10px;color:var(--text-dim);opacity:.6;flex-shrink:0}
+#conv-list-inner.collapsed{display:none}
+
 /* Main */
 #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 #topbar{height:48px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;font-size:14px;font-weight:600;color:var(--text)}
@@ -238,6 +251,13 @@ blockquote{border-left:3px solid var(--accent);padding:4px 12px;margin:8px 0;col
       System Config
     </a>
   </nav>
+  <div class="conv-section" id="conv-list">
+    <div class="conv-heading" onclick="document.getElementById('conv-list-inner').classList.toggle('collapsed')">
+      Conversations
+      <span style="font-size:10px;opacity:.5" id="conv-count"></span>
+    </div>
+    <div id="conv-list-inner"></div>
+  </div>
   <div class="status-bar" id="status-bar">
     <div class="status-row">
       <span class="status-dot" id="status-dot" role="status" aria-live="polite"></span>
@@ -318,6 +338,62 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// ── Conversation List ──────────────────────────────────────────────────
+let convListRefreshTimer = null;
+
+async function renderConvList() {
+  try {
+    const sessions = await fetchJSONGet(`${API}/sessions`);
+    const container = document.getElementById('conv-list-inner');
+    const countEl = document.getElementById('conv-count');
+    if (!container) return;
+    
+    const convs = Array.isArray(sessions) ? sessions : [];
+    if (countEl) countEl.textContent = `${convs.length}`;
+    
+    if (convs.length === 0) {
+      container.innerHTML = '<div style="padding:8px 20px;font-size:11px;color:var(--text-dim);opacity:.6">No conversations yet</div>';
+      return;
+    }
+    
+    container.innerHTML = convs.map(s => {
+      const isActive = s.id === sessionId;
+      const title = s.title || s.id.substring(0,12);
+      const count = s.messages ? Math.ceil(s.messages.length / 2) : 0;
+      return `<div class="conv-item${isActive?' active':''}" data-id="${s.id}" onclick="switchConv('${s.id}')" title="${escapeHtml(title)}">
+        <span class="conv-dot"></span>
+        <span class="conv-title">${escapeHtml(title)}</span>
+        <span class="conv-msgs">${count}</span>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    // ignore
+  }
+}
+
+async function switchConv(newId) {
+  if (newId === sessionId) return;
+  sessionId = newId;
+  
+  const msgs = document.getElementById('chat-messages');
+  if (!msgs) return;
+  msgs.innerHTML = '';
+  
+  try {
+    const history = await fetchJSONGet(`${API}/messages?sessionId=${sessionId}`);
+    for(const m of history) appendMsg(msgs, m.role, m.content);
+  } catch(e) {
+    appendMsg(msgs, 'assistant', `Error: ${e.message}`);
+  }
+  
+  renderConvList();
+}
+
+function startConvListRefresh() {
+  if (convListRefreshTimer) clearInterval(convListRefreshTimer);
+  convListRefreshTimer = setInterval(renderConvList, 15000);
+}
+
 // ── Hash-based routing ───────────────────────────────────────────────────
 const VALID_PAGES = ['chat','analytics','tools','cron','config'];
 
@@ -326,11 +402,20 @@ function pageFromHash() {
   return VALID_PAGES.includes(hash) ? hash : 'chat';
 }
 
-function navigate(page) {
+async function navigate(page) {
   _currentPage = page;
   document.querySelectorAll('#sidebar nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
   const titles = {chat:'Chat',analytics:'Analytics',tools:'Skills',cron:'Cron Jobs',config:'System Config'};
   document.getElementById('page-title').textContent = titles[page] || page;
+  // Show session name in title when on chat page
+  if (page === 'chat' && sessionId) {
+    const sessions = await fetchJSONGet(`${API}/sessions`).catch(() => []);
+    const cur = Array.isArray(sessions) ? sessions.find(s => s.id === sessionId) : null;
+    if (cur) {
+      const name = cur.title || cur.id.substring(0,12);
+      document.getElementById('page-title').textContent = name;
+    }
+  }
   // Set hash last so hashchange fires after DOM updates — but guard against
   // re-entry since hashchange will call navigate() again via the listener.
   if (window.location.hash !== `#${page}`) {
@@ -525,6 +610,9 @@ function renderChat(el) {
       if (!sessionId) { appendMsg(msgs,'assistant','Failed to create a chat session.'); return; }
       const history = await fetchJSONGet(`${API}/messages?sessionId=${sessionId}`);
       for(const m of history) appendMsg(msgs, m.role, m.content);
+      // Render conversation list and start auto-refresh
+      renderConvList();
+      startConvListRefresh();
     } catch(e){ appendMsg(msgs,'assistant',`Error loading chat: ${e.message}`); }
   })();
 
@@ -586,6 +674,7 @@ function renderChat(el) {
     } finally {
       sendBtn.disabled=false;
       input.focus();
+      renderConvList(); // refresh conversation list after message
     }
   }
 
