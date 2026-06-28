@@ -30,13 +30,21 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // ── Server ──────────────────────────────────────────────────────────────────
 
 export class WebUIServer {
+	private config: WebUIConfig;
 	private backend: WebUIBackend;
 	private providerManager: ProviderManager;
 	private skillManager: SkillManager;
 	private server: ReturnType<typeof createServer> | null = null;
 
-	constructor(private config: WebUIConfig) {
-		const workspaceDir = process.env.SYNTHTEK_WORKSPACE || "/data";
+	constructor(
+		config: WebUIConfig,
+		workspaceDirOverride?: string,
+	) {
+		this.config = config;
+		const workspaceDir =
+			workspaceDirOverride !== undefined
+				? workspaceDirOverride
+				: process.env.SYNTHTEK_WORKSPACE || "/data";
 		this.backend = new WebUIBackend(config, workspaceDir);
 		const configDir = join(workspaceDir, "config");
 		// Ensure dirs exist

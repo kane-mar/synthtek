@@ -6,46 +6,40 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, before, describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import { WebUIServer } from "../../src/webui/server.js";
 
 describe("WebUIServer", () => {
 	const workspace = mkdtempSync(join(tmpdir(), "synthtek-webui-"));
-	const origWorkspace = process.env.SYNTHTEK_WORKSPACE;
 	let port = 19900;
 
-	before(() => {
-		process.env.SYNTHTEK_WORKSPACE = workspace;
-	});
-
 	after(() => {
-		if (origWorkspace !== undefined) {
-			process.env.SYNTHTEK_WORKSPACE = origWorkspace;
-		} else {
-			delete process.env.SYNTHTEK_WORKSPACE;
-		}
 		rmSync(workspace, { recursive: true, force: true });
 	});
 
-	function freshConfig() {
-		return {
-			host: "127.0.0.1",
-			port: port++,
-			apiKey: "",
-			maxSessions: 10,
-			sessionTimeout: 3600,
-		};
-	}
+function freshConfig() {
+	return {
+		host: "127.0.0.1",
+		port: port++,
+		apiKey: "",
+		maxSessions: 10,
+		sessionTimeout: 3600,
+	};
+}
+
+function createServer(cfg?: ReturnType<typeof freshConfig>) {
+	return new WebUIServer(cfg ?? freshConfig(), workspace);
+}
 
 	it("creates a server instance", () => {
-		const server = new WebUIServer(freshConfig());
+		const server = createServer(freshConfig());
 		assert.ok(server);
 		assert.equal(server.backendInstance.status, "stopped");
 	});
 
 	it("starts and stops the server", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		assert.equal(server.backendInstance.status, "started");
 		await server.stop();
@@ -54,7 +48,7 @@ describe("WebUIServer", () => {
 
 	it("serves the frontend HTML on /", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(`http://${cfg.host}:${cfg.port}/`);
@@ -87,7 +81,7 @@ describe("WebUIServer", () => {
 
 	it("frontend meets accessibility guidelines", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(`http://${cfg.host}:${cfg.port}/`);
@@ -213,7 +207,7 @@ describe("WebUIServer", () => {
 
 	it("returns health check on /api/health", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(`http://${cfg.host}:${cfg.port}/api/health`);
@@ -228,7 +222,7 @@ describe("WebUIServer", () => {
 
 	it("creates a session via POST /api/sessions", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(`http://${cfg.host}:${cfg.port}/api/sessions`, {
@@ -247,7 +241,7 @@ describe("WebUIServer", () => {
 
 	it("adds and retrieves messages", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const sessRes = await fetch(
@@ -288,7 +282,7 @@ describe("WebUIServer", () => {
 
 	it("returns stats on /api/stats", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(`http://${cfg.host}:${cfg.port}/api/stats`);
@@ -303,7 +297,7 @@ describe("WebUIServer", () => {
 	it("returns sanitized config on /api/config", async () => {
 		const cfg = freshConfig();
 		cfg.apiKey = "secret-key-123";
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(`http://${cfg.host}:${cfg.port}/api/config`);
@@ -323,7 +317,7 @@ describe("WebUIServer", () => {
 	it("shows apiKeyConfigured=false when no key set on /api/config", async () => {
 		const cfg = freshConfig();
 		cfg.apiKey = "";
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(`http://${cfg.host}:${cfg.port}/api/config`);
@@ -337,7 +331,7 @@ describe("WebUIServer", () => {
 
 	it("returns empty plugin list on /api/plugins when standalone", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(`http://${cfg.host}:${cfg.port}/api/plugins`);
@@ -352,7 +346,7 @@ describe("WebUIServer", () => {
 
 	it("returns 404 for unknown API routes", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(`http://${cfg.host}:${cfg.port}/api/unknown`);
@@ -364,7 +358,7 @@ describe("WebUIServer", () => {
 
 	it("handles CORS preflight", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(`http://${cfg.host}:${cfg.port}/api/health`, {
@@ -380,7 +374,7 @@ describe("WebUIServer", () => {
 
 	it("returns empty provider list initially", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(`http://${cfg.host}:${cfg.port}/api/providers`);
@@ -394,7 +388,7 @@ describe("WebUIServer", () => {
 
 	it("creates a provider via POST /api/providers", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(`http://${cfg.host}:${cfg.port}/api/providers`, {
@@ -421,7 +415,7 @@ describe("WebUIServer", () => {
 
 	it("rejects provider creation without name/type", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(`http://${cfg.host}:${cfg.port}/api/providers`, {
@@ -437,7 +431,7 @@ describe("WebUIServer", () => {
 
 	it("gets a provider by ID via GET /api/providers/:id", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			// Create first
@@ -472,7 +466,7 @@ describe("WebUIServer", () => {
 
 	it("returns 404 for non-existent provider ID", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(
@@ -486,7 +480,7 @@ describe("WebUIServer", () => {
 
 	it("updates a provider via PUT /api/providers/:id", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const createRes = await fetch(
@@ -525,7 +519,7 @@ describe("WebUIServer", () => {
 
 	it("deletes a provider via DELETE /api/providers/:id", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const createRes = await fetch(
@@ -562,7 +556,7 @@ describe("WebUIServer", () => {
 
 	it("returns provider presets", async () => {
 		const cfg = freshConfig();
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			const res = await fetch(
@@ -584,7 +578,7 @@ describe("WebUIServer", () => {
 		// when the server is configured without an API key (local/dev mode).
 		const cfg = freshConfig();
 		cfg.apiKey = ""; // no API key = open mode
-		const server = new WebUIServer(cfg);
+		const server = createServer(cfg);
 		await server.start();
 		try {
 			// Without auth header — should succeed in open mode
