@@ -25,7 +25,10 @@ FROM node:20-slim AS runtime
 WORKDIR /app
 
 # Install system dependencies required for running packages (like Puppeteer)
-RUN apt-get update && apt-get install -y --no-install-recommends unzip build-essential && rm -rf /var/lib/apt/lists/*
+# and for skill installation via npx (git for cloning skills repos)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    unzip build-essential git \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install production dependencies only
 COPY package.json package-lock.json ./
@@ -34,22 +37,29 @@ RUN npm ci --omit=dev && npm cache clean --force
 # Copy compiled source (not tests) from builder
 COPY --from=builder /app/dist/src/ ./dist/src/
 
-# Create non-root user and ensure workspace is writable
+# Create non-root user and ensure data directory is writable
 RUN groupadd -r synthtek && \
-    useradd -r -g synthtek -d /app -s /sbin/nologin synthtek && \
+    useradd -r -g synthtek -d /data -s /bin/bash synthtek && \
     chown -R synthtek:synthtek /app && \
     mkdir -p /data && \
-    chown synthtek:synthtek /data
+    chown synthtek:synthtek /data && \
+    mkdir -p /data/.npm && \
+    chown synthtek:synthtek /data/.npm
 
 # Copy docker-entrypoint.sh (before switching to non-root user)
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-USER synthtek
+# Run as root so entrypoint can fix data permissions.
+# The entrypoint drops privileges after setup.
 
 # Environment
 ENV NODE_ENV=production
 ENV SYNTHTEK_WORKSPACE=/data
+ENV HOME=/data
+
+# Speed up npx by caching to persistent volume
+ENV npm_config_cache=/data/.npm
 
 # CLI tool — no ports needed by default (channels may need them)
 EXPOSE 8080

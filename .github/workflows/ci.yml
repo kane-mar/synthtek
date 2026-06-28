@@ -129,8 +129,11 @@ jobs:
             --restart unless-stopped \
             -p ${{ secrets.PRODUCTION_PORT_MAPPING || '8080:8080' }} \
             -v /volume1/docker/synthtek/config:/root/.synthtek/config \
-            -v /volume1/docker/synthtek/data:/root/.synthtek/data \
+            -v /volume1/docker/synthtek/data:/data \
             -e SYNTHTEK_PORT=8080 \
+            -e SYNTHTEK_WORKSPACE=/data \
+            -e HOME=/data \
+            -e npm_config_cache=/data/.npm \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
           echo 'Cleaning up old images...'

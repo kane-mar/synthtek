@@ -22,8 +22,10 @@ services:
       - SYNTHTEK_PROVIDER_API_KEY=
       - SYNTHTEK_PROVIDER_BASE_URL=
       - SYNTHTEK_PROVIDER_DEFAULT_MODEL=gpt-4o
-      # Workspace
+      # Workspace & skills
       - SYNTHTEK_WORKSPACE=/data
+      - HOME=/data
+      - npm_config_cache=/data/.npm
     volumes:
       # Persist data across restarts
       - synthtek-data:/data
