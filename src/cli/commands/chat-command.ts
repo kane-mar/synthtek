@@ -69,12 +69,14 @@ const C = {
 	reset: "\x1b[0m",
 	bold: "\x1b[1m",
 	dim: "\x1b[2m",
+	rev: "\x1b[7m",
 	green: "\x1b[32m",
 	cyan: "\x1b[36m",
 	yellow: "\x1b[33m",
 	red: "\x1b[31m",
 	magenta: "\x1b[35m",
 	grey: "\x1b[90m",
+	bgDark: "\x1b[100m",
 } as const;
 
 function color(text: string, code: string): string {
@@ -112,13 +114,18 @@ function resetScrollRegion(): void {
 // ── Message formatting ────────────────────────────────────────────────────────
 
 function formatMessage(msg: ChatMessage): string {
-	const name =
-		msg.role === "user"
-			? color("You", C.green)
-			: msg.role === "assistant"
-				? color("AI", C.cyan)
-				: color("System", C.yellow);
+	const isUser = msg.role === "user";
+	const isAssistant = msg.role === "assistant";
+	const isSystem = msg.role === "system";
 
+	// Role label: reverse video with role color
+	const roleLabel = isUser
+		? color(" You ", C.rev + C.green)
+		: isAssistant
+			? color(" AI ", C.rev + C.cyan)
+			: color(" System ", C.rev + C.yellow);
+
+	// Body: wrap in subtle background tint for user messages
 	const lines = msg.content.split("\n");
 	const formatted = lines
 		.map((line) => {
@@ -128,7 +135,10 @@ function formatMessage(msg: ChatMessage): string {
 		})
 		.join("\n");
 
-	return `${color(SEP_CHAR.repeat(40), C.dim)}\n${name}:\n${formatted}`;
+	// Wrap message body in background tint for user messages
+	const body = isUser ? color(formatted, C.bgDark) : formatted;
+
+	return `\n${roleLabel}\n${body}`;
 }
 
 // ── Chat TUI ──────────────────────────────────────────────────────────────────
