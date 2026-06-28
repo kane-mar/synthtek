@@ -35,7 +35,6 @@ function removeFile(path: string): void {
 describe("Conversation sharing between TUI and WebUI", () => {
 	let workspaceDir: string;
 	let conversationStore: any;
-	let webuiBackend: any;
 	let WebUIBackendType: typeof import("../../src/webui/backend.js").WebUIBackend;
 	let ConversationStoreType: typeof import("../../src/messaging/conversation-store.js").ConversationStore;
 
@@ -192,10 +191,6 @@ describe("Conversation sharing between TUI and WebUI", () => {
 			},
 			workspaceDir,
 		);
-
-		// Store the WebUI session id for later
-		const sessionsBefore = webuiBackend.listSessions();
-		const webuiSessionId = sessionsBefore[0]?.id;
 
 		// TUI sends another message — this makes it more recent
 		await new Promise((r) => setTimeout(r, 5));
