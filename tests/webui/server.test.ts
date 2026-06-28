@@ -6,12 +6,26 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import { WebUIServer } from "../../src/webui/server.js";
 
 describe("WebUIServer", () => {
 	const workspace = mkdtempSync(join(tmpdir(), "synthtek-webui-"));
+	const origWorkspace = process.env.SYNTHTEK_WORKSPACE;
 	let port = 19900;
+
+	before(() => {
+		process.env.SYNTHTEK_WORKSPACE = workspace;
+	});
+
+	after(() => {
+		if (origWorkspace !== undefined) {
+			process.env.SYNTHTEK_WORKSPACE = origWorkspace;
+		} else {
+			delete process.env.SYNTHTEK_WORKSPACE;
+		}
+		rmSync(workspace, { recursive: true, force: true });
+	});
 
 	function freshConfig() {
 		return {
@@ -609,6 +623,4 @@ describe("WebUIServer", () => {
 			await server.stop();
 		}
 	});
-
-	after(() => rmSync(workspace, { recursive: true, force: true }));
 });
