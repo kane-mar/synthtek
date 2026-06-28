@@ -8,11 +8,11 @@
  * This test must pass before deploying to production.
  */
 
-import { describe, it, before, after } from "node:test";
-import { existsSync, unlinkSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import assert from "node:assert";
+import { existsSync, mkdirSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, before, describe, it } from "node:test";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,10 +42,8 @@ describe("Conversation sharing between TUI and WebUI", () => {
 		workspaceDir = tmpWorkspace();
 
 		// Dynamic imports to avoid circular deps at the module level
-	const convMod = await import(
-		"../../src/messaging/conversation-store.js"
-	);
-	const webuiMod = await import("../../src/webui/backend.js");
+		const convMod = await import("../../src/messaging/conversation-store.js");
+		const webuiMod = await import("../../src/webui/backend.js");
 
 		ConversationStoreType = convMod.ConversationStore;
 		WebUIBackendType = webuiMod.WebUIBackend;

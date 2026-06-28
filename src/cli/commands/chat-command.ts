@@ -226,7 +226,10 @@ class ChatTUI {
 		);
 		if (this.history.length === 0) {
 			this.writeRaw(
-				color("Type /help for commands. Enter = submit, Alt+Enter = newline.", C.dim),
+				color(
+					"Type /help for commands. Enter = submit, Alt+Enter = newline.",
+					C.dim,
+				),
 			);
 			this.writeRaw("");
 		}
@@ -275,16 +278,21 @@ class ChatTUI {
 		// Row 3 of bar: secondary info — provider • model • msgs • convs
 		cursorMove(barTop + 2, 1);
 		clearLine();
-		const providerInfo = this.providerName ? `Provider: ${this.providerName}` : "";
+		const providerInfo = this.providerName
+			? `Provider: ${this.providerName}`
+			: "";
 		const modelInfo = this.modelName ? `Model: ${this.modelName}` : "";
 		const msgCount =
 			this.history.length > 0
 				? `Msgs: ${Math.ceil(this.history.length / 2)}`
 				: "";
 		const convCount = this.store.list().length;
-		const parts = [providerInfo, modelInfo, msgCount, `${convCount} conversations`].filter(
-			Boolean,
-		);
+		const parts = [
+			providerInfo,
+			modelInfo,
+			msgCount,
+			`${convCount} conversations`,
+		].filter(Boolean);
 		process.stdout.write(color(` ${parts.join("  •  ")}`, C.dim));
 
 		// Rows 4-6: multi-line input area
@@ -356,16 +364,21 @@ class ChatTUI {
 		// Update secondary info
 		cursorMove(barTop + 2, 1);
 		clearLine();
-		const providerInfo = this.providerName ? `Provider: ${this.providerName}` : "";
+		const providerInfo = this.providerName
+			? `Provider: ${this.providerName}`
+			: "";
 		const modelInfo = this.modelName ? `Model: ${this.modelName}` : "";
 		const msgCount =
 			this.history.length > 0
 				? `Msgs: ${Math.ceil(this.history.length / 2)}`
 				: "";
 		const convCount = this.store.list().length;
-		const parts = [providerInfo, modelInfo, msgCount, `${convCount} conversations`].filter(
-			Boolean,
-		);
+		const parts = [
+			providerInfo,
+			modelInfo,
+			msgCount,
+			`${convCount} conversations`,
+		].filter(Boolean);
 		process.stdout.write(color(` ${parts.join("  •  ")}`, C.dim));
 
 		this.drawInputLines();
@@ -418,7 +431,10 @@ class ChatTUI {
 		if (this.isWaiting) return;
 
 		// Alt+Enter / Meta+Enter = insert newline
-		if ((key.meta || key.ctrl) && (key.name === "return" || key.name === "enter")) {
+		if (
+			(key.meta || key.ctrl) &&
+			(key.name === "return" || key.name === "enter")
+		) {
 			this.inputBuffer =
 				this.inputBuffer.slice(0, this.cursorPos) +
 				"\n" +
@@ -729,10 +745,7 @@ class ChatTUI {
 		this.updateStatusOnly();
 	}
 
-	private persistMessage(
-		role: "user" | "assistant",
-		content: string,
-	): void {
+	private persistMessage(role: "user" | "assistant", content: string): void {
 		if (!this.conversationId) return;
 		this.store.addMessage(this.conversationId, { role, content });
 	}
@@ -740,17 +753,42 @@ class ChatTUI {
 	/** Map error messages to a concise status label shown in the bar. */
 	private detectStatusFromError(error: string): string {
 		const lower = error.toLowerCase();
-		if (lower.includes("429") || lower.includes("rate limit") || lower.includes("too many requests"))
+		if (
+			lower.includes("429") ||
+			lower.includes("rate limit") ||
+			lower.includes("too many requests")
+		)
 			return "⚠ Throttled";
-		if (lower.includes("timeout") || lower.includes("timed out") || lower.includes("deadline"))
+		if (
+			lower.includes("timeout") ||
+			lower.includes("timed out") ||
+			lower.includes("deadline")
+		)
 			return "⏱ Timeout";
-		if (lower.includes("quota") || lower.includes("insufficient") || lower.includes("billing"))
+		if (
+			lower.includes("quota") ||
+			lower.includes("insufficient") ||
+			lower.includes("billing")
+		)
 			return "⚠ Quota exceeded";
-		if (lower.includes("auth") || lower.includes("401") || lower.includes("403") || lower.includes("key"))
+		if (
+			lower.includes("auth") ||
+			lower.includes("401") ||
+			lower.includes("403") ||
+			lower.includes("key")
+		)
 			return "⚠ Auth error";
-		if (lower.includes("context") || lower.includes("token limit") || lower.includes("max_tokens"))
+		if (
+			lower.includes("context") ||
+			lower.includes("token limit") ||
+			lower.includes("max_tokens")
+		)
 			return "⚠ Context full";
-		if (lower.includes("unavailable") || lower.includes("overloaded") || lower.includes("503"))
+		if (
+			lower.includes("unavailable") ||
+			lower.includes("overloaded") ||
+			lower.includes("503")
+		)
 			return "⚠ Service down";
 		return "✖ Error";
 	}

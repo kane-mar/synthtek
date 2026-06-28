@@ -72,9 +72,7 @@ export class ConversationStore {
 	/** Return all conversations, newest first. */
 	list(): Conversation[] {
 		const data = this.read();
-		return [...data.conversations].sort(
-			(a, b) => b.updatedAt - a.updatedAt,
-		);
+		return [...data.conversations].sort((a, b) => b.updatedAt - a.updatedAt);
 	}
 
 	/** Get a single conversation by id. */

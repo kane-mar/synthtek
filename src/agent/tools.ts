@@ -72,7 +72,8 @@ function classifyError(message: string): string {
 	const lower = message.toLowerCase();
 	if (/rate\s*limit|too\s*many|429/.test(lower)) return "rate_limit";
 	if (/timeout|timed?\s*out|deadline/.test(lower)) return "timeout";
-	if (/unavailable|overloaded|503|502/.test(lower)) return "service_unavailable";
+	if (/unavailable|overloaded|503|502/.test(lower))
+		return "service_unavailable";
 	if (/network|connection\s*(refused|reset|closed|timeout)/.test(lower))
 		return "network";
 	if (/disabled/.test(lower)) return "disabled";
@@ -182,12 +183,22 @@ export class ToolRegistry {
 
 		const handler = this.handlers.get(call.name);
 		if (!handler) {
-			return this.makeError(call, "unknown_tool", `Unknown tool: ${call.name}`, false);
+			return this.makeError(
+				call,
+				"unknown_tool",
+				`Unknown tool: ${call.name}`,
+				false,
+			);
 		}
 
 		const tool = this.tools.get(call.name);
 		if (tool?.enabled === false) {
-			return this.makeError(call, "disabled", `Tool "${call.name}" is disabled`, false);
+			return this.makeError(
+				call,
+				"disabled",
+				`Tool "${call.name}" is disabled`,
+				false,
+			);
 		}
 
 		const timeout = tool?.timeout ?? DEFAULT_TIMEOUT_MS;
@@ -205,7 +216,8 @@ export class ToolRegistry {
 
 		// Truncate oversized content
 		if (!result.error && result.content.length > maxLength) {
-			result.content = result.content.slice(0, Math.max(0, maxLength - 1)) + "…";
+			result.content =
+				result.content.slice(0, Math.max(0, maxLength - 1)) + "…";
 		}
 
 		// Validate output schema
@@ -252,7 +264,10 @@ export class ToolRegistry {
 					handler(call.arguments),
 					new Promise<never>((_, reject) => {
 						setTimeout(
-							() => reject(Object.assign(new Error("timeout"), { code: "TIMEOUT" })),
+							() =>
+								reject(
+									Object.assign(new Error("timeout"), { code: "TIMEOUT" }),
+								),
 							timeoutMs,
 						);
 					}),
@@ -268,8 +283,7 @@ export class ToolRegistry {
 				const message = error instanceof Error ? error.message : String(error);
 				const isTimeout =
 					error instanceof Error && (error as any).code === "TIMEOUT";
-				lastError =
-					error instanceof Error ? error : new Error(String(error));
+				lastError = error instanceof Error ? error : new Error(String(error));
 
 				// Timeout
 				if (isTimeout) {
@@ -283,7 +297,9 @@ export class ToolRegistry {
 				}
 
 				// Not retryable or out of retries
-				const code = isRetryable(message) ? classifyError(message) : "handler_error";
+				const code = isRetryable(message)
+					? classifyError(message)
+					: "handler_error";
 				const retryable = isRetryable(message);
 				return this.makeError(call, code, message, retryable);
 			}

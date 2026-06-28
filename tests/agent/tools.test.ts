@@ -37,14 +37,19 @@ describe("ToolRegistry — improved execution", () => {
 				slowHandler(500),
 			);
 			const result = await registry.execute(makeCall("slow"));
-			equal(result.error, "Tool \"slow\" timed out after 50ms");
+			equal(result.error, 'Tool "slow" timed out after 50ms');
 			equal(result.errorDetails?.code, "timeout");
 			equal(result.errorDetails?.retryable, true);
 		});
 
 		it("completes a tool within its timeout", async () => {
 			registry.register(
-				{ name: "fast", description: "Fast tool", parameters: {}, timeout: 500 },
+				{
+					name: "fast",
+					description: "Fast tool",
+					parameters: {},
+					timeout: 500,
+				},
 				slowHandler(10),
 			);
 			const result = await registry.execute(makeCall("fast"));
@@ -84,10 +89,7 @@ describe("ToolRegistry — improved execution", () => {
 				},
 			);
 
-			const results = await registry.executeAll([
-				makeCall("a"),
-				makeCall("b"),
-			]);
+			const results = await registry.executeAll([makeCall("a"), makeCall("b")]);
 			equal(results.length, 2);
 			// Both should complete — order is indeterminate but both run
 			const contents = results.map((r) => r.content).sort();
@@ -105,7 +107,9 @@ describe("ToolRegistry — improved execution", () => {
 			);
 			registry.register(
 				{ name: "bad", description: "Fails", parameters: {} },
-				async () => { throw new Error("boom"); },
+				async () => {
+					throw new Error("boom");
+				},
 			);
 
 			const results = await registry.executeAll([
@@ -268,7 +272,9 @@ describe("ToolRegistry — improved execution", () => {
 		it("includes errorDetails for handler crash", async () => {
 			registry.register(
 				{ name: "crash", description: "Crashes", parameters: {} },
-				async () => { throw new Error("segfault"); },
+				async () => {
+					throw new Error("segfault");
+				},
 			);
 			const result = await registry.execute(makeCall("crash"));
 			equal(result.error, "segfault");

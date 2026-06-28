@@ -10,8 +10,8 @@ import {
 	resetAgentConfig as resetSharedAgentConfig,
 	setAgentConfig as setSharedAgentConfig,
 } from "../config/agent-config.js";
-import { AnalyticsTracker } from "./analytics.js";
 import { ConversationStore } from "../messaging/conversation-store.js";
+import { AnalyticsTracker } from "./analytics.js";
 import type {
 	AnalyticsSummary,
 	APIResponse,
@@ -77,7 +77,9 @@ export class WebUIBackend {
 	constructor(config: WebUIConfig, workspaceDir?: string) {
 		this.config = config;
 		this.analytics = new AnalyticsTracker();
-		this.conversationStore = new ConversationStore(workspaceDir ?? process.cwd());
+		this.conversationStore = new ConversationStore(
+			workspaceDir ?? process.cwd(),
+		);
 		this.loadSessionsFromStore();
 		this.initDefaultTools();
 		this.initRoutes();
@@ -400,7 +402,7 @@ export class WebUIBackend {
 		msg: { role: "user" | "assistant" | "system"; content: string },
 	): Message | null {
 		// Load or create session from store (source of truth)
-		let session = this.getSession(sessionId);
+		const session = this.getSession(sessionId);
 		if (!session) {
 			return null;
 		}
