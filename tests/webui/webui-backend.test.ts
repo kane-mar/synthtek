@@ -3,10 +3,15 @@
  */
 
 import { ok, strictEqual } from "node:assert";
-import { beforeEach, describe, it } from "node:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, beforeEach, describe, it } from "node:test";
 import { deleteAgentConfigFile } from "../../src/config/agent-config.js";
 import { WebUIBackend } from "../../src/webui/backend.js";
 import type { WebUIConfig } from "../../src/webui/types.js";
+
+const rootWorkspace = mkdtempSync(join(tmpdir(), "synthtek-backend-"));
 
 const defaultConfig: WebUIConfig = {
 	host: "localhost",
@@ -18,11 +23,17 @@ const defaultConfig: WebUIConfig = {
 
 describe("WebUIBackend", () => {
 	let backend: WebUIBackend;
+	let workspaceDir: string;
+
+	after(() => {
+		rmSync(rootWorkspace, { recursive: true, force: true });
+	});
 
 	beforeEach(() => {
+		workspaceDir = mkdtempSync(join(rootWorkspace, "test-"));
 		// Reset shared agent config first so each test starts fresh
 		deleteAgentConfigFile();
-		backend = new WebUIBackend(defaultConfig);
+		backend = new WebUIBackend(defaultConfig, workspaceDir);
 	});
 
 	describe("constructor", () => {
