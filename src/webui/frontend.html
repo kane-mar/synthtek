@@ -45,6 +45,9 @@ a:hover{color:var(--accent-hover)}
 .conv-item.active .conv-dot{background:var(--accent)}
 .conv-item .conv-title{overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
 .conv-item .conv-msgs{font-size:10px;color:var(--text-dim);opacity:.6;flex-shrink:0}
+.conv-item .conv-del{display:none;font-size:12px;color:var(--text-dim);cursor:pointer;padding:0 4px;border-radius:2px;flex-shrink:0;opacity:.5}
+.conv-item:hover .conv-del{display:inline-block}
+.conv-item .conv-del:hover{opacity:1;color:var(--red);background:rgba(239,68,68,.1)}
 #conv-list-inner.collapsed{display:none}
 
 /* Main */
@@ -360,10 +363,11 @@ async function renderConvList() {
       const isActive = s.id === sessionId;
       const title = s.title || s.id.substring(0,12);
       const count = s.messages ? Math.ceil(s.messages.length / 2) : 0;
-      return `<div class="conv-item${isActive?' active':''}" data-id="${s.id}" onclick="switchConv('${s.id}')" title="${escapeHtml(title)}">
+      return `<div class="conv-item${isActive?' active':''}" data-id="${s.id}">
         <span class="conv-dot"></span>
-        <span class="conv-title">${escapeHtml(title)}</span>
+        <span class="conv-title" onclick="switchConv('${s.id}')" title="${escapeHtml(title)}">${escapeHtml(title)}</span>
         <span class="conv-msgs">${count}</span>
+        <span class="conv-del" onclick="event.stopPropagation();deleteConv('${s.id}')" title="Delete conversation">✕</span>
       </div>`;
     }).join('');
   } catch(e) {
@@ -392,6 +396,29 @@ async function switchConv(newId) {
 function startConvListRefresh() {
   if (convListRefreshTimer) clearInterval(convListRefreshTimer);
   convListRefreshTimer = setInterval(renderConvList, 15000);
+}
+
+async function deleteConv(id) {
+  if (!confirm('Delete this conversation and all its messages?')) return;
+  const wasActive = id === sessionId;
+  try {
+    await fetchJSONDelete(`${API}/sessions/${id}`);
+  } catch(e) {
+    // fallback: if DELETE route missing, try via POST
+    await fetchJSONPost(`${API}/sessions/${id}/delete`).catch(()=>{});
+  }
+  // If we deleted the active session, switch to the most recent one
+  if (wasActive) {
+    sessionId = null;
+    const msgs = document.getElementById('chat-messages');
+    if (msgs) msgs.innerHTML = '';
+    // Reload sessions and pick the first
+    const sessions = await fetchJSONGet(`${API}/sessions`).catch(() => []);
+    if (Array.isArray(sessions) && sessions.length > 0) {
+      await switchConv(sessions[0].id);
+    }
+  }
+  renderConvList();
 }
 
 // ── Hash-based routing ───────────────────────────────────────────────────

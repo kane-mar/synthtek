@@ -564,7 +564,9 @@ class ChatTUI {
 				[
 					color("Commands:", C.bold),
 					`  ${color("/exit, /quit", C.green)} — Exit the chat`,
-					`  ${color("/clear", C.green)} — Clear conversation`,
+					`  ${color("/clear", C.green)} — Clear this conversation`,
+					`  ${color("/list", C.green)} — List all conversations`,
+					`  ${color("/delete <id>", C.green)} — Delete a conversation`,
 					`  ${color("/help", C.green)} — Show this help`,
 					``,
 					color("Editing:", C.bold),
@@ -573,6 +575,53 @@ class ChatTUI {
 					`  ${color("↑/↓", C.green)} — Jump between lines`,
 				].join("\n"),
 			);
+			return;
+		}
+
+		if (trimmed.startsWith("/list")) {
+			const convs = this.store.list();
+			if (convs.length === 0) {
+				this.writeContent(color("No conversations.", C.dim));
+			} else {
+				const lines = convs.map((c) => {
+					const active = c.id === this.conversationId ? " ← current" : "";
+					const title = c.title || c.id.substring(0, 12);
+					const msgs = c.messages.length > 0 ? ` (${Math.ceil(c.messages.length / 2)} msgs)` : "";
+					return `  ${color(c.id, C.cyan)}  ${title}${color(msgs, C.dim)}${color(active, C.green)}`;
+				});
+				this.writeContent(
+					color(`Conversations (${convs.length}):`, C.bold) +
+						"\n" +
+						lines.join("\n"),
+				);
+			}
+			return;
+		}
+
+		if (trimmed.startsWith("/delete ")) {
+			const targetId = trimmed.slice(8).trim();
+			if (!targetId) {
+				this.writeContent(color("Usage: /delete <conversation-id>", C.yellow));
+				return;
+			}
+			const exists = this.store.get(targetId);
+			if (!exists) {
+				this.writeContent(color(`Conversation "${targetId}" not found.`, C.red));
+				return;
+			}
+			this.store.delete(targetId);
+			// If we deleted our current conversation, create a new one
+			if (this.conversationId === targetId) {
+				const conv = this.store.create();
+				this.conversationId = conv.id;
+				this.history = [];
+				clearScreen();
+				this.setScrollRegion();
+				this.drawBottomBar();
+				this.writeContent(color(`— Deleted "${targetId}" and started fresh —`, C.dim));
+			} else {
+				this.writeContent(color(`Deleted "${targetId}".`, C.dim));
+			}
 			return;
 		}
 

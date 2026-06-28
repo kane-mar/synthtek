@@ -26,6 +26,7 @@ import { getSystemPrompt } from "../config/agent-config.js";
 import { SimpleLogger } from "../core/logger.js";
 import type { ChannelConfigs } from "../messaging/channel-configs.js";
 import { ChatService } from "../messaging/chat-service.js";
+import { ConversationStore } from "../messaging/conversation-store.js";
 import type { ChatMessage, ChatResponse } from "../messaging/types.js";
 import {
 	createFallbackProvider,
@@ -66,12 +67,15 @@ export interface AgentRunnerConfig {
 	logLevel?: "debug" | "info" | "warn" | "error";
 	/** Whether to stream responses to stdout */
 	streamOutput?: boolean;
+	/** Workspace directory (for ConversationStore, config, etc.) */
+	workspaceDir?: string;
 }
 
 export class AgentRunner {
 	private logger: SimpleLogger;
 	private loop: AgentLoop;
 	private chatService?: ChatService;
+	private conversationStore: ConversationStore;
 	private telegram?: TelegramChannel;
 	private discord?: DiscordChannel;
 	private slack?: SlackChannel;
@@ -89,6 +93,9 @@ export class AgentRunner {
 			prefix: "synthtek-agent",
 		});
 		this.running = false;
+		this.conversationStore = new ConversationStore(
+			config.workspaceDir ?? process.env.SYNTHTEK_WORKSPACE ?? process.cwd(),
+		);
 
 		// Build hooks
 		const hooks: AgentHooks = {
@@ -423,10 +430,23 @@ export class AgentRunner {
 	/** Handle a message from any channel — routes through ChatService */
 	private async handleChannelMessage(
 		content: string,
-		_channelName: string,
+		channelName: string,
 		sendResponse: (text: string) => Promise<void>,
 	): Promise<void> {
 		if (!this.chatService || !this.running) return;
+
+		// Persist user message to ConversationStore (shared with TUI/WebUI)
+		const convId = `channel:${channelName}`;
+		let conv = this.conversationStore.get(convId);
+		if (!conv) {
+			conv = this.conversationStore.create(`#${channelName}`);
+			conv.id = convId; // Override with stable channel ID
+			this.conversationStore.save(conv);
+		}
+		this.conversationStore.addMessage(convId, {
+			role: "user",
+			content,
+		});
 
 		const result = await this.chatService.sendMessage({
 			messages: [{ role: "user", content }],
@@ -439,6 +459,12 @@ export class AgentRunner {
 		}
 
 		await sendResponse(result.content);
+
+		// Persist assistant response
+		this.conversationStore.addMessage(convId, {
+			role: "assistant",
+			content: result.content,
+		});
 	}
 
 	// ── Telegram ─────────────────────────────────────────────────────────────
