@@ -26,19 +26,31 @@ import { config, logger } from "../cli-context.js";
 
 // ── Provider Loader ──────────────────────────────────────────────────────────
 
-function loadLocalProviders(configDir: string): LLMProviderConfig[] {
-	const filePath = join(configDir, "providers.json");
-	if (!existsSync(filePath)) return [];
-	try {
-		const raw = readFileSync(filePath, "utf-8");
-		const data = JSON.parse(raw);
-		const providers = Array.isArray(data)
-			? data
-			: (data.providers ?? data ?? []);
-		return providers.filter((p: Partial<LLMProviderConfig>) => p.id && p.type);
-	} catch {
-		return [];
+function loadLocalProviders(workspaceDir: string): LLMProviderConfig[] {
+	// WebUI saves providers to {workspace}/config/providers.json
+	// Legacy location: {workspace}/providers.json
+	const candidates = [
+		join(workspaceDir, "config", "providers.json"),
+		join(workspaceDir, "providers.json"),
+	];
+
+	for (const filePath of candidates) {
+		if (!existsSync(filePath)) continue;
+		try {
+			const raw = readFileSync(filePath, "utf-8");
+			const data = JSON.parse(raw);
+			const providers = Array.isArray(data)
+				? data
+				: (data.providers ?? data ?? []);
+			const valid = providers.filter(
+				(p: Partial<LLMProviderConfig>) => p.id && p.type,
+			);
+			if (valid.length > 0) return valid;
+		} catch {
+			// Try next candidate
+		}
 	}
+	return [];
 }
 
 // ── Terminal helpers ──────────────────────────────────────────────────────────
@@ -519,25 +531,39 @@ export function registerChatCommand(program: Command): void {
 							},
 						},
 						{
-							completionHandler: async (_provider, messages) => {
+							completionHandler: async (_, messages) => {
 								const { AgentLoop } = await import("../../agent/index.js");
+								const { getRegistry, registerDefaultProviders } = await import(
+									"../../providers/index.js"
+								);
+
+								registerDefaultProviders();
+								const registry = getRegistry();
+								// eslint-disable-next-line @typescript-eslint/no-explicit-any
+								const provider = registry.create(activeProvider.type as any, {
+									provider: activeProvider.type,
+									apiKey: activeProvider.apiKey,
+									baseUrl: activeProvider.baseUrl,
+									model: activeProvider.defaultModel || opts.model,
+									maxTokens: activeProvider.maxTokens,
+									temperature: activeProvider.temperature,
+									timeout: activeProvider.timeoutMs,
+								});
+
 								const agent = new AgentLoop({
 									systemPrompt,
 									maxToolCalls: 20,
-									model: opts.model,
+									model: activeProvider.defaultModel || opts.model,
 								});
 								await agent.start();
 								try {
-									const result = await agent.processMessageWithCallback(
+									const result = await agent.processMessage(
 										messages[messages.length - 1] as {
 											role: "user" | "assistant" | "system";
 											content: string;
+											metadata?: Record<string, unknown>;
 										},
-										async (_msgs) => ({
-											content:
-												"Agent is running. Configure an LLM provider for real responses.",
-											totalTokens: 0,
-										}),
+										provider,
 									);
 									return { content: result.response };
 								} finally {
