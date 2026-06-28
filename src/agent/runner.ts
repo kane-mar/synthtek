@@ -548,9 +548,9 @@ export class AgentRunner {
 		config: import("../channels/slack/types.js").SlackConfig,
 	): Promise<void> {
 		const { SlackChannel } = await import("../channels/slack/channel.js");
-		const slack = new SlackChannel(config) as any;
-		this.slack = slack;
-		await this.wireBaseChannel(slack, "slack");
+		const slack = new SlackChannel(config);
+		this.slack = slack as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+		await this.wireBaseChannel(slack as any, "slack");
 	}
 
 	// ── WeChat ───────────────────────────────────────────────────────────────

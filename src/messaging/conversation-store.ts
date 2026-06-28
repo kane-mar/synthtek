@@ -69,12 +69,6 @@ export class ConversationStore {
 		writeFileSync(this.filePath, JSON.stringify(data, null, 2), "utf-8");
 	}
 
-	private invalidate(): void {
-		// No-op: reads go directly to disk
-	}
-
-	// ── Public API ────────────────────────────────────────────────────
-
 	/** Return all conversations, newest first. */
 	list(): Conversation[] {
 		const data = this.read();
@@ -140,10 +134,5 @@ export class ConversationStore {
 		data.conversations.splice(idx, 1);
 		this.write(data);
 		return true;
-	}
-
-	/** Reload from disk (call if another process may have changed the file). */
-	reload(): void {
-		this.invalidate();
 	}
 }

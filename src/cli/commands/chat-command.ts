@@ -158,6 +158,7 @@ class ChatTUI {
 		this.systemPrompt = systemPrompt;
 		this.store = store;
 		this.model = model;
+		this.registerCommands();
 	}
 
 	/** Start the TUI. Returns a promise that resolves when the user exits. */
@@ -529,6 +530,132 @@ class ChatTUI {
 
 	// ── Submitting input ───────────────────────────────────────────
 
+	private commands = new Map<
+		string,
+		{ desc: string; run: (args: string) => void | Promise<void> }
+	>();
+
+	private registerCommands(): void {
+		const cmds: Array<{
+			name: string;
+			aliases?: string[];
+			desc: string;
+			run: (args: string) => void | Promise<void>;
+		}> = [
+			{
+				name: "/exit",
+				aliases: ["/quit"],
+				desc: "Exit the chat",
+				run: () => this.shutdown(),
+			},
+			{
+				name: "/clear",
+				desc: "Clear this conversation",
+				run: () => {
+					this.history = [];
+					if (this.conversationId) {
+						this.store.delete(this.conversationId);
+					}
+					const conv = this.store.create();
+					this.conversationId = conv.id;
+					clearScreen();
+					this.setScrollRegion();
+					this.drawBottomBar();
+					this.writeContent(color("— Cleared —", C.dim));
+				},
+			},
+			{
+				name: "/help",
+				desc: "Show this help",
+				run: () => {
+					const lines = Array.from(this.commands.entries())
+						.filter(([k]) => !k.includes(":")) // skip alias keys
+						.map(
+							([k, v]) =>
+								`  ${color(k, C.green)}${v.desc ? " — " + v.desc : ""}`,
+						);
+					this.writeContent(
+						[
+							color("Commands:", C.bold),
+							...lines,
+							``,
+							color("Editing:", C.bold),
+							`  ${color("Enter", C.green)} — Submit message`,
+							`  ${color("Alt+Enter", C.green)} — New line in message`,
+							`  ${color("↑/↓", C.green)} — Jump between lines`,
+						].join("\n"),
+					);
+				},
+			},
+			{
+				name: "/list",
+				desc: "List all conversations",
+				run: () => {
+					const convs = this.store.list();
+					if (convs.length === 0) {
+						this.writeContent(color("No conversations.", C.dim));
+						return;
+					}
+					const lines = convs.map((c) => {
+						const active =
+							c.id === this.conversationId ? color(" ← current", C.green) : "";
+						const title = c.title || c.id.substring(0, 12);
+						const msgs =
+							c.messages.length > 0
+								? ` (${Math.ceil(c.messages.length / 2)} msgs)`
+								: "";
+						return `  ${color(c.id, C.cyan)}  ${title}${color(msgs, C.dim)}${active}`;
+					});
+					this.writeContent(
+						color(`Conversations (${convs.length}):`, C.bold) +
+							"\n" +
+							lines.join("\n"),
+					);
+				},
+			},
+			{
+				name: "/delete",
+				desc: "/delete <id> — Delete a conversation",
+				run: (args) => {
+					const targetId = args.trim();
+					if (!targetId) {
+						this.writeContent(
+							color("Usage: /delete <conversation-id>", C.yellow),
+						);
+						return;
+					}
+					if (!this.store.get(targetId)) {
+						this.writeContent(
+							color(`Conversation "${targetId}" not found.`, C.red),
+						);
+						return;
+					}
+					this.store.delete(targetId);
+					if (this.conversationId === targetId) {
+						const conv = this.store.create();
+						this.conversationId = conv.id;
+						this.history = [];
+						clearScreen();
+						this.setScrollRegion();
+						this.drawBottomBar();
+						this.writeContent(
+							color(`— Deleted "${targetId}" and started fresh —`, C.dim),
+						);
+					} else {
+						this.writeContent(color(`Deleted "${targetId}".`, C.dim));
+					}
+				},
+			},
+		];
+
+		for (const cmd of cmds) {
+			this.commands.set(cmd.name, cmd);
+			for (const alias of cmd.aliases ?? []) {
+				this.commands.set(alias, cmd);
+			}
+		}
+	}
+
 	private async submit(): Promise<void> {
 		const trimmed = this.inputBuffer.trim();
 		this.inputBuffer = "";
@@ -539,101 +666,21 @@ class ChatTUI {
 			return;
 		}
 
-		// Built-in commands
-		if (trimmed === "/exit" || trimmed === "/quit") {
-			this.shutdown();
-			return;
-		}
-
-		if (trimmed === "/clear") {
-			this.history = [];
-			if (this.conversationId) {
-				this.store.delete(this.conversationId);
-			}
-			const conv = this.store.create();
-			this.conversationId = conv.id;
-			clearScreen();
-			this.setScrollRegion();
-			this.drawBottomBar();
-			this.writeContent(color("— Cleared —", C.dim));
-			return;
-		}
-
-		if (trimmed === "/help") {
-			this.writeContent(
-				[
-					color("Commands:", C.bold),
-					`  ${color("/exit, /quit", C.green)} — Exit the chat`,
-					`  ${color("/clear", C.green)} — Clear this conversation`,
-					`  ${color("/list", C.green)} — List all conversations`,
-					`  ${color("/delete <id>", C.green)} — Delete a conversation`,
-					`  ${color("/help", C.green)} — Show this help`,
-					``,
-					color("Editing:", C.bold),
-					`  ${color("Enter", C.green)} — Submit message`,
-					`  ${color("Alt+Enter", C.green)} — New line in message`,
-					`  ${color("↑/↓", C.green)} — Jump between lines`,
-				].join("\n"),
-			);
-			return;
-		}
-
-		if (trimmed.startsWith("/list")) {
-			const convs = this.store.list();
-			if (convs.length === 0) {
-				this.writeContent(color("No conversations.", C.dim));
-			} else {
-				const lines = convs.map((c) => {
-					const active = c.id === this.conversationId ? " ← current" : "";
-					const title = c.title || c.id.substring(0, 12);
-					const msgs = c.messages.length > 0 ? ` (${Math.ceil(c.messages.length / 2)} msgs)` : "";
-					return `  ${color(c.id, C.cyan)}  ${title}${color(msgs, C.dim)}${color(active, C.green)}`;
-				});
-				this.writeContent(
-					color(`Conversations (${convs.length}):`, C.bold) +
-						"\n" +
-						lines.join("\n"),
-				);
-			}
-			return;
-		}
-
-		if (trimmed.startsWith("/delete ")) {
-			const targetId = trimmed.slice(8).trim();
-			if (!targetId) {
-				this.writeContent(color("Usage: /delete <conversation-id>", C.yellow));
+		// Slash-command dispatch
+		if (trimmed.startsWith("/")) {
+			const spaceIdx = trimmed.indexOf(" ");
+			const cmdName = spaceIdx >= 0 ? trimmed.slice(0, spaceIdx) : trimmed;
+			const args = spaceIdx >= 0 ? trimmed.slice(spaceIdx + 1) : "";
+			const handler = this.commands.get(cmdName);
+			if (handler) {
+				await handler.run(args);
 				return;
 			}
-			const exists = this.store.get(targetId);
-			if (!exists) {
-				this.writeContent(color(`Conversation "${targetId}" not found.`, C.red));
-				return;
-			}
-			this.store.delete(targetId);
-			// If we deleted our current conversation, create a new one
-			if (this.conversationId === targetId) {
-				const conv = this.store.create();
-				this.conversationId = conv.id;
-				this.history = [];
-				clearScreen();
-				this.setScrollRegion();
-				this.drawBottomBar();
-				this.writeContent(color(`— Deleted "${targetId}" and started fresh —`, C.dim));
-			} else {
-				this.writeContent(color(`Deleted "${targetId}".`, C.dim));
-			}
-			return;
 		}
 
-		// User message
+		// Regular message: persist user input
 		this.history.push({ role: "user", content: trimmed });
-		// Persist to store
-		if (this.conversationId) {
-			this.store.addMessage(this.conversationId, {
-				role: "user",
-				content: trimmed,
-			});
-		}
+		this.persistMessage("user", trimmed);
 		this.writeContent(formatMessage(this.history[this.history.length - 1]));
 		this.writeContent("");
 
@@ -656,13 +703,7 @@ class ChatTUI {
 					content: result.content,
 				};
 				this.history.push(assistantMsg);
-				// Persist to store
-				if (this.conversationId) {
-					this.store.addMessage(this.conversationId, {
-						role: "assistant",
-						content: result.content,
-					});
-				}
+				this.persistMessage("assistant", result.content);
 				this.writeContent(formatMessage(assistantMsg));
 				this.writeContent("");
 			}
@@ -678,6 +719,14 @@ class ChatTUI {
 		this.isWaiting = false;
 		this.statusText = "Ready";
 		this.updateStatusOnly();
+	}
+
+	private persistMessage(
+		role: "user" | "assistant",
+		content: string,
+	): void {
+		if (!this.conversationId) return;
+		this.store.addMessage(this.conversationId, { role, content });
 	}
 }
 

@@ -432,22 +432,11 @@ export class WebUIBackend {
 			// Sync in-memory session if it exists
 			const session = this.sessions.get(sessionId);
 			if (session) {
-				session.messages = conv.messages.map((m, i) => ({
-					id: `msg_${conv.id}_${i}`,
-					sessionId: conv.id,
-					role: m.role as "user" | "assistant" | "system",
-					content: m.content,
-					timestamp: m.timestamp,
-				}));
-				session.lastActivity = conv.updatedAt;
+				const updated = this.convToSession(conv);
+				session.messages = updated.messages;
+				session.lastActivity = updated.lastActivity;
 			}
-			return conv.messages.map((m, i) => ({
-				id: `msg_${conv.id}_${i}`,
-				sessionId: conv.id,
-				role: m.role as "user" | "assistant" | "system",
-				content: m.content,
-				timestamp: m.timestamp,
-			}));
+			return this.convToSession(conv).messages;
 		}
 		const session = this.sessions.get(sessionId);
 		return session ? session.messages : [];
