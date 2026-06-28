@@ -63,7 +63,6 @@ function loadLocalProviders(workspaceDir: string): LLMProviderConfig[] {
 
 const STATUS_ROWS = 6; // rows reserved at the bottom: sep + 2 status + 3 input
 const INPUT_VISIBLE_LINES = 3; // how many input lines are shown
-const SEP_CHAR = "━";
 
 const C = {
 	reset: "\x1b[0m",
@@ -76,7 +75,6 @@ const C = {
 	red: "\x1b[31m",
 	magenta: "\x1b[35m",
 	grey: "\x1b[90m",
-	bgDark: "\x1b[100m",
 } as const;
 
 function color(text: string, code: string): string {
@@ -116,7 +114,6 @@ function resetScrollRegion(): void {
 function formatMessage(msg: ChatMessage): string {
 	const isUser = msg.role === "user";
 	const isAssistant = msg.role === "assistant";
-	const isSystem = msg.role === "system";
 
 	// Role label: reverse video with role color
 	const roleLabel = isUser
@@ -125,7 +122,7 @@ function formatMessage(msg: ChatMessage): string {
 			? color(" AI ", C.rev + C.cyan)
 			: color(" System ", C.rev + C.yellow);
 
-	// Body: wrap in subtle background tint for user messages
+	// Body: code blocks dimmed, otherwise plain text
 	const lines = msg.content.split("\n");
 	const formatted = lines
 		.map((line) => {
@@ -135,10 +132,7 @@ function formatMessage(msg: ChatMessage): string {
 		})
 		.join("\n");
 
-	// Wrap message body in background tint for user messages
-	const body = isUser ? color(formatted, C.bgDark) : formatted;
-
-	return `\n${roleLabel}\n${body}`;
+	return `\n${roleLabel}\n${formatted}`;
 }
 
 // ── Chat TUI ──────────────────────────────────────────────────────────────────
@@ -267,10 +261,10 @@ class ChatTUI {
 		const w = tWidth();
 		const barTop = Math.max(1, h - STATUS_ROWS + 1);
 
-		// Row 1 of bar: separator
+		// Row 1 of bar: thin separator
 		cursorMove(barTop, 1);
 		clearLine();
-		process.stdout.write(SEP_CHAR.repeat(w));
+		process.stdout.write(`\x1b[2m${"─".repeat(w)}\x1b[0m`);
 
 		// Row 2 of bar: primary status (grey)
 		cursorMove(barTop + 1, 1);
