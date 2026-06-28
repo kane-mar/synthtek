@@ -336,14 +336,57 @@ export class WebUIBackend {
 	}
 
 	getSession(id: string): Session | null {
-		return this.sessions.get(id) ?? null;
+		const existing = this.sessions.get(id);
+		if (existing) return existing;
+		// Fallback to conversation store
+		const conv = this.conversationStore.get(id);
+		if (conv) {
+			const session = this.convToSession(conv);
+			this.sessions.set(session.id, session);
+			return session;
+		}
+		return null;
 	}
 
 	listSessions(): Session[] {
-		return Array.from(this.sessions.values());
+		// Merge in-memory sessions with store conversations not yet loaded
+		const merged = new Map(this.sessions);
+		const convs = this.conversationStore.list();
+		for (const conv of convs) {
+			if (merged.has(conv.id)) continue;
+			if (conv.messages.length === 0) continue;
+			const session = this.convToSession(conv);
+			merged.set(session.id, session);
+		}
+		// Sort by most recent activity first
+		return Array.from(merged.values()).sort(
+			(a, b) => b.lastActivity - a.lastActivity,
+		);
+	}
+
+	private convToSession(conv: {
+		id: string;
+		createdAt: number;
+		updatedAt: number;
+		messages: Array<{ role: string; content: string; timestamp: number }>;
+	}): Session {
+		return {
+			id: conv.id,
+			userId: "persisted",
+			createdAt: conv.createdAt,
+			lastActivity: conv.updatedAt,
+			messages: conv.messages.map((m, i) => ({
+				id: `msg_${conv.id}_${i}`,
+				sessionId: conv.id,
+				role: m.role as "user" | "assistant" | "system",
+				content: m.content,
+				timestamp: m.timestamp,
+			})),
+		};
 	}
 
 	deleteSession(id: string): boolean {
+		this.conversationStore.delete(id);
 		return this.sessions.delete(id);
 	}
 
@@ -353,7 +396,16 @@ export class WebUIBackend {
 		sessionId: string,
 		msg: { role: "user" | "assistant" | "system"; content: string },
 	): Message | null {
-		const session = this.sessions.get(sessionId);
+		// Check both in-memory and store for the session
+		let session = this.sessions.get(sessionId);
+		if (!session) {
+			// Try loading from conversation store
+			const conv = this.conversationStore.get(sessionId);
+			if (conv) {
+				session = this.convToSession(conv);
+				this.sessions.set(session.id, session);
+			}
+		}
 		if (!session) return null;
 
 		const message: Message = {
@@ -378,7 +430,19 @@ export class WebUIBackend {
 
 	getMessages(sessionId: string): Message[] {
 		const session = this.sessions.get(sessionId);
-		return session ? session.messages : [];
+		if (session) return session.messages;
+		// Fallback to conversation store
+		const conv = this.conversationStore.get(sessionId);
+		if (conv) {
+			return conv.messages.map((m, i) => ({
+				id: `msg_${conv.id}_${i}`,
+				sessionId: conv.id,
+				role: m.role as "user" | "assistant" | "system",
+				content: m.content,
+				timestamp: m.timestamp,
+			}));
+		}
+		return [];
 	}
 
 	// ── Authentication ─────────────────────────────────────────────────────────

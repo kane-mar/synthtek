@@ -15,7 +15,7 @@
  *   └──────────────────────────────────┘
  *
  * Bottom 6 rows are reserved: separator + 2 status + 3 input lines.
- * Shift+Enter = newline, Enter = submit.
+ * Alt+Enter = newline, Enter = submit.
  * Conversations are persisted to a shared store so the WebUI and TUI
  * share the same conversation history.
  */
@@ -217,7 +217,7 @@ class ChatTUI {
 		);
 		if (this.history.length === 0) {
 			this.writeRaw(
-				color("Type /help for commands. Shift+Enter = newline, Enter = submit.", C.dim),
+				color("Type /help for commands. Enter = submit, Alt+Enter = newline.", C.dim),
 			);
 			this.writeRaw("");
 		}
@@ -406,20 +406,20 @@ class ChatTUI {
 		// Ignore input while waiting for response
 		if (this.isWaiting) return;
 
-		// Ctrl+Enter = submit (always)
-		if (key.ctrl && (key.name === "return" || key.name === "enter")) {
-			this.submit();
-			return;
-		}
-
-		// Enter (without Ctrl) = insert newline
-		if (key.name === "return" || key.name === "enter") {
+		// Alt+Enter / Meta+Enter = insert newline
+		if ((key.meta || key.ctrl) && (key.name === "return" || key.name === "enter")) {
 			this.inputBuffer =
 				this.inputBuffer.slice(0, this.cursorPos) +
 				"\n" +
 				this.inputBuffer.slice(this.cursorPos);
 			this.cursorPos++;
 			this.drawInputLines();
+			return;
+		}
+
+		// Enter (without Alt/Ctrl) = submit
+		if (key.name === "return" || key.name === "enter") {
+			this.submit();
 			return;
 		}
 
@@ -568,8 +568,8 @@ class ChatTUI {
 					`  ${color("/help", C.green)} — Show this help`,
 					``,
 					color("Editing:", C.bold),
-					`  ${color("Enter", C.green)} — New line`,
-					`  ${color("Ctrl+Enter", C.green)} — Submit message`,
+					`  ${color("Enter", C.green)} — Submit message`,
+					`  ${color("Alt+Enter", C.green)} — New line in message`,
 					`  ${color("↑/↓", C.green)} — Jump between lines`,
 				].join("\n"),
 			);
