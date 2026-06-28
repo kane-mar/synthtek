@@ -11,6 +11,7 @@ import {
 	setAgentConfig as setSharedAgentConfig,
 } from "../config/agent-config.js";
 import { AnalyticsTracker } from "./analytics.js";
+import { ConversationStore } from "../messaging/conversation-store.js";
 import type {
 	AnalyticsSummary,
 	APIResponse,
@@ -60,6 +61,7 @@ export interface RouteParams extends Record<string, string> {
 export class WebUIBackend {
 	public status: "started" | "stopped" = "stopped";
 	public readonly analytics: AnalyticsTracker;
+	public readonly conversationStore: ConversationStore;
 
 	private readonly config: WebUIConfig;
 	private readonly sessions: Map<string, Session> = new Map();
@@ -72,11 +74,35 @@ export class WebUIBackend {
 	};
 	private startedAt: number | null = null;
 
-	constructor(config: WebUIConfig) {
+	constructor(config: WebUIConfig, workspaceDir?: string) {
 		this.config = config;
 		this.analytics = new AnalyticsTracker();
+		this.conversationStore = new ConversationStore(workspaceDir ?? process.cwd());
+		this.loadSessionsFromStore();
 		this.initDefaultTools();
 		this.initRoutes();
+	}
+
+	/** Load persisted conversations as sessions on startup. */
+	private loadSessionsFromStore(): void {
+		const convs = this.conversationStore.list();
+		for (const conv of convs) {
+			if (conv.messages.length === 0) continue;
+			const session: Session = {
+				id: conv.id,
+				userId: "persisted",
+				createdAt: conv.createdAt,
+				lastActivity: conv.updatedAt,
+				messages: conv.messages.map((m, i) => ({
+					id: `msg_${conv.id}_${i}`,
+					sessionId: conv.id,
+					role: m.role,
+					content: m.content,
+					timestamp: m.timestamp,
+				})),
+			};
+			this.sessions.set(session.id, session);
+		}
 	}
 
 	// ── Route Registration ────────────────────────────────────────────────────
@@ -284,8 +310,9 @@ export class WebUIBackend {
 			return null;
 		}
 
+		const sessionId = generateId();
 		const session: Session = {
-			id: generateId(),
+			id: sessionId,
 			userId,
 			createdAt: Date.now(),
 			lastActivity: Date.now(),
@@ -293,6 +320,18 @@ export class WebUIBackend {
 		};
 
 		this.sessions.set(session.id, session);
+
+		// Persist so the TUI can see this conversation
+		const conv = this.conversationStore.create(`Chat with ${userId}`);
+		// Re-align: delete the store-generated conv and save one with session id
+		if (conv) {
+			this.conversationStore.delete(conv.id);
+			this.conversationStore.save({
+				...conv,
+				id: sessionId,
+			});
+		}
+
 		return session;
 	}
 
@@ -327,6 +366,13 @@ export class WebUIBackend {
 
 		session.messages.push(message);
 		session.lastActivity = Date.now();
+
+		// Persist to shared store
+		this.conversationStore.addMessage(sessionId, {
+			role: msg.role,
+			content: msg.content,
+		});
+
 		return message;
 	}
 

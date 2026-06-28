@@ -2,17 +2,22 @@
  * Chat command — TUI chat with the AI agent.
  *
  * Layout:
- *   ┌─────────────────────────────────┐
- *   │  Conversation history            │  ← scrollable content area
- *   │  ...                             │
- *   │                                  │
- *   ├─────────────────────────────────┤  ← separator (1px visual line)
- *   │  Status info (grey)              │
- *   │  Model / provider info (grey)    │
- *   │ > input buffer                   │
- *   └─────────────────────────────────┘
+ *   ┌──────────────────────────────────┐
+ *   │  Conversation history             │  ← scrollable content area
+ *   │  ...                              │
+ *   │                                   │
+ *   ├━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┤  ← separator
+ *   │  Status info (grey)               │
+ *   │  Model / provider info (grey)     │
+ *   │ > first line of input ...         │
+ *   │   second line ...                 │
+ *   │   third line ...                  │  ← multi-line input (≥2 lines)
+ *   └──────────────────────────────────┘
  *
- * Bottom 4 rows are reserved for separator + status + input.
+ * Bottom 6 rows are reserved: separator + 2 status + 3 input lines.
+ * Shift+Enter = newline, Enter = submit.
+ * Conversations are persisted to a shared store so the WebUI and TUI
+ * share the same conversation history.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -21,6 +26,7 @@ import { emitKeypressEvents } from "node:readline";
 import type { Command } from "commander";
 import { getSystemPrompt } from "../../config/agent-config.js";
 import { ChatService } from "../../messaging/chat-service.js";
+import { ConversationStore } from "../../messaging/conversation-store.js";
 import type { ChatMessage, LLMProviderConfig } from "../../messaging/types.js";
 import { config, logger } from "../cli-context.js";
 
@@ -55,7 +61,8 @@ function loadLocalProviders(workspaceDir: string): LLMProviderConfig[] {
 
 // ── Terminal helpers ──────────────────────────────────────────────────────────
 
-const STATUS_ROWS = 4; // rows reserved at the bottom
+const STATUS_ROWS = 6; // rows reserved at the bottom: sep + 2 status + 3 input
+const INPUT_VISIBLE_LINES = 3; // how many input lines are shown
 const SEP_CHAR = "━";
 
 const C = {
@@ -133,15 +140,23 @@ class ChatTUI {
 	private statusText = "";
 	private isWaiting = false;
 	private done = false;
+	private conversationId: string | null = null;
 
 	private chat: ChatService;
 	private systemPrompt: string;
 	private model?: string;
+	private store: ConversationStore;
 	private resolvePromise!: () => void;
 
-	constructor(chat: ChatService, systemPrompt: string, model?: string) {
+	constructor(
+		chat: ChatService,
+		systemPrompt: string,
+		store: ConversationStore,
+		model?: string,
+	) {
 		this.chat = chat;
 		this.systemPrompt = systemPrompt;
+		this.store = store;
 		this.model = model;
 	}
 
@@ -160,6 +175,21 @@ class ChatTUI {
 		clearScreen();
 		this.setScrollRegion();
 		this.statusText = "Ready";
+
+		// Load existing conversation or create a new one
+		const convs = this.store.list();
+		if (convs.length > 0) {
+			const conv = convs[0]; // most recent conversation
+			this.conversationId = conv.id;
+			// Load history into memory
+			for (const m of conv.messages) {
+				this.history.push({ role: m.role, content: m.content });
+			}
+		} else {
+			const conv = this.store.create();
+			this.conversationId = conv.id;
+		}
+
 		this.drawBottomBar();
 
 		// Keypress handling
@@ -173,14 +203,24 @@ class ChatTUI {
 			this.drawBottomBar();
 		});
 
+		// Print existing conversation if any
+		if (this.history.length > 0) {
+			for (const msg of this.history) {
+				this.writeRaw(formatMessage(msg));
+			}
+			this.writeRaw("");
+		}
+
 		// Welcome message
 		this.writeRaw(
 			`${color("🚀 Synthtek Chat", C.magenta)} ${color(`(${this.model || "default"})`, C.dim)}`,
 		);
-		this.writeRaw(
-			color("Type /help for commands. Ctrl+C or /exit to quit.", C.dim),
-		);
-		this.writeRaw("");
+		if (this.history.length === 0) {
+			this.writeRaw(
+				color("Type /help for commands. Shift+Enter = newline, Enter = submit.", C.dim),
+			);
+			this.writeRaw("");
+		}
 
 		this.drawBottomBar();
 		this.moveToInput();
@@ -212,10 +252,9 @@ class ChatTUI {
 		const w = tWidth();
 		const barTop = Math.max(1, h - STATUS_ROWS + 1);
 
-		// Row 1 of bar: separator line (1px visual line using full block chars)
+		// Row 1 of bar: separator
 		cursorMove(barTop, 1);
 		clearLine();
-		// Use the upper half block character for a thin 1px-high line
 		process.stdout.write(SEP_CHAR.repeat(w));
 
 		// Row 2 of bar: primary status (grey)
@@ -228,29 +267,70 @@ class ChatTUI {
 		cursorMove(barTop + 2, 1);
 		clearLine();
 		const modelInfo = this.model ? `Model: ${this.model}` : "";
-		const msgCount = this.history.length
-			? `Messages: ${Math.ceil(this.history.length / 2)}`
-			: "";
-		const parts = [modelInfo, msgCount].filter(Boolean);
+		const msgCount =
+			this.history.length > 0
+				? `Msgs: ${Math.ceil(this.history.length / 2)}`
+				: "";
+		const convCount = this.store.list().length;
+		const parts = [modelInfo, msgCount, `${convCount} conversations`].filter(
+			Boolean,
+		);
 		process.stdout.write(color(` ${parts.join("  •  ")}`, C.dim));
 
-		// Row 4 of bar: input line
-		this.drawInputLine();
+		// Rows 4-6: multi-line input area
+		this.drawInputLines();
 	}
 
-	private drawInputLine(): void {
+	/** Split input into lines, showing the last INPUT_VISIBLE_LINES. */
+	private drawInputLines(): void {
 		const h = tHeight();
-		const inputRow = h; // bottommost row
-		cursorMove(inputRow, 1);
-		clearLine();
-		const prefix = this.isWaiting ? "" : "> ";
-		process.stdout.write(`${prefix}${this.inputBuffer}`);
+		const barTop = Math.max(1, h - STATUS_ROWS + 1);
+		// Input area starts at row barTop+3
+		const inputStart = barTop + 3;
+
+		// Split input buffer into display lines
+		const lines = this.inputBuffer.split("\n");
+		// Take the last INPUT_VISIBLE_LINES
+		const visible = lines.slice(-INPUT_VISIBLE_LINES);
+		// Pad to full height
+		while (visible.length < INPUT_VISIBLE_LINES) {
+			visible.unshift("");
+		}
+
+		for (let i = 0; i < INPUT_VISIBLE_LINES; i++) {
+			const row = inputStart + i;
+			cursorMove(row, 1);
+			clearLine();
+			const isLastInputLine = i === INPUT_VISIBLE_LINES - 1;
+			if (i < INPUT_VISIBLE_LINES - lines.length) {
+				// Above actual input — show as empty scroll hint
+				continue;
+			}
+
+			const content = visible[i] ?? "";
+			let prefix = "";
+			if (isLastInputLine) {
+				prefix = this.isWaiting ? "" : "> ";
+			} else {
+				prefix = "  ";
+			}
+			process.stdout.write(`${prefix}${content}`);
+		}
+
+		// Place cursor at end of last line
 		this.moveToInput();
 	}
 
 	private moveToInput(): void {
 		const h = tHeight();
-		cursorMove(h, 3 + Math.min(this.cursorPos, this.inputBuffer.length));
+		const inputStart = Math.max(1, h - STATUS_ROWS + 1) + 3;
+		const lastInputRow = inputStart + INPUT_VISIBLE_LINES - 1;
+
+		// Find the cursor position on the last line
+		const lines = this.inputBuffer.split("\n");
+		const lastLine = lines[lines.length - 1] ?? "";
+		const cursorOnLastLine = Math.min(this.cursorPos, lastLine.length);
+		cursorMove(lastInputRow, 3 + cursorOnLastLine);
 	}
 
 	private updateStatusOnly(): void {
@@ -267,13 +347,17 @@ class ChatTUI {
 		cursorMove(barTop + 2, 1);
 		clearLine();
 		const modelInfo = this.model ? `Model: ${this.model}` : "";
-		const msgCount = this.history.length
-			? `Messages: ${Math.ceil(this.history.length / 2)}`
-			: "";
-		const parts = [modelInfo, msgCount].filter(Boolean);
+		const msgCount =
+			this.history.length > 0
+				? `Msgs: ${Math.ceil(this.history.length / 2)}`
+				: "";
+		const convCount = this.store.list().length;
+		const parts = [modelInfo, msgCount, `${convCount} conversations`].filter(
+			Boolean,
+		);
 		process.stdout.write(color(` ${parts.join("  •  ")}`, C.dim));
 
-		this.drawInputLine();
+		this.drawInputLines();
 	}
 
 	// ── Content writing ────────────────────────────────────────────
@@ -302,18 +386,17 @@ class ChatTUI {
 
 	private onKeypress(
 		_str: string,
-		key: { name?: string; ctrl?: boolean },
+		key: { name?: string; ctrl?: boolean; meta?: boolean; shift?: boolean },
 	): void {
 		if (this.done) return;
 
-		// Ctrl+C
+		// Ctrl+C / escape
 		if ((key.ctrl && key.name === "c") || key.name === "escape") {
 			if (this.isWaiting) {
-				// Cancel in-progress request
 				this.isWaiting = false;
 				this.statusText = "Cancelled";
 				this.updateStatusOnly();
-				this.drawInputLine();
+				this.drawInputLines();
 			} else {
 				this.shutdown();
 			}
@@ -323,9 +406,20 @@ class ChatTUI {
 		// Ignore input while waiting for response
 		if (this.isWaiting) return;
 
-		// Enter
-		if (key.name === "return" || key.name === "enter") {
+		// Ctrl+Enter = submit (always)
+		if (key.ctrl && (key.name === "return" || key.name === "enter")) {
 			this.submit();
+			return;
+		}
+
+		// Enter (without Ctrl) = insert newline
+		if (key.name === "return" || key.name === "enter") {
+			this.inputBuffer =
+				this.inputBuffer.slice(0, this.cursorPos) +
+				"\n" +
+				this.inputBuffer.slice(this.cursorPos);
+			this.cursorPos++;
+			this.drawInputLines();
 			return;
 		}
 
@@ -336,7 +430,7 @@ class ChatTUI {
 					this.inputBuffer.slice(0, this.cursorPos - 1) +
 					this.inputBuffer.slice(this.cursorPos);
 				this.cursorPos--;
-				this.drawInputLine();
+				this.drawInputLines();
 			}
 			return;
 		}
@@ -347,7 +441,7 @@ class ChatTUI {
 				this.inputBuffer =
 					this.inputBuffer.slice(0, this.cursorPos) +
 					this.inputBuffer.slice(this.cursorPos + 1);
-				this.drawInputLine();
+				this.drawInputLines();
 			}
 			return;
 		}
@@ -370,6 +464,32 @@ class ChatTUI {
 			return;
 		}
 
+		// Arrow up — skip to previous line boundary
+		if (key.name === "up") {
+			const before = this.inputBuffer.slice(0, this.cursorPos);
+			const prevNewline = before.lastIndexOf("\n");
+			if (prevNewline >= 0) {
+				this.cursorPos = prevNewline;
+			} else {
+				this.cursorPos = 0;
+			}
+			this.moveToInput();
+			return;
+		}
+
+		// Arrow down — skip to next line boundary
+		if (key.name === "down") {
+			const after = this.inputBuffer.slice(this.cursorPos);
+			const nextNewline = after.indexOf("\n");
+			if (nextNewline >= 0) {
+				this.cursorPos += nextNewline + 1;
+			} else {
+				this.cursorPos = this.inputBuffer.length;
+			}
+			this.moveToInput();
+			return;
+		}
+
 		// Home
 		if (key.name === "home") {
 			this.cursorPos = 0;
@@ -384,8 +504,15 @@ class ChatTUI {
 			return;
 		}
 
-		// Tab (completion or just ignore)
+		// Tab
 		if (key.name === "tab") {
+			// Insert 2 spaces for indentation
+			this.inputBuffer =
+				this.inputBuffer.slice(0, this.cursorPos) +
+				"  " +
+				this.inputBuffer.slice(this.cursorPos);
+			this.cursorPos += 2;
+			this.drawInputLines();
 			return;
 		}
 
@@ -396,7 +523,7 @@ class ChatTUI {
 				_str +
 				this.inputBuffer.slice(this.cursorPos);
 			this.cursorPos++;
-			this.drawInputLine();
+			this.drawInputLines();
 		}
 	}
 
@@ -408,7 +535,7 @@ class ChatTUI {
 		this.cursorPos = 0;
 
 		if (!trimmed) {
-			this.drawInputLine();
+			this.drawInputLines();
 			return;
 		}
 
@@ -420,6 +547,11 @@ class ChatTUI {
 
 		if (trimmed === "/clear") {
 			this.history = [];
+			if (this.conversationId) {
+				this.store.delete(this.conversationId);
+			}
+			const conv = this.store.create();
+			this.conversationId = conv.id;
 			clearScreen();
 			this.setScrollRegion();
 			this.drawBottomBar();
@@ -434,6 +566,11 @@ class ChatTUI {
 					`  ${color("/exit, /quit", C.green)} — Exit the chat`,
 					`  ${color("/clear", C.green)} — Clear conversation`,
 					`  ${color("/help", C.green)} — Show this help`,
+					``,
+					color("Editing:", C.bold),
+					`  ${color("Enter", C.green)} — New line`,
+					`  ${color("Ctrl+Enter", C.green)} — Submit message`,
+					`  ${color("↑/↓", C.green)} — Jump between lines`,
 				].join("\n"),
 			);
 			return;
@@ -441,6 +578,13 @@ class ChatTUI {
 
 		// User message
 		this.history.push({ role: "user", content: trimmed });
+		// Persist to store
+		if (this.conversationId) {
+			this.store.addMessage(this.conversationId, {
+				role: "user",
+				content: trimmed,
+			});
+		}
 		this.writeContent(formatMessage(this.history[this.history.length - 1]));
 		this.writeContent("");
 
@@ -463,6 +607,13 @@ class ChatTUI {
 					content: result.content,
 				};
 				this.history.push(assistantMsg);
+				// Persist to store
+				if (this.conversationId) {
+					this.store.addMessage(this.conversationId, {
+						role: "assistant",
+						content: result.content,
+					});
+				}
 				this.writeContent(formatMessage(assistantMsg));
 				this.writeContent("");
 			}
@@ -586,7 +737,8 @@ export function registerChatCommand(program: Command): void {
 						}
 					} else {
 						// Interactive TUI mode
-						const tui = new ChatTUI(chat, systemPrompt, opts.model);
+						const store = new ConversationStore(wsDir);
+						const tui = new ChatTUI(chat, systemPrompt, store, opts.model);
 						await tui.start();
 					}
 				} catch (err) {

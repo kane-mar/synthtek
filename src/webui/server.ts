@@ -36,8 +36,8 @@ export class WebUIServer {
 	private server: ReturnType<typeof createServer> | null = null;
 
 	constructor(private config: WebUIConfig) {
-		this.backend = new WebUIBackend(config);
 		const workspaceDir = process.env.SYNTHTEK_WORKSPACE || "/data";
+		this.backend = new WebUIBackend(config, workspaceDir);
 		const configDir = join(workspaceDir, "config");
 		// Ensure dirs exist
 		try {
