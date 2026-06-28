@@ -42,7 +42,6 @@ function generateId(): string {
 
 export class ConversationStore {
 	private filePath: string;
-	private cache: StoreData | null = null;
 
 	constructor(workspaceDir: string) {
 		const dir = join(workspaceDir, "config");
@@ -55,28 +54,23 @@ export class ConversationStore {
 	// ── Internal I/O ──────────────────────────────────────────────────
 
 	private read(): StoreData {
-		if (this.cache) return this.cache;
 		if (!existsSync(this.filePath)) {
-			this.cache = { conversations: [] };
-			return this.cache;
+			return { conversations: [] };
 		}
 		try {
 			const raw = readFileSync(this.filePath, "utf-8");
-			this.cache = JSON.parse(raw) as StoreData;
-			return this.cache;
+			return JSON.parse(raw) as StoreData;
 		} catch {
-			this.cache = { conversations: [] };
-			return this.cache;
+			return { conversations: [] };
 		}
 	}
 
-	private write(): void {
-		if (!this.cache) return;
-		writeFileSync(this.filePath, JSON.stringify(this.cache, null, 2), "utf-8");
+	private write(data: StoreData): void {
+		writeFileSync(this.filePath, JSON.stringify(data, null, 2), "utf-8");
 	}
 
 	private invalidate(): void {
-		this.cache = null;
+		// No-op: reads go directly to disk
 	}
 
 	// ── Public API ────────────────────────────────────────────────────
@@ -107,7 +101,7 @@ export class ConversationStore {
 			messages: [],
 		};
 		data.conversations.push(conv);
-		this.write();
+		this.write(data);
 		return conv;
 	}
 
@@ -121,7 +115,7 @@ export class ConversationStore {
 		} else {
 			data.conversations.push(conv);
 		}
-		this.write();
+		this.write(data);
 	}
 
 	/** Add a message to a conversation. Returns updated conversation or null. */
@@ -134,7 +128,7 @@ export class ConversationStore {
 		if (!conv) return null;
 		conv.messages.push({ ...msg, timestamp: Date.now() });
 		conv.updatedAt = Date.now();
-		this.write();
+		this.write(data);
 		return conv;
 	}
 
@@ -144,7 +138,7 @@ export class ConversationStore {
 		const idx = data.conversations.findIndex((c) => c.id === id);
 		if (idx < 0) return false;
 		data.conversations.splice(idx, 1);
-		this.write();
+		this.write(data);
 		return true;
 	}
 
