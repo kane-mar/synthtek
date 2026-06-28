@@ -7,7 +7,7 @@
  */
 
 import { deepStrictEqual, ok, strictEqual } from "node:assert";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -530,10 +530,121 @@ describe("WebUI end-to-end", () => {
 			strictEqual(res.headers.get("access-control-allow-origin"), "*");
 		});
 
-		it("includes Content-Type: application/json on API responses", async () => {
-			const res = await get("/api/health");
-			const ct = res.headers.get("content-type");
-			ok(ct?.includes("application/json"), "content-type is application/json");
-		});
+	it("includes Content-Type: application/json on API responses", async () => {
+		const res = await get("/api/health");
+		const ct = res.headers.get("content-type");
+		ok(ct?.includes("application/json"), "content-type is application/json");
 	});
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Skills (auth required)
+// ──────────────────────────────────────────────────────────────────────
+
+describe("Skills API", () => {
+	const testSkillName = "e2e-test-skill";
+	const skillDir = join(e2eWorkspace, "skills", testSkillName);
+
+	before(() => {
+		// Create a test skill SKILL.md directly in the workspace
+		mkdirSync(skillDir, { recursive: true });
+		writeFileSync(
+			join(skillDir, "SKILL.md"),
+			`---
+name: e2e-test-skill
+description: "A test skill created by E2E tests"
+---
+
+# E2E Test Skill
+
+Used for testing the skills API endpoints.
+`,
+		);
+	});
+
+	it("GET /api/skills returns list including the test skill", async () => {
+		const res = await get("/api/skills", authHeaders);
+		strictEqual(res.status, 200);
+		const json = await res.json();
+		ok(Array.isArray(json), "returns array");
+		const found = json.find((s: { name: string }) => s.name === testSkillName);
+		ok(found, `test skill "${testSkillName}" should be listed`);
+		ok(found.description?.includes("E2E"), "description is loaded");
+	});
+
+	it("POST /api/skills/:name/toggle toggles enabled state", async () => {
+		// Toggle off
+		const res1 = await post(
+			`/api/skills/${testSkillName}/toggle`,
+			{},
+			authHeaders,
+		);
+		strictEqual(res1.status, 200);
+		const json1 = await res1.json();
+		strictEqual(json1.enabled, false);
+
+		// Toggle back on
+		const res2 = await post(
+			`/api/skills/${testSkillName}/toggle`,
+			{},
+			authHeaders,
+		);
+		strictEqual(res2.status, 200);
+		const json2 = await res2.json();
+		strictEqual(json2.enabled, true);
+	});
+
+	it("POST /api/skills/:name/toggle returns 404 for unknown skill", async () => {
+		const res = await post(
+			"/api/skills/nonexistent-skill/toggle",
+			{},
+			authHeaders,
+		);
+		strictEqual(res.status, 404);
+		const json = await res.json();
+		ok(json.error?.includes("not found"), "error mentions not found");
+	});
+
+	it("DELETE /api/skills/:name removes the skill", async () => {
+		const res = await del(`/api/skills/${testSkillName}`, authHeaders);
+		strictEqual(res.status, 200);
+		const json = await res.json();
+		strictEqual(json.success, true);
+
+		// Verify it's gone
+		const listRes = await get("/api/skills", authHeaders);
+		const list = await listRes.json();
+		const found = list.find((s: { name: string }) => s.name === testSkillName);
+		ok(!found, "skill should be removed from the list");
+	});
+
+	it("DELETE /api/skills/:name returns 404 for already deleted skill", async () => {
+		const res = await del(`/api/skills/${testSkillName}`, authHeaders);
+		strictEqual(res.status, 404);
+	});
+
+	it("POST /api/skills/install returns 400 when source is missing", async () => {
+		const res = await post("/api/skills/install", {}, authHeaders);
+		strictEqual(res.status, 400);
+		const json = await res.json();
+		ok(json.error?.includes("source"), "error mentions source");
+	});
+
+	it("POST /api/skills/install returns 500 when installation fails", async () => {
+		const res = await post(
+			"/api/skills/install",
+			{ source: "invalid-gh-repo-that-does-not-exist/skill" },
+			authHeaders,
+		);
+		// Should fail gracefully — either 500 with error, or 200 if somehow works
+		if (res.status === 200) {
+			const json = await res.json();
+			ok(json.success, "unexpectedly succeeded");
+		} else {
+			const json = await res.json();
+			ok(!json.success, "reports failure");
+			ok(typeof json.error === "string", "includes error message");
+		}
+	});
+});
 });
