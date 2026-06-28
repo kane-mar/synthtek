@@ -2,10 +2,10 @@
  * ToolRegistry Tests — TDD for tool execution improvements
  */
 
-import { deepStrictEqual, equal, ok, rejects, doesNotReject } from "node:assert";
-import { afterEach, beforeEach, describe, it, mock } from "node:test";
+import { deepStrictEqual, equal, ok } from "node:assert";
+import { beforeEach, describe, it } from "node:test";
 import { ToolRegistry } from "../../src/agent/tools.js";
-import type { ToolCall, ToolResult } from "../../src/agent/types.js";
+import type { ToolCall } from "../../src/agent/types.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -18,10 +18,6 @@ function slowHandler(ms: number) {
 		await new Promise((r) => setTimeout(r, ms));
 		return { callId: "c1", name: "test", content: "done" };
 	};
-}
-
-function resultOf(r: ToolResult): string {
-	return r.error ? `ERROR:${r.error}` : r.content;
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -225,7 +221,7 @@ describe("ToolRegistry — improved execution", () => {
 				},
 			);
 
-			const result = await registry.execute(makeCall("bad_input"));
+			await registry.execute(makeCall("bad_input"));
 			equal(attempts, 1); // no retry
 		});
 

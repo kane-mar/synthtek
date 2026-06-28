@@ -12,7 +12,7 @@
  * - Deduplication of identical calls
  */
 
-import type { ToolCall, ToolError, ToolResult } from "./types.js";
+import type { ToolCall, ToolResult } from "./types.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -168,16 +168,6 @@ export class ToolRegistry {
 			content: "",
 			error: message,
 			errorDetails: { code, message, retryable },
-		};
-	}
-
-	private makeSuccess(call: ToolCall, content: string): ToolResult {
-		return {
-			callId: call.id,
-			name: call.name,
-			content,
-			error: undefined,
-			errorDetails: undefined,
 		};
 	}
 

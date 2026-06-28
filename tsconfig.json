@@ -19,5 +19,13 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],
-  "exclude": ["node_modules", "dist", "src/services", "src/agents", "src/commands"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/services",
+    "src/agents",
+    "src/commands",
+    "tests/e2e/*.spec.ts",
+    "tests/e2e/puppeteer.test.ts"
+  ]
 }
