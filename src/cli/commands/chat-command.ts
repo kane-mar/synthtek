@@ -144,20 +144,23 @@ class ChatTUI {
 
 	private chat: ChatService;
 	private systemPrompt: string;
-	private model?: string;
+	private providerName: string;
+	private modelName: string;
 	private store: ConversationStore;
 	private resolvePromise!: () => void;
 
 	constructor(
 		chat: ChatService,
 		systemPrompt: string,
+		providerName: string,
+		modelName: string,
 		store: ConversationStore,
-		model?: string,
 	) {
 		this.chat = chat;
 		this.systemPrompt = systemPrompt;
+		this.providerName = providerName;
+		this.modelName = modelName;
 		this.store = store;
-		this.model = model;
 		this.registerCommands();
 	}
 
@@ -191,6 +194,7 @@ class ChatTUI {
 			this.conversationId = conv.id;
 		}
 
+		this.statusText = `${this.providerName} • Ready`;
 		this.drawBottomBar();
 
 		// Keypress handling
@@ -214,7 +218,7 @@ class ChatTUI {
 
 		// Welcome message
 		this.writeRaw(
-			`${color("🚀 Synthtek Chat", C.magenta)} ${color(`(${this.model || "default"})`, C.dim)}`,
+			`${color("🚀 Synthtek Chat", C.magenta)} ${color(`(${this.providerName} / ${this.modelName || "default"})`, C.dim)}`,
 		);
 		if (this.history.length === 0) {
 			this.writeRaw(
@@ -264,16 +268,17 @@ class ChatTUI {
 		const spinner = this.isWaiting ? "⏳ " : "  ";
 		process.stdout.write(color(`${spinner}${this.statusText}`, C.grey));
 
-		// Row 3 of bar: secondary status (model info, grey)
+		// Row 3 of bar: secondary info — provider • model • msgs • convs
 		cursorMove(barTop + 2, 1);
 		clearLine();
-		const modelInfo = this.model ? `Model: ${this.model}` : "";
+		const providerInfo = this.providerName ? `Provider: ${this.providerName}` : "";
+		const modelInfo = this.modelName ? `Model: ${this.modelName}` : "";
 		const msgCount =
 			this.history.length > 0
 				? `Msgs: ${Math.ceil(this.history.length / 2)}`
 				: "";
 		const convCount = this.store.list().length;
-		const parts = [modelInfo, msgCount, `${convCount} conversations`].filter(
+		const parts = [providerInfo, modelInfo, msgCount, `${convCount} conversations`].filter(
 			Boolean,
 		);
 		process.stdout.write(color(` ${parts.join("  •  ")}`, C.dim));
@@ -344,16 +349,17 @@ class ChatTUI {
 		const spinner = this.isWaiting ? "⏳ " : "  ";
 		process.stdout.write(color(`${spinner}${this.statusText}`, C.grey));
 
-		// Update secondary status
+		// Update secondary info
 		cursorMove(barTop + 2, 1);
 		clearLine();
-		const modelInfo = this.model ? `Model: ${this.model}` : "";
+		const providerInfo = this.providerName ? `Provider: ${this.providerName}` : "";
+		const modelInfo = this.modelName ? `Model: ${this.modelName}` : "";
 		const msgCount =
 			this.history.length > 0
 				? `Msgs: ${Math.ceil(this.history.length / 2)}`
 				: "";
 		const convCount = this.store.list().length;
-		const parts = [modelInfo, msgCount, `${convCount} conversations`].filter(
+		const parts = [providerInfo, modelInfo, msgCount, `${convCount} conversations`].filter(
 			Boolean,
 		);
 		process.stdout.write(color(` ${parts.join("  •  ")}`, C.dim));
@@ -697,6 +703,7 @@ class ChatTUI {
 
 			if (result.error) {
 				this.writeContent(color(`✖ Error: ${result.error}`, C.red));
+				this.statusText = this.detectStatusFromError(result.error);
 			} else {
 				const assistantMsg: ChatMessage = {
 					role: "assistant",
@@ -708,12 +715,9 @@ class ChatTUI {
 				this.writeContent("");
 			}
 		} catch (err) {
-			this.writeContent(
-				color(
-					`✖ Error: ${err instanceof Error ? err.message : "Unknown error"}`,
-					C.red,
-				),
-			);
+			const msg = err instanceof Error ? err.message : "Unknown error";
+			this.writeContent(color(`✖ Error: ${msg}`, C.red));
+			this.statusText = this.detectStatusFromError(msg);
 		}
 
 		this.isWaiting = false;
@@ -727,6 +731,24 @@ class ChatTUI {
 	): void {
 		if (!this.conversationId) return;
 		this.store.addMessage(this.conversationId, { role, content });
+	}
+
+	/** Map error messages to a concise status label shown in the bar. */
+	private detectStatusFromError(error: string): string {
+		const lower = error.toLowerCase();
+		if (lower.includes("429") || lower.includes("rate limit") || lower.includes("too many requests"))
+			return "⚠ Throttled";
+		if (lower.includes("timeout") || lower.includes("timed out") || lower.includes("deadline"))
+			return "⏱ Timeout";
+		if (lower.includes("quota") || lower.includes("insufficient") || lower.includes("billing"))
+			return "⚠ Quota exceeded";
+		if (lower.includes("auth") || lower.includes("401") || lower.includes("403") || lower.includes("key"))
+			return "⚠ Auth error";
+		if (lower.includes("context") || lower.includes("token limit") || lower.includes("max_tokens"))
+			return "⚠ Context full";
+		if (lower.includes("unavailable") || lower.includes("overloaded") || lower.includes("503"))
+			return "⚠ Service down";
+		return "✖ Error";
 	}
 }
 
@@ -836,7 +858,13 @@ export function registerChatCommand(program: Command): void {
 					} else {
 						// Interactive TUI mode
 						const store = new ConversationStore(wsDir);
-						const tui = new ChatTUI(chat, systemPrompt, store, opts.model);
+						const tui = new ChatTUI(
+							chat,
+							systemPrompt,
+							activeProvider.type,
+							activeProvider.defaultModel || opts.model || activeProvider.type,
+							store,
+						);
 						await tui.start();
 					}
 				} catch (err) {
