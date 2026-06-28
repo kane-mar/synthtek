@@ -103,7 +103,20 @@ export async function handleChatCompletion(
 		};
 
 		// Call the LLM
+		const startTime = Date.now();
 		const response = await llmProvider.chat(completionReq);
+		const latencyMs = Date.now() - startTime;
+
+		// Track token usage and request in analytics
+		backend.analytics.trackRequest({
+			provider: providerLabel,
+			model: response.model || providerConfig.model || "unknown",
+			promptTokens: response.inputTokens ?? 0,
+			completionTokens: response.outputTokens ?? 0,
+			latencyMs,
+			cost: response.cost ?? 0,
+			success: true,
+		});
 
 		// Report success
 		backend.analytics.trackProviderEvent(providerLabel, "success");
