@@ -36,10 +36,7 @@ export class WebUIServer {
 	private skillManager: SkillManager;
 	private server: ReturnType<typeof createServer> | null = null;
 
-	constructor(
-		config: WebUIConfig,
-		workspaceDirOverride?: string,
-	) {
+	constructor(config: WebUIConfig, workspaceDirOverride?: string) {
 		this.config = config;
 		const workspaceDir =
 			workspaceDirOverride !== undefined

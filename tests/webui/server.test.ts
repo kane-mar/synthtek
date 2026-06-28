@@ -17,19 +17,19 @@ describe("WebUIServer", () => {
 		rmSync(workspace, { recursive: true, force: true });
 	});
 
-function freshConfig() {
-	return {
-		host: "127.0.0.1",
-		port: port++,
-		apiKey: "",
-		maxSessions: 10,
-		sessionTimeout: 3600,
-	};
-}
+	function freshConfig() {
+		return {
+			host: "127.0.0.1",
+			port: port++,
+			apiKey: "",
+			maxSessions: 10,
+			sessionTimeout: 3600,
+		};
+	}
 
-function createServer(cfg?: ReturnType<typeof freshConfig>) {
-	return new WebUIServer(cfg ?? freshConfig(), workspace);
-}
+	function createServer(cfg?: ReturnType<typeof freshConfig>) {
+		return new WebUIServer(cfg ?? freshConfig(), workspace);
+	}
 
 	it("creates a server instance", () => {
 		const server = createServer(freshConfig());
