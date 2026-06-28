@@ -23,11 +23,23 @@ export interface ToolCall {
 	arguments: Record<string, unknown>;
 }
 
+export interface ToolError {
+	/** Machine-readable error code (e.g. "timeout", "rate_limit", "unknown_tool") */
+	code: string;
+	/** Human-readable error description */
+	message: string;
+	/** Whether the operation can be retried */
+	retryable: boolean;
+}
+
 export interface ToolResult {
 	callId: string;
 	name: string;
 	content: string;
+	/** Backward-compatible error string (derived from ToolError) */
 	error?: string;
+	/** Structured error details */
+	errorDetails?: ToolError;
 }
 
 // ─── Context Window ─────────────────────────────────────────────────────────

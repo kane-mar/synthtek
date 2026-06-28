@@ -27,5 +27,6 @@ export type {
 	SubagentConfig,
 	SubagentResult,
 	ToolCall,
+	ToolError,
 	ToolResult,
 } from "./types.js";

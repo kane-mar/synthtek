@@ -549,15 +549,24 @@ export class AgentLoop {
 		toolCallsMadeRef.value += toolCalls.length;
 		this.context.addMessage({ role: "assistant", content: llmResponse });
 
+		// Execute all tools in parallel
+		this.stats.toolCallsMade += toolCalls.length;
+		this.state = "waiting_for_tool";
+
+		// Call before-hooks sequentially (side effects may depend on order)
 		for (const call of toolCalls) {
 			if (this.hooks.onBeforeToolCall) {
 				await this.hooks.onBeforeToolCall(call);
 			}
+		}
 
-			this.stats.toolCallsMade++;
-			this.state = "waiting_for_tool";
+		// Run all tools in parallel via executeAll
+		const results = await this.tools.executeAll(toolCalls);
 
-			const result = await this.tools.execute(call);
+		// Process results — call after-hooks and add to context
+		for (let i = 0; i < toolCalls.length; i++) {
+			const call = toolCalls[i];
+			const result = results[i];
 
 			if (this.hooks.onAfterToolCall) {
 				await this.hooks.onAfterToolCall(result);
