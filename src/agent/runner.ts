@@ -23,6 +23,7 @@ export interface ChannelMessage {
 }
 
 import { getSystemPrompt } from "../config/agent-config.js";
+import { registerBuiltinTools } from "./builtin-tools.js";
 import { SimpleLogger } from "../core/logger.js";
 import type { ChannelConfigs } from "../messaging/channel-configs.js";
 import { ChatService } from "../messaging/chat-service.js";
@@ -152,6 +153,9 @@ export class AgentRunner {
 		};
 
 		this.loop = new AgentLoop(loopConfig, hooks);
+
+		// Register built-in tools so channels get read_file, exec, glob, etc.
+		registerBuiltinTools(this.loop);
 
 		// Build providers
 		this.providers = [];

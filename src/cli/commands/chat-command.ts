@@ -846,6 +846,7 @@ export function registerChatCommand(program: Command): void {
 						{
 							completionHandler: async (_, messages) => {
 								const { AgentLoop } = await import("../../agent/index.js");
+								const { registerBuiltinTools } = await import("../../agent/builtin-tools.js");
 								const { getRegistry, registerDefaultProviders } = await import(
 									"../../providers/index.js"
 								);
@@ -870,6 +871,14 @@ export function registerChatCommand(program: Command): void {
 									maxToolCalls: 20,
 									model: activeProvider.defaultModel || opts.model,
 								});
+								registerBuiltinTools(agent);
+
+								// Pre-load history for context
+								const historyMessages = messages.slice(0, -1) as Array<{ role: string; content: string }>;
+								agent.loadHistory(
+									historyMessages.map((m) => ({ role: m.role as "user" | "assistant" | "system", content: m.content || "" })),
+								);
+
 								await agent.start();
 								try {
 									const result = await agent.processMessage(
