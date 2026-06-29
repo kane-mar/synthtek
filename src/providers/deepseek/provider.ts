@@ -26,12 +26,29 @@ function toDeepSeekMessages(messages: ProviderMessage[]): Array<{
 	content: string;
 	tool_call_id?: string;
 	name?: string;
+	tool_calls?: Array<{
+		id: string;
+		type: string;
+		function: { name: string; arguments: string };
+	}>;
 }> {
 	return messages.map((m) => ({
 		role: m.role,
 		content: m.content,
 		tool_call_id: m.toolCallId,
 		name: m.metadata?.name as string | undefined,
+		...(m.toolCalls && m.toolCalls.length > 0
+			? {
+					tool_calls: m.toolCalls.map((tc) => ({
+						id: tc.id,
+						type: "function" as const,
+						function: {
+							name: tc.name,
+							arguments: JSON.stringify(tc.arguments),
+						},
+					})),
+				}
+			: {}),
 	}));
 }
 

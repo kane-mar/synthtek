@@ -199,10 +199,21 @@ export class ContextWindowManager {
 	/**
 	 * Get messages formatted for LLM API (role/content pairs).
 	 */
-	getFormattedMessages(): Array<{ role: string; content: string }> {
+	getFormattedMessages(): Array<{
+		role: string;
+		content: string;
+		toolCallId?: string;
+		toolCalls?: Array<{
+			id: string;
+			name: string;
+			arguments: Record<string, unknown>;
+		}>;
+	}> {
 		return this.messages.map((m) => ({
 			role: m.role,
 			content: m.content,
+			...(m.toolCallId ? { toolCallId: m.toolCallId } : {}),
+			...(m.toolCalls && m.toolCalls.length > 0 ? { toolCalls: m.toolCalls } : {}),
 		}));
 	}
 

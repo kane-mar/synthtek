@@ -27,6 +27,12 @@ export interface ProviderMessage {
 	metadata?: Record<string, unknown>;
 	/** For tool messages: the tool call ID this result belongs to */
 	toolCallId?: string;
+	/** For assistant messages: tool calls made by the LLM */
+	toolCalls?: Array<{
+		id: string;
+		name: string;
+		arguments: Record<string, unknown>;
+	}>;
 }
 
 // ─── Chat Completion ────────────────────────────────────────────────────────

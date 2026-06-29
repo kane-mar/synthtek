@@ -547,7 +547,13 @@ export class AgentLoop {
 		}
 
 		toolCallsMadeRef.value += toolCalls.length;
-		this.context.addMessage({ role: "assistant", content: llmResponse });
+		this.context.addMessage({
+			role: "assistant",
+			content: llmResponse,
+			...(nativeToolCalls && nativeToolCalls.length > 0
+				? { toolCalls: nativeToolCalls }
+				: {}),
+		});
 
 		// Execute all tools in parallel
 		this.stats.toolCallsMade += toolCalls.length;
@@ -871,6 +877,7 @@ export class AgentLoop {
 		return this.tools;
 	}
 
+	/** Register a tool: adds handler + sends definition to the LLM. */
 	registerTool(
 		tool: {
 			name: string;
@@ -890,6 +897,24 @@ export class AgentLoop {
 				error: result.error,
 			};
 		});
+		// Also add to config.tools so the LLM receives the tool definitions
+		const toolDefs = this.config.tools || [];
+		toolDefs.push({
+			name: tool.name,
+			description: tool.description,
+			parameters: tool.parameters,
+		});
+		this.config.tools = toolDefs;
+	}
+
+	/**
+	 * Pre-load conversation history into the context window.
+	 * Call before processMessage() to maintain continuity across turns.
+	 */
+	loadHistory(messages: AgentMessage[]): void {
+		for (const msg of messages) {
+			this.context.addMessage(msg);
+		}
 	}
 
 	// ── State & Stats ────────────────────────────────────────────────────────
