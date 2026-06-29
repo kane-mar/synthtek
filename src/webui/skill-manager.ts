@@ -12,6 +12,7 @@ import {
 	readdirSync,
 	readFileSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -136,7 +137,9 @@ export class SkillManager {
 		const entries = readdirSync(this.skillsDir, { withFileTypes: true });
 
 		for (const entry of entries) {
-			if (!entry.isDirectory()) continue;
+			// Accept real directories OR symlinks to directories
+			const isDir = entry.isDirectory() || (entry.isSymbolicLink() && statSync(join(this.skillsDir, entry.name)).isDirectory());
+			if (!isDir) continue;
 			const skillPath = join(this.skillsDir, entry.name, "SKILL.md");
 
 			if (!existsSync(skillPath)) continue;
@@ -214,10 +217,18 @@ export class SkillManager {
 			// Try to get stderr/stdout for diagnostics
 			const stderr = ((err as { stderr?: string })?.stderr || "");
 			const stdout = ((err as { stdout?: string })?.stdout || "");
-			const raw = (stderr || stdout || "").replace(/\x1B\[[0-9;?]*[a-zA-Z]/g, "").replace(/\x1B\][0-9;]*[a-zA-Z]?/g, "").trim();
-			// Extract meaningful lines (skip blank/escape artifacts)
-			const lines = raw.split("\n").filter((l: string) => l.trim() && !l.includes("?25"));
-			const summary = lines.slice(-3).join(" • ");
+			const raw = (stderr || stdout || "")
+				.replace(/\x1B\[[0-9;?]*[a-zA-Z]/g, "")
+				.replace(/\x1B\][0-9;]*[a-zA-Z]?/g, "")
+				.replace(/[■◒◓◑◐◌]/g, "")   // spinner chars
+				.trim();
+			// Extract meaningful lines (skip blank/escape artifacts, spinner, borders)
+			const lines = raw.split("\n").filter((l: string) =>
+				l.trim() && !l.includes("?25") && !l.match(/^[│└┌├─━┃┏┗┓┛]*$/)
+			);
+			// Look for fatal/error lines first, fall back to last 3 lines
+			const fatal = lines.find((l: string) => /fatal|error|✗/i.test(l));
+			const summary = fatal || lines.slice(-3).join(" • ");
 			const display = message + (summary ? " — " + summary : "");
 			return { success: false, error: display.slice(0, 500) };
 		}
@@ -274,7 +285,8 @@ export class SkillManager {
 	delete(name: string): { success: boolean; error?: string } {
 		const entries = readdirSync(this.skillsDir, { withFileTypes: true });
 		for (const entry of entries) {
-			if (!entry.isDirectory()) continue;
+			const isDir = entry.isDirectory() || (entry.isSymbolicLink() && statSync(join(this.skillsDir, entry.name)).isDirectory());
+			if (!isDir) continue;
 
 			const skillPath = join(this.skillsDir, entry.name, "SKILL.md");
 			if (!existsSync(skillPath)) continue;

@@ -27,7 +27,7 @@ WORKDIR /app
 # Install system dependencies required for running packages (like Puppeteer)
 # and for skill installation via npx (git for cloning skills repos)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    unzip build-essential git \
+    unzip build-essential git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Install production dependencies only
