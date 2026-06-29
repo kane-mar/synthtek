@@ -190,10 +190,15 @@ export class SkillManager {
 			// Parse full URLs into owner/repo format
 			const parsed = this.parseSourceUrl(source);
 
-			// Install skill via skills.sh CLI (skip prompts with -y --all)
-			execSync(`npx --yes skills@latest add "${parsed}" -y --all 2>&1`, {
+			// Use the globally installed `skills` CLI if available, fall back to npx
+			// Pre-installed in the Docker image for fast first-use
+			const cmd = existsSync("/usr/local/bin/skills")
+				? `skills add "${parsed}" -y --all 2>&1`
+				: `npx --yes skills@latest add "${parsed}" -y --all 2>&1`;
+
+			execSync(cmd, {
 				encoding: "utf-8",
-				timeout: 120_000,
+				timeout: 600_000,
 			});
 
 			// After installation, mark as enabled
@@ -206,14 +211,15 @@ export class SkillManager {
 			return { success: true };
 		} catch (err: unknown) {
 			const message = err instanceof Error ? err.message : "Unknown installation error";
-			// Try to get the stderr/stdout for better diagnostics
-			const stderr = (err as { stderr?: string })?.stderr || "";
-			const stdout = (err as { stdout?: string })?.stdout || "";
-			const detail = stderr || stdout || "";
-			const cleaned = detail
-				? message.replace(detail, "").trim() + " — " + detail.split("\n").slice(-3).join("; ").trim()
-				: message;
-			return { success: false, error: cleaned.slice(0, 500) };
+			// Try to get stderr/stdout for diagnostics
+			const stderr = ((err as { stderr?: string })?.stderr || "");
+			const stdout = ((err as { stdout?: string })?.stdout || "");
+			const raw = (stderr || stdout || "").replace(/\x1B\[[0-9;?]*[a-zA-Z]/g, "").replace(/\x1B\][0-9;]*[a-zA-Z]?/g, "").trim();
+			// Extract meaningful lines (skip blank/escape artifacts)
+			const lines = raw.split("\n").filter((l: string) => l.trim() && !l.includes("?25"));
+			const summary = lines.slice(-3).join(" • ");
+			const display = message + (summary ? " — " + summary : "");
+			return { success: false, error: display.slice(0, 500) };
 		}
 	}
 

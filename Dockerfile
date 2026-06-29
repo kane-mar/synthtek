@@ -34,6 +34,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
+# Pre-install skills.sh CLI globally so `npx skills` doesn't need to download it
+# on the first skill install (which can timeout on slow connections)
+RUN npm install -g skills && npm cache clean --force
+
 # Copy compiled source (not tests) from builder
 COPY --from=builder /app/dist/src/ ./dist/src/
 
