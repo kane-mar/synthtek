@@ -133,7 +133,7 @@ function formatMessage(msg: ChatMessage): string {
 		})
 		.join("\n");
 
-	return `\n${roleLabel}\n${formatted}`;
+	return `${roleLabel}\n${formatted}`;
 }
 
 // ── Chat TUI ──────────────────────────────────────────────────────────────────
@@ -218,7 +218,6 @@ class ChatTUI {
 			for (const msg of this.history) {
 				this.writeRaw(formatMessage(msg));
 			}
-			this.writeRaw("");
 		}
 
 		// Welcome message
@@ -232,7 +231,6 @@ class ChatTUI {
 					C.dim,
 				),
 			);
-			this.writeRaw("");
 		}
 
 		this.drawBottomBar();
