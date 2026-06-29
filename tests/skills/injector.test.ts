@@ -1,10 +1,11 @@
 /**
  * Skill Injector Tests
  */
-import { describe, it } from "node:test";
+
 import { strict as assert } from "node:assert";
-import { SkillInjector } from "../../src/skills/injector.js";
+import { describe, it } from "node:test";
 import { ToolRegistry } from "../../src/agent/tools.js";
+import { SkillInjector } from "../../src/skills/injector.js";
 
 function makeRegistry(): ToolRegistry {
 	return new ToolRegistry();
@@ -30,7 +31,11 @@ describe("SkillInjector", () => {
 			assert.equal(tools.length, 1);
 			assert.equal(tools[0].name, "weather");
 
-			const result = await r.execute({ id: "1", name: "weather", arguments: { city: "London" } });
+			const result = await r.execute({
+				id: "1",
+				name: "weather",
+				arguments: { city: "London" },
+			});
 			assert.equal(result.error, undefined);
 			assert.match(result.content, /London/);
 		});
@@ -43,10 +48,16 @@ describe("SkillInjector", () => {
 				name: "failing",
 				description: "Always fails",
 				schema: { type: "object", properties: {} },
-				handler: async () => { throw new Error("boom"); },
+				handler: async () => {
+					throw new Error("boom");
+				},
 			});
 
-			const result = await r.execute({ id: "1", name: "failing", arguments: {} });
+			const result = await r.execute({
+				id: "1",
+				name: "failing",
+				arguments: {},
+			});
 			assert.match(result.error || "", /boom/);
 		});
 
@@ -54,8 +65,18 @@ describe("SkillInjector", () => {
 			const r = makeRegistry();
 			const inj = new SkillInjector(r);
 
-			inj.injectLangChain({ name: "a", description: "A", schema: {}, handler: async () => "ok" });
-			inj.injectLangChain({ name: "b", description: "B", schema: {}, handler: async () => "ok" });
+			inj.injectLangChain({
+				name: "a",
+				description: "A",
+				schema: {},
+				handler: async () => "ok",
+			});
+			inj.injectLangChain({
+				name: "b",
+				description: "B",
+				schema: {},
+				handler: async () => "ok",
+			});
 
 			assert.equal(r.getToolCount(), 2);
 		});
@@ -86,11 +107,18 @@ describe("SkillInjector", () => {
 
 			inj.injectExecutor("env-test", {
 				command: "node -e 'console.log(process.env.TEST_VAR)'",
-				inputSchema: { type: "object", properties: { TEST_VAR: { type: "string" } } },
+				inputSchema: {
+					type: "object",
+					properties: { TEST_VAR: { type: "string" } },
+				},
 				inputMode: "env",
 			});
 
-			const result = await r.execute({ id: "1", name: "env-test", arguments: { TEST_VAR: "HelloWorld" } });
+			const result = await r.execute({
+				id: "1",
+				name: "env-test",
+				arguments: { TEST_VAR: "HelloWorld" },
+			});
 			assert.equal(result.error, undefined);
 			assert.match(result.content, /HelloWorld/);
 		});
@@ -131,12 +159,23 @@ describe("SkillInjector", () => {
 			const r = makeRegistry();
 			const inj = new SkillInjector(r);
 
-			inj.injectLangChain({ name: "lc", description: "LC", schema: {}, handler: async () => "ok" });
+			inj.injectLangChain({
+				name: "lc",
+				description: "LC",
+				schema: {},
+				handler: async () => "ok",
+			});
 			inj.injectExecutor("exec", { command: "true", inputSchema: {} });
 			inj.injectHttp("http", { url: "https://example.com", inputSchema: {} });
 
 			assert.equal(r.getToolCount(), 3);
-			assert.deepEqual(r.getTools().map((t) => t.name).sort(), ["exec", "http", "lc"]);
+			assert.deepEqual(
+				r
+					.getTools()
+					.map((t) => t.name)
+					.sort(),
+				["exec", "http", "lc"],
+			);
 		});
 	});
 });

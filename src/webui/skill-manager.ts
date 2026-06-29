@@ -16,8 +16,8 @@ import {
 	symlinkSync,
 	writeFileSync,
 } from "node:fs";
-import { join, relative } from "node:path";
 import * as os from "node:os";
+import { join, relative } from "node:path";
 import type { SkillInfo } from "./types.js";
 
 /** Name of the state file that tracks enabled/disabled status */
@@ -140,7 +140,10 @@ export class SkillManager {
 
 		for (const entry of entries) {
 			// Accept real directories OR symlinks to directories
-			const isDir = entry.isDirectory() || (entry.isSymbolicLink() && statSync(join(this.skillsDir, entry.name)).isDirectory());
+			const isDir =
+				entry.isDirectory() ||
+				(entry.isSymbolicLink() &&
+					statSync(join(this.skillsDir, entry.name)).isDirectory());
 			if (!isDir) continue;
 			const skillPath = join(this.skillsDir, entry.name, "SKILL.md");
 
@@ -202,19 +205,28 @@ export class SkillManager {
 			// Also handle owner/repo/skill-name format (3+ segments without @)
 			const segments = repoPath.split("/");
 			const hasDirectSkillPath = segments.length >= 3;
-			const finalSkillPath = skillPath || (hasDirectSkillPath ? segments.slice(2).join("/") : "");
-			const finalRepoPath = hasDirectSkillPath && !skillPath ? segments.slice(0, 2).join("/") : repoPath;
+			const finalSkillPath =
+				skillPath || (hasDirectSkillPath ? segments.slice(2).join("/") : "");
+			const finalRepoPath =
+				hasDirectSkillPath && !skillPath
+					? segments.slice(0, 2).join("/")
+					: repoPath;
 			const finalSegments = finalRepoPath.split("/");
 
 			if (finalSegments.length >= 2 && finalSkillPath) {
 				// Specific skill → direct install (avoids buggy skills CLI @filter)
-				return this.installDirect(finalSegments[0], finalSegments[1], finalSkillPath);
+				return this.installDirect(
+					finalSegments[0],
+					finalSegments[1],
+					finalSkillPath,
+				);
 			}
 
 			// For bare owner/repo, use the skills CLI (it works for bulk installs)
 			return this.installViaCli(parsed);
 		} catch (err: unknown) {
-			const message = err instanceof Error ? err.message : "Unknown installation error";
+			const message =
+				err instanceof Error ? err.message : "Unknown installation error";
 			return { success: false, error: message };
 		}
 	}
@@ -223,7 +235,11 @@ export class SkillManager {
 	 * Install a specific skill directly by cloning the repo and copying the
 	 * SKILL.md directory — avoids the buggy @filter in skills CLI v1.5.x.
 	 */
-	private installDirect(owner: string, repo: string, skillPath: string): { success: boolean; error?: string } {
+	private installDirect(
+		owner: string,
+		repo: string,
+		skillPath: string,
+	): { success: boolean; error?: string } {
 		const tmpDir = join(os.tmpdir(), `synthtek-skill-${Date.now()}`);
 		try {
 			const cloneUrl = `https://github.com/${owner}/${repo}.git`;
@@ -241,7 +257,10 @@ export class SkillManager {
 				const nested = this.findSkillDir(join(tmpDir, "skills"), skillPath);
 				if (!nested.length) {
 					rmSync(tmpDir, { recursive: true, force: true });
-					return { success: false, error: `Skill "${skillPath}" not found in ${owner}/${repo}. Check the skill name and path.` };
+					return {
+						success: false,
+						error: `Skill "${skillPath}" not found in ${owner}/${repo}. Check the skill name and path.`,
+					};
 				}
 				return this.copySkill(nested[0], skillPath);
 			}
@@ -251,7 +270,9 @@ export class SkillManager {
 			const message = err instanceof Error ? err.message : "Unknown error";
 			return { success: false, error: message };
 		} finally {
-			try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+			try {
+				rmSync(tmpDir, { recursive: true, force: true });
+			} catch {}
 		}
 	}
 
@@ -279,7 +300,11 @@ export class SkillManager {
 
 		const scan = (dir: string) => {
 			let entries: string[];
-			try { entries = readdirSync(dir); } catch { return; }
+			try {
+				entries = readdirSync(dir);
+			} catch {
+				return;
+			}
 			for (const entry of entries) {
 				const full = join(dir, entry);
 				try {
@@ -291,7 +316,9 @@ export class SkillManager {
 							scan(full);
 						}
 					}
-				} catch { /* skip unreadable */ }
+				} catch {
+					/* skip unreadable */
+				}
 			}
 		};
 		scan(root);
@@ -301,8 +328,17 @@ export class SkillManager {
 	/**
 	 * Copy a skill directory into the agents skills directory and create a symlink.
 	 */
-	private copySkill(skillDir: string, skillName: string): { success: boolean; error?: string } {
-		const targetDir = join(this.skillsDir, "..", ".agents", "skills", skillName);
+	private copySkill(
+		skillDir: string,
+		skillName: string,
+	): { success: boolean; error?: string } {
+		const targetDir = join(
+			this.skillsDir,
+			"..",
+			".agents",
+			"skills",
+			skillName,
+		);
 		mkdirSync(targetDir, { recursive: true });
 
 		// Copy all files from the skill directory
@@ -324,12 +360,15 @@ export class SkillManager {
 		// Create symlink in skills/ dir
 		const agentsSkillsDir = join(this.skillsDir, "..", ".agents", "skills");
 		const linkPath = join(this.skillsDir, skillName);
-		const relativeTarget = relative(this.skillsDir, join(agentsSkillsDir, skillName));
+		const relativeTarget = relative(
+			this.skillsDir,
+			join(agentsSkillsDir, skillName),
+		);
 		if (!existsSync(linkPath)) {
 			try {
 				mkdirSync(this.skillsDir, { recursive: true });
 				symlinkSync(relativeTarget, linkPath);
-			} catch (e) {
+			} catch (_e) {
 				// If symlink fails, that's OK — the install still works
 			}
 		}
@@ -364,20 +403,25 @@ export class SkillManager {
 
 			return { success: true };
 		} catch (err: unknown) {
-			const message = err instanceof Error ? err.message : "Unknown installation error";
-			const stderr = ((err as { stderr?: string })?.stderr || "");
-			const stdout = ((err as { stdout?: string })?.stdout || "");
+			const message =
+				err instanceof Error ? err.message : "Unknown installation error";
+			const stderr = (err as { stderr?: string })?.stderr || "";
+			const stdout = (err as { stdout?: string })?.stdout || "";
+			const ansiEscape = String.fromCharCode(27);
 			const raw = (stderr || stdout || "")
-				.replace(/\x1B\[[0-9;?]*[a-zA-Z]/g, "")
-				.replace(/\x1B\][0-9;]*[a-zA-Z]?/g, "")
+				.replace(new RegExp(`${ansiEscape}\\[[0-9;?]*[a-zA-Z]`, "g"), "")
+				.replace(new RegExp(`${ansiEscape}\\][0-9;]*[a-zA-Z]?`, "g"), "")
 				.replace(/[■◒◓◑◐◌]/g, "")
 				.trim();
-			const lines = raw.split("\n").filter((l: string) =>
-				l.trim() && !l.includes("?25") && !l.match(/^[│└┌├─━┃┏┗┓┛]*$/)
-			);
+			const lines = raw
+				.split("\n")
+				.filter(
+					(l: string) =>
+						l.trim() && !l.includes("?25") && !l.match(/^[│└┌├─━┃┏┗┓┛]*$/),
+				);
 			const fatal = lines.find((l: string) => /fatal|error|✗/i.test(l));
 			const summary = fatal || lines.slice(-3).join(" • ");
-			const display = message + (summary ? " — " + summary : "");
+			const display = message + (summary ? ` — ${summary}` : "");
 			return { success: false, error: display.slice(0, 500) };
 		}
 	}
@@ -398,11 +442,9 @@ export class SkillManager {
 						repo = parts[1];
 					const treeIdx = parts.indexOf("tree");
 					if (treeIdx !== -1 && parts.length > treeIdx + 2) {
-						return (
-							owner + "/" + repo + "@" + parts.slice(treeIdx + 2).join("/")
-						);
+						return `${owner}/${repo}@${parts.slice(treeIdx + 2).join("/")}`;
 					}
-					return owner + "/" + repo;
+					return `${owner}/${repo}`;
 				}
 			}
 			// skills.sh: https://skills.sh/owner/repo or /owner/repo@skill
@@ -433,7 +475,10 @@ export class SkillManager {
 	delete(name: string): { success: boolean; error?: string } {
 		const entries = readdirSync(this.skillsDir, { withFileTypes: true });
 		for (const entry of entries) {
-			const isDir = entry.isDirectory() || (entry.isSymbolicLink() && statSync(join(this.skillsDir, entry.name)).isDirectory());
+			const isDir =
+				entry.isDirectory() ||
+				(entry.isSymbolicLink() &&
+					statSync(join(this.skillsDir, entry.name)).isDirectory());
 			if (!isDir) continue;
 
 			const skillPath = join(this.skillsDir, entry.name, "SKILL.md");

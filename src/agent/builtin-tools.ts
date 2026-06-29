@@ -6,7 +6,13 @@
  */
 
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	readdirSync,
+	readFileSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
 import { join, resolve, sep } from "node:path";
 import type { AgentLoop } from "./loop.js";
 
@@ -77,12 +83,17 @@ export function registerBuiltinTools(agent: AgentLoop): void {
 				}
 				const content = readFileSync(filePath, "utf-8");
 				const lines = content.split("\n");
-				const offset = Number(args.offset) || 1;
-				const limit = Number(args.limit) || lines.length;
+				const offset = args.offset != null ? Number(args.offset) : 1;
+				const limit = args.limit != null ? Number(args.limit) : lines.length;
 				const selected = lines.slice(offset - 1, offset - 1 + limit);
 				return { callId: "", name: "read_file", content: selected.join("\n") };
 			} catch (err) {
-				return { callId: "", name: "read_file", content: "", error: String(err) };
+				return {
+					callId: "",
+					name: "read_file",
+					content: "",
+					error: String(err),
+				};
 			}
 		},
 	);
@@ -99,7 +110,10 @@ export function registerBuiltinTools(agent: AgentLoop): void {
 						type: "string",
 						description: "Path to the file (relative to workspace)",
 					},
-					content: { type: "string", description: "Full file content to write" },
+					content: {
+						type: "string",
+						description: "Full file content to write",
+					},
 				},
 				required: ["path", "content"],
 			},
@@ -114,7 +128,12 @@ export function registerBuiltinTools(agent: AgentLoop): void {
 					content: `Written ${String(args.path).split("/").pop()}`,
 				};
 			} catch (err) {
-				return { callId: "", name: "write_file", content: "", error: String(err) };
+				return {
+					callId: "",
+					name: "write_file",
+					content: "",
+					error: String(err),
+				};
 			}
 		},
 	);
@@ -152,11 +171,20 @@ export function registerBuiltinTools(agent: AgentLoop): void {
 						error: `Text not found in ${args.path}`,
 					};
 				}
-				const updated = content.replace(oldText, newText);
+				const updated = content.replaceAll(oldText, newText);
 				writeFileSync(filePath, updated, "utf-8");
-				return { callId: "", name: "edit_file", content: "File updated successfully" };
+				return {
+					callId: "",
+					name: "edit_file",
+					content: "File updated successfully",
+				};
 			} catch (err) {
-				return { callId: "", name: "edit_file", content: "", error: String(err) };
+				return {
+					callId: "",
+					name: "edit_file",
+					content: "",
+					error: String(err),
+				};
 			}
 		},
 	);
@@ -165,11 +193,15 @@ export function registerBuiltinTools(agent: AgentLoop): void {
 	agent.registerTool(
 		{
 			name: "exec",
-			description: "Execute a shell command and return its output. Use with caution.",
+			description:
+				"Execute a shell command and return its output. Use with caution.",
 			parameters: {
 				type: "object",
 				properties: {
-					command: { type: "string", description: "The shell command to execute" },
+					command: {
+						type: "string",
+						description: "The shell command to execute",
+					},
 					timeout: {
 						type: "number",
 						description: "Timeout in seconds (default 30)",
@@ -221,14 +253,20 @@ export function registerBuiltinTools(agent: AgentLoop): void {
 				const pattern = String(args.pattern);
 				const searchDir = args.path ? safePath(String(args.path)) : WORKSPACE;
 				const { globSync } = await import("glob");
-				const results = globSync(pattern, { cwd: searchDir, nodir: true, dot: true });
+				const results = globSync(pattern, {
+					cwd: searchDir,
+					nodir: true,
+					dot: true,
+				});
 				const truncated = results.slice(0, 200);
 				return {
 					callId: "",
 					name: "glob",
 					content:
 						truncated.join("\n") +
-						(results.length > 200 ? `\n... and ${results.length - 200} more` : ""),
+						(results.length > 200
+							? `\n... and ${results.length - 200} more`
+							: ""),
 				};
 			} catch (err) {
 				return { callId: "", name: "glob", content: "", error: String(err) };
@@ -240,12 +278,19 @@ export function registerBuiltinTools(agent: AgentLoop): void {
 	agent.registerTool(
 		{
 			name: "grep",
-			description: "Search file contents with a pattern. Returns matching file paths.",
+			description:
+				"Search file contents with a pattern. Returns matching file paths.",
 			parameters: {
 				type: "object",
 				properties: {
-					pattern: { type: "string", description: "Regex or text pattern to search for" },
-					path: { type: "string", description: "File or directory to search in" },
+					pattern: {
+						type: "string",
+						description: "Regex or text pattern to search for",
+					},
+					path: {
+						type: "string",
+						description: "File or directory to search in",
+					},
 					case_insensitive: {
 						type: "boolean",
 						description: "Case-insensitive search",
@@ -259,11 +304,59 @@ export function registerBuiltinTools(agent: AgentLoop): void {
 				const pattern = String(args.pattern);
 				const searchPath = args.path ? safePath(String(args.path)) : WORKSPACE;
 				const ignoreCase = args.case_insensitive === true;
-				const flag = ignoreCase ? "i" : "";
-				const cmd = `grep -r${flag}l "${pattern.replace(/"/g, '\\"')}" "${searchPath}" 2>/dev/null | head -100`;
-				const output = execSync(cmd, { encoding: "utf-8", timeout: 15_000 });
-				const files = output.trim();
-				return { callId: "", name: "grep", content: files || "No matches found" };
+
+				// Validate regex pattern first
+				let regex: RegExp;
+				try {
+					regex = new RegExp(pattern, ignoreCase ? "gi" : "g");
+				} catch {
+					return {
+						callId: "",
+						name: "grep",
+						content: "",
+						error: `Invalid regex pattern: ${pattern}`,
+					};
+				}
+
+				// Walk directory recursively and search file contents
+				function walkDir(dir: string, depth = 0): string[] {
+					if (depth > 20) return [];
+					const results: string[] = [];
+					try {
+						const entries = readdirSync(dir, { withFileTypes: true });
+						for (const entry of entries) {
+							const fullPath = join(dir, entry.name);
+							if (entry.isDirectory()) {
+								if (entry.name.startsWith(".") || entry.name === "node_modules")
+									continue;
+								results.push(...walkDir(fullPath, depth + 1));
+							} else if (entry.isFile()) {
+								try {
+									const stat = statSync(fullPath);
+									if (stat.size > 10 * 1024 * 1024) continue; // skip files >10MB
+									const content = readFileSync(fullPath, "utf-8");
+									if (regex.test(content)) {
+										results.push(
+											fullPath.replace(searchPath, "").replace(/^\//, ""),
+										);
+									}
+								} catch {
+									// skip unreadable files
+								}
+							}
+						}
+					} catch {
+						// skip unreadable directories
+					}
+					return results;
+				}
+
+				const matchedFiles = walkDir(searchPath).slice(0, 100);
+				return {
+					callId: "",
+					name: "grep",
+					content: matchedFiles.join("\n") || "No matches found",
+				};
 			} catch (err) {
 				return { callId: "", name: "grep", content: "", error: String(err) };
 			}
@@ -297,13 +390,20 @@ export function registerBuiltinTools(agent: AgentLoop): void {
 						try {
 							const st = statSync(join(dirPath, e.name));
 							info += `\t${st.size} bytes`;
-						} catch { /* stat failed */ }
+						} catch {
+							/* stat failed */
+						}
 					}
 					return info;
 				});
 				return { callId: "", name: "list_dir", content: lines.join("\n") };
 			} catch (err) {
-				return { callId: "", name: "list_dir", content: "", error: String(err) };
+				return {
+					callId: "",
+					name: "list_dir",
+					content: "",
+					error: String(err),
+				};
 			}
 		},
 	);
@@ -324,11 +424,26 @@ export function registerBuiltinTools(agent: AgentLoop): void {
 		async (args) => {
 			try {
 				const url = String(args.url);
-				const response = await fetch(url);
-				const text = await response.text();
-				return { callId: "", name: "web_fetch", content: text.slice(0, 50_000) };
+				const controller = new AbortController();
+				const timeoutId = setTimeout(() => controller.abort(), 30_000);
+				try {
+					const response = await fetch(url, { signal: controller.signal });
+					const text = await response.text();
+					return {
+						callId: "",
+						name: "web_fetch",
+						content: text.slice(0, 50_000),
+					};
+				} finally {
+					clearTimeout(timeoutId);
+				}
 			} catch (err) {
-				return { callId: "", name: "web_fetch", content: "", error: String(err) };
+				return {
+					callId: "",
+					name: "web_fetch",
+					content: "",
+					error: String(err),
+				};
 			}
 		},
 	);

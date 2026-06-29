@@ -11,7 +11,13 @@
  *   4. Built-in defaults        (DEFAULT_SETTINGS below)
  */
 
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	unlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ResponseFormat, ValidationResult } from "./schema.js";
@@ -210,7 +216,8 @@ export function getAgentConfig(): AgentSettings {
 			const parsed = JSON.parse(raw) as Partial<AgentSettings>;
 			// Stale detection: if the system prompt hash doesn't match, use defaults.
 			// Accept both old `defaultPromptHash` and new `_defaultPromptHash` keys.
-			const savedHash = parsed._defaultPromptHash ?? (parsed as any).defaultPromptHash;
+			const savedHash =
+				parsed._defaultPromptHash ?? (parsed as any).defaultPromptHash;
 			if (savedHash !== undefined && savedHash !== DEFAULT_PROMPT_HASH) {
 				cachedConfig = { ...DEFAULT_SETTINGS };
 				return { ...cachedConfig };
@@ -224,9 +231,7 @@ export function getAgentConfig(): AgentSettings {
 	return { ...DEFAULT_SETTINGS };
 }
 
-export function setAgentConfig(
-	update: Partial<AgentSettings>,
-): AgentSettings {
+export function setAgentConfig(update: Partial<AgentSettings>): AgentSettings {
 	const current = getAgentConfig();
 	const merged: AgentSettings = {
 		...current,
@@ -293,10 +298,16 @@ export function validateAgentSettings(
 ): ValidationResult {
 	const errors: string[] = [];
 
-	if (settings.systemPrompt !== undefined && typeof settings.systemPrompt !== "string") {
+	if (
+		settings.systemPrompt !== undefined &&
+		typeof settings.systemPrompt !== "string"
+	) {
 		errors.push("systemPrompt must be a string");
 	}
-	if (settings.language !== undefined && typeof settings.language !== "string") {
+	if (
+		settings.language !== undefined &&
+		typeof settings.language !== "string"
+	) {
 		errors.push("language must be a string");
 	}
 
@@ -305,7 +316,10 @@ export function validateAgentSettings(
 	}
 
 	if (settings.maxToolCalls !== undefined) {
-		if (typeof settings.maxToolCalls !== "number" || !Number.isInteger(settings.maxToolCalls)) {
+		if (
+			typeof settings.maxToolCalls !== "number" ||
+			!Number.isInteger(settings.maxToolCalls)
+		) {
 			errors.push("maxToolCalls must be an integer");
 		} else if (settings.maxToolCalls < 1 || settings.maxToolCalls > 100) {
 			errors.push("maxToolCalls must be between 1 and 100");
@@ -313,7 +327,10 @@ export function validateAgentSettings(
 	}
 
 	if (settings.maxTokens !== undefined) {
-		if (typeof settings.maxTokens !== "number" || !Number.isInteger(settings.maxTokens)) {
+		if (
+			typeof settings.maxTokens !== "number" ||
+			!Number.isInteger(settings.maxTokens)
+		) {
 			errors.push("maxTokens must be an integer");
 		} else if (settings.maxTokens < 64 || settings.maxTokens > 128_000) {
 			errors.push("maxTokens must be between 64 and 128000");
@@ -341,7 +358,10 @@ export function validateAgentSettings(
 	}
 
 	if (settings.maxRetries !== undefined) {
-		if (typeof settings.maxRetries !== "number" || !Number.isInteger(settings.maxRetries)) {
+		if (
+			typeof settings.maxRetries !== "number" ||
+			!Number.isInteger(settings.maxRetries)
+		) {
 			errors.push("maxRetries must be an integer");
 		} else if (settings.maxRetries < 0 || settings.maxRetries > 10) {
 			errors.push("maxRetries must be between 0 and 10");
@@ -349,7 +369,10 @@ export function validateAgentSettings(
 	}
 
 	if (settings.retryDelay !== undefined) {
-		if (typeof settings.retryDelay !== "number" || !Number.isInteger(settings.retryDelay)) {
+		if (
+			typeof settings.retryDelay !== "number" ||
+			!Number.isInteger(settings.retryDelay)
+		) {
 			errors.push("retryDelay must be an integer");
 		} else if (settings.retryDelay < 100) {
 			errors.push("retryDelay must be at least 100");
@@ -357,7 +380,10 @@ export function validateAgentSettings(
 	}
 
 	if (settings.retryMaxDelay !== undefined) {
-		if (typeof settings.retryMaxDelay !== "number" || !Number.isInteger(settings.retryMaxDelay)) {
+		if (
+			typeof settings.retryMaxDelay !== "number" ||
+			!Number.isInteger(settings.retryMaxDelay)
+		) {
 			errors.push("retryMaxDelay must be an integer");
 		} else if (settings.retryMaxDelay < (settings.retryDelay ?? 1000)) {
 			errors.push("retryMaxDelay must be >= retryDelay");
@@ -373,17 +399,28 @@ export function validateAgentSettings(
 	}
 
 	if (settings.responseFormat !== undefined) {
-		const validFormats: ResponseFormat[] = ["markdown", "json", "plain", "structured"];
+		const validFormats: ResponseFormat[] = [
+			"markdown",
+			"json",
+			"plain",
+			"structured",
+		];
 		if (!validFormats.includes(settings.responseFormat as ResponseFormat)) {
 			errors.push(`responseFormat must be one of: ${validFormats.join(", ")}`);
 		}
 	}
 
-	if (settings.workspaceDir !== undefined && typeof settings.workspaceDir !== "string") {
+	if (
+		settings.workspaceDir !== undefined &&
+		typeof settings.workspaceDir !== "string"
+	) {
 		errors.push("workspaceDir must be a string");
 	}
 
-	if (settings.autoPersist !== undefined && typeof settings.autoPersist !== "boolean") {
+	if (
+		settings.autoPersist !== undefined &&
+		typeof settings.autoPersist !== "boolean"
+	) {
 		errors.push("autoPersist must be a boolean");
 	}
 

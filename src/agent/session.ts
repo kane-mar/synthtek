@@ -13,10 +13,10 @@
  */
 
 import { ConversationStore } from "../messaging/conversation-store.js";
+import type { LLMProvider } from "../providers/types.js";
+import { registerBuiltinTools } from "./builtin-tools.js";
 import { AgentLoop } from "./loop.js";
 import type { AgentHooks, AgentLoopConfig, AgentLoopResult } from "./types.js";
-import { registerBuiltinTools } from "./builtin-tools.js";
-import type { LLMProvider } from "../providers/types.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -50,10 +50,7 @@ export class AgentSession {
 	private store: ConversationStore;
 	private sessionCount = 0;
 
-	constructor(
-		provider: LLMProvider,
-		config: AgentSessionConfig = {},
-	) {
+	constructor(provider: LLMProvider, config: AgentSessionConfig = {}) {
 		this.provider = provider;
 		this.config = {
 			systemPrompt: config.systemPrompt || "You are a helpful AI assistant.",
@@ -62,7 +59,8 @@ export class AgentSession {
 			responseFormat: config.responseFormat ?? "markdown",
 			loopConfig: config.loopConfig ?? {},
 			hooks: config.hooks ?? {},
-			workspaceDir: config.workspaceDir ?? process.env.SYNTHTEK_WORKSPACE ?? process.cwd(),
+			workspaceDir:
+				config.workspaceDir ?? process.env.SYNTHTEK_WORKSPACE ?? process.cwd(),
 			autoPersist: config.autoPersist ?? true,
 			onResult: config.onResult ?? (() => {}),
 		};
@@ -117,6 +115,8 @@ export class AgentSession {
 		this.sessionCount++;
 
 		// ── Load conversation history ────────────────────────────
+		// Clear context first to prevent history duplication across turns
+		this.loop.clearContext();
 		let loadedFromStore = false;
 		if (historyMessages && historyMessages.length > 0) {
 			// Use provided history (WebUI pattern: whole conversation in request)
@@ -146,7 +146,9 @@ export class AgentSession {
 				// Ensure conversation exists
 				let conv = this.store.get(conversationId);
 				if (!conv) {
-					conv = this.store.create(`Conversation ${conversationId.slice(0, 8)}`);
+					conv = this.store.create(
+						`Conversation ${conversationId.slice(0, 8)}`,
+					);
 					conv.id = conversationId;
 					this.store.save(conv);
 				}

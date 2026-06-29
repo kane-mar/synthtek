@@ -875,7 +875,10 @@ export function registerChatCommand(program: Command): void {
 								const result = await agent.processMessage(
 									messages[messages.length - 1]?.content ?? "",
 									undefined,
-									messages.slice(0, -1) as Array<{ role: string; content: string }>,
+									messages.slice(0, -1) as Array<{
+										role: string;
+										content: string;
+									}>,
 								);
 								return { content: result.response };
 							},

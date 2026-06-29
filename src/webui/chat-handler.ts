@@ -25,9 +25,21 @@ function classifyProviderError(
 	message: string,
 ): "rate_limit" | "timeout" | "network" | "error" {
 	const lowered = message.toLowerCase();
-	if (/rate.?limit/i.test(lowered) || /too many requests/i.test(lowered) || /429/i.test(lowered)) return "rate_limit";
+	if (
+		/rate.?limit/i.test(lowered) ||
+		/too many requests/i.test(lowered) ||
+		/429/i.test(lowered)
+	)
+		return "rate_limit";
 	if (/timeout/i.test(lowered) || /etimedout/i.test(lowered)) return "timeout";
-	if (/network/i.test(lowered) || /connection refuse/i.test(lowered) || /econnreset/i.test(lowered) || /eai_again/i.test(lowered) || /enotfound/i.test(lowered)) return "network";
+	if (
+		/network/i.test(lowered) ||
+		/connection refuse/i.test(lowered) ||
+		/econnreset/i.test(lowered) ||
+		/eai_again/i.test(lowered) ||
+		/enotfound/i.test(lowered)
+	)
+		return "network";
 	return "error";
 }
 
@@ -55,10 +67,13 @@ export async function handleChatCompletion(
 		}
 
 		const registry = getRegistry();
-		const providerType = provider.type as import("../providers/types.js").ProviderType;
+		const providerType =
+			provider.type as import("../providers/types.js").ProviderType;
 		if (!registry.has(providerType)) {
 			backend.analytics.trackProviderEvent(providerLabel, "error");
-			return sendJson(res, 500, { error: `Provider type "${provider.type}" not supported` });
+			return sendJson(res, 500, {
+				error: `Provider type "${provider.type}" not supported`,
+			});
 		}
 
 		const providerConfig: ProviderConfig = {
@@ -70,24 +85,33 @@ export async function handleChatCompletion(
 			headers: provider.headers,
 		};
 
-		const llmProvider: LLMProvider = registry.create(providerType, providerConfig);
+		const llmProvider: LLMProvider = registry.create(
+			providerType,
+			providerConfig,
+		);
 
 		// ── AgentSession ──────────────────────────────────────────
 		const allMessages = chatReq.messages || [];
-		const lastMessage = allMessages.length > 0 ? allMessages[allMessages.length - 1] : null;
-		if (!lastMessage || lastMessage.role !== "user") {
+		const lastMessage =
+			allMessages.length > 0 ? allMessages[allMessages.length - 1] : null;
+		if (lastMessage?.role !== "user") {
 			return sendJson(res, 422, { error: "Last message must be from user" });
 		}
 
 		const systemContent = chatReq.system || "You are a helpful AI assistant.";
-		const sessionId = (chatReq as Record<string, unknown>).sessionId as string | undefined;
+		const sessionId = (chatReq as Record<string, unknown>).sessionId as
+			| string
+			| undefined;
 
 		// Read agent parameters from shared config
 		const { getAgentConfig } = await import("../config/agent-config.js");
 		const agentCfg = getAgentConfig();
 
 		// Collect tool calls as they happen
-		const madeToolCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+		const madeToolCalls: Array<{
+			name: string;
+			args: Record<string, unknown>;
+		}> = [];
 
 		// Create session — autoPersist off because backend.addMessage handles storage
 		const agent = new AgentSession(llmProvider, {
@@ -114,9 +138,16 @@ export async function handleChatCompletion(
 		});
 
 		// Provide history (all messages except the last) + process the new message
-		const history = allMessages.slice(0, -1) as Array<{ role: string; content: string }>;
+		const history = allMessages.slice(0, -1) as Array<{
+			role: string;
+			content: string;
+		}>;
 		const startTime = Date.now();
-		const result = await agent.processMessage(lastMessage.content || "", undefined, history);
+		const result = await agent.processMessage(
+			lastMessage.content || "",
+			undefined,
+			history,
+		);
 
 		// Track analytics
 		backend.analytics.trackRequest({
@@ -132,7 +163,10 @@ export async function handleChatCompletion(
 
 		// Store assistant response in backend session
 		if (sessionId) {
-			backend.addMessage(sessionId, { role: "assistant", content: result.response });
+			backend.addMessage(sessionId, {
+				role: "assistant",
+				content: result.response,
+			});
 		}
 
 		return sendJson(res, 200, {
@@ -147,8 +181,13 @@ export async function handleChatCompletion(
 		try {
 			const p = providerManager.getActiveProvider((body as any)?.providerId);
 			if (p) providerLabel = p.name || p.type || "unknown";
-		} catch { /* ignore */ }
-		backend.analytics.trackProviderEvent(providerLabel, classifyProviderError(message));
+		} catch {
+			/* ignore */
+		}
+		backend.analytics.trackProviderEvent(
+			providerLabel,
+			classifyProviderError(message),
+		);
 		return sendJson(res, 500, { error: `Chat completion failed: ${message}` });
 	}
 }

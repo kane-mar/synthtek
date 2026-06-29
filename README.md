@@ -2,7 +2,7 @@
 
 A modular, plugin-based AI agent framework built with Node.js and TypeScript.
 
-[![Tests](https://img.shields.io/badge/tests-1312%20passing-brightgreen)](https://github.com/synthtek/synthtek)
+[![Tests](https://img.shields.io/badge/tests-1320%20passing-brightgreen)](https://github.com/synthtek/synthtek)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node](https://img.shields.io/badge/Node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
@@ -78,19 +78,18 @@ npm start
 └─────────────┘          │
                          ▼
                   ┌──────────────┐
-                  │   Plugins    │
-                  │ (tools,      │
-                  │  hooks)      │
-                  └──────────────┘
+                   │   Memory &   │
+                   │   Security   │
+                   └──────────────┘
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture docs.
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed architecture docs.
 
 ## Development
 
 ```bash
 npm run build      # Compile TypeScript
-npm test           # Run all tests (1,312+ passing)
+npm test           # Run all tests (1,320+ passing)
 npm run dev        # Development mode with source maps
 npm run lint       # Lint source code
 npm run clean      # Remove dist/
@@ -98,17 +97,16 @@ npm run clean      # Remove dist/
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md) — System design and data flow
-- [Plugin Development](docs/PLUGIN-DEVELOPMENT.md) — How to write plugins
-- [Configuration](docs/CONFIGURATION.md) — Full config reference
-- [Deployment](docs/DEPLOYMENT.md) — Docker, systemd, CI/CD
+- [Architecture](./ARCHITECTURE.md) — System design and data flow
+- [Docker Guide](./DOCKER.md) — Docker setup and configuration
+- [Backlog](./BACKLOG.md) — Development roadmap and completed items
 
 ## Project Stats
 
-- **~31,000 lines** of source code
-- **~20,200 lines** of tests
-- **174 source files**, **87 test files**
-- **100% tests passing** (all green)
+- **~33,600 lines** of source code
+- **~24,300 lines** of tests
+- **165 source files**, **87 test files**
+- **1,320 tests passing** (100% green)
 
 ## License
 

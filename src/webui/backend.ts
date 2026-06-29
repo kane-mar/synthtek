@@ -688,16 +688,28 @@ export class WebUIBackend {
 		if (update.language !== undefined && typeof update.language !== "string") {
 			return { valid: false, error: "language must be a string" };
 		}
-		if (update.maxToolCalls !== undefined && typeof update.maxToolCalls !== "number") {
+		if (
+			update.maxToolCalls !== undefined &&
+			typeof update.maxToolCalls !== "number"
+		) {
 			return { valid: false, error: "maxToolCalls must be a number" };
 		}
-		if (update.maxRetries !== undefined && typeof update.maxRetries !== "number") {
+		if (
+			update.maxRetries !== undefined &&
+			typeof update.maxRetries !== "number"
+		) {
 			return { valid: false, error: "maxRetries must be a number" };
 		}
-		if (update.temperature !== undefined && typeof update.temperature !== "number") {
+		if (
+			update.temperature !== undefined &&
+			typeof update.temperature !== "number"
+		) {
 			return { valid: false, error: "temperature must be a number" };
 		}
-		if (update.maxTokens !== undefined && typeof update.maxTokens !== "number") {
+		if (
+			update.maxTokens !== undefined &&
+			typeof update.maxTokens !== "number"
+		) {
 			return { valid: false, error: "maxTokens must be a number" };
 		}
 		return { valid: true };

@@ -213,7 +213,9 @@ export class ContextWindowManager {
 			role: m.role,
 			content: m.content,
 			...(m.toolCallId ? { toolCallId: m.toolCallId } : {}),
-			...(m.toolCalls && m.toolCalls.length > 0 ? { toolCalls: m.toolCalls } : {}),
+			...(m.toolCalls && m.toolCalls.length > 0
+				? { toolCalls: m.toolCalls }
+				: {}),
 		}));
 	}
 
