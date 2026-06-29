@@ -122,6 +122,9 @@ select.form-input{appearance:auto;cursor:pointer}
 .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:100}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;width:480px;max-width:90vw;max-height:80vh;overflow-y:auto;overscroll-behavior:contain}
 .modal h3{margin-bottom:16px;font-size:16px;font-weight:600}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.modal-header h3{margin-bottom:0}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 .modal-actions{display:flex;gap:8px;margin-top:20px}
 
 /* Empty state */
@@ -855,6 +858,37 @@ async function renderSkills(el) {
 }
 
 // ── Install Skill Modal ────────────────────────────────────────────────────
+
+/** Parse a skill source string — accepts full URLs or owner/repo format */
+function parseSkillSource(src) {
+  src = src.trim();
+  try {
+    const url = new URL(src);
+    // GitHub URL: https://github.com/owner/repo or https://github.com/owner/repo/tree/main/skill-path
+    if (url.hostname === 'github.com' || url.hostname === 'www.github.com') {
+      const parts = url.pathname.replace(/^\//, '').split('/');
+      if (parts.length >= 2) {
+        const owner = parts[0], repo = parts[1];
+        // Check for skill path after tree/branch
+        const treeIdx = parts.indexOf('tree');
+        if (treeIdx !== -1 && parts.length > treeIdx + 2) {
+          return owner + '/' + repo + '@' + parts.slice(treeIdx + 2).join('/');
+        }
+        return owner + '/' + repo;
+      }
+    }
+    // skills.sh URL: https://skills.sh/owner/repo or /owner/repo@skill
+    if (url.hostname === 'skills.sh' || url.hostname === 'www.skills.sh') {
+      const parts = url.pathname.replace(/^\//, '').split('/');
+      if (parts.length >= 2) {
+        return parts.join('/');
+      }
+    }
+  } catch {}
+  // Already in owner/repo or owner/repo@skill format — pass through
+  return src;
+}
+
 function showInstallModal() {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -862,10 +896,10 @@ function showInstallModal() {
     '<div class="modal">' +
       '<div class="modal-header"><h3>Install Skill</h3><button class="btn btn-icon modal-close" id="modal-close-btn" aria-label="Close">&times;</button></div>' +
       '<div class="modal-body">' +
-        '<p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">Enter a GitHub source or skills.sh URL:</p>' +
+        '<p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">Enter a GitHub repo, skills.sh URL, or source path:</p>' +
         '<label for="skill-source-input" style="font-size:12px;font-weight:600;color:var(--text)">Source</label>' +
-        '<input class="form-input" id="skill-source-input" placeholder="e.g. vercel-labs/agent-skills/web-design-guidelines" style="margin-top:4px;width:100%">' +
-        '<p style="font-size:11px;color:var(--text-dim);margin-top:6px">Examples: <code>owner/repo</code> or <code>owner/repo@skill-name</code></p>' +
+        '<input class="form-input" id="skill-source-input" placeholder="e.g. https://github.com/owner/repo or xsailor511/duckduck-web-search" style="margin-top:4px;width:100%">' +
+        '<p style="font-size:11px;color:var(--text-dim);margin-top:6px">Examples: <code>owner/repo</code> · <code>https://github.com/owner/repo</code> · <code>https://skills.sh/owner/repo</code></p>' +
         '<div id="install-status" style="font-size:13px;margin-top:8px;display:none"></div>' +
       '</div>' +
       '<div class="modal-footer">' +
@@ -890,13 +924,15 @@ function showInstallModal() {
   confirmBtn.onclick = async () => {
     const source = input.value.trim();
     if (!source) { input.focus(); return; }
+    // Parse full URLs into owner/repo format
+    const parsed = parseSkillSource(source);
     confirmBtn.disabled = true;
     confirmBtn.textContent = 'Installing...';
     status.style.display = 'block';
     status.className = '';
     status.textContent = 'Installing...';
     try {
-      const result = await fetchJSONPost(`${API}/skills/install`, { source });
+      const result = await fetchJSONPost(`${API}/skills/install`, { source: parsed });
       if (result.success) {
         status.textContent = '✓ Installed successfully!';
         status.style.color = 'var(--green)';

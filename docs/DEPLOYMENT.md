@@ -41,7 +41,7 @@ docker pull ghcr.io/<owner>/synthtek:latest
 | Runtime user   | `synthtek` (non-root, UID 1000) |
 | Working dir    | `/app`                       |
 | Data dir       | `/data`                      |
-| Default cmd    | `node dist/cli.js status`    |
+| Default cmd    | `docker-entrypoint.sh node dist/src/cli.js webui` |
 | Exposed port   | `8080` (optional, CLI tool)  |
 | Health check   | Every 30s, 3s timeout        |
 

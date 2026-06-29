@@ -187,14 +187,17 @@ export class SkillManager {
 
 	install(source: string): { success: boolean; error?: string } {
 		try {
-			// Install skill via skills.sh CLI
-			execSync(`npx --yes skills@latest add "${source}" 2>&1`, {
+			// Parse full URLs into owner/repo format
+			const parsed = this.parseSourceUrl(source);
+
+			// Install skill via skills.sh CLI (skip prompts with -y --all)
+			execSync(`npx --yes skills@latest add "${parsed}" -y --all 2>&1`, {
 				encoding: "utf-8",
 				timeout: 60_000,
 			});
 
 			// After installation, mark as enabled
-			const name = this.extractSkillName(source);
+			const name = this.extractSkillName(parsed);
 			if (name) {
 				this.state.set(name, true);
 				this.saveState();
@@ -206,6 +209,37 @@ export class SkillManager {
 				err instanceof Error ? err.message : "Unknown installation error";
 			return { success: false, error: message };
 		}
+	}
+
+	/**
+	 * Parse a full GitHub/skills.sh URL into owner/repo format.
+	 * Falls through to the raw source if it's already in the right format.
+	 */
+	private parseSourceUrl(src: string): string {
+		const s = src.trim();
+		try {
+			const url = new URL(s);
+			// GitHub: https://github.com/owner/repo or /owner/repo/tree/branch/path
+			if (/github\.com$/i.test(url.hostname)) {
+				const parts = url.pathname.replace(/^\//, "").split("/");
+				if (parts.length >= 2) {
+					const owner = parts[0], repo = parts[1];
+					const treeIdx = parts.indexOf("tree");
+					if (treeIdx !== -1 && parts.length > treeIdx + 2) {
+						return owner + "/" + repo + "@" + parts.slice(treeIdx + 2).join("/");
+					}
+					return owner + "/" + repo;
+				}
+			}
+			// skills.sh: https://skills.sh/owner/repo or /owner/repo@skill
+			if (/skills\.sh$/i.test(url.hostname)) {
+				const parts = url.pathname.replace(/^\//, "").split("/");
+				if (parts.length >= 2) return parts.join("/");
+			}
+		} catch {
+			// Not a URL — pass through as-is
+		}
+		return s;
 	}
 
 	/**

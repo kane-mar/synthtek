@@ -2,7 +2,7 @@
 
 A modular, plugin-based AI agent framework built with Node.js and TypeScript.
 
-[![Tests](https://img.shields.io/badge/tests-304%20passing-brightgreen)](https://github.com/synthtek/synthtek)
+[![Tests](https://img.shields.io/badge/tests-1312%20passing-brightgreen)](https://github.com/synthtek/synthtek)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node](https://img.shields.io/badge/Node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
@@ -10,7 +10,7 @@ A modular, plugin-based AI agent framework built with Node.js and TypeScript.
 ## Features
 
 - **Plugin System** — Topological dependency resolution, error boundaries, JSON Schema validation
-- **Multi-Provider** — OpenAI, Anthropic, OpenRouter, Ollama, LM Studio, llama.cpp with unified interface
+- **Multi-Provider** — OpenAI, Anthropic, OpenRouter, Azure, Gemini, Mistral, DeepSeek, Qwen, vLLM, Ollama, LM Studio, llama.cpp with unified interface
 - **Channel Integrations** — Telegram, Discord, Slack with full feature parity
 - **Agent Loop** — Streaming responses, tool calls, exponential backoff, circuit breaker, subagent spawning
 - **Configuration** — JSON/YAML files, env var overrides, secret management, hot-reload
@@ -90,7 +90,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture docs.
 
 ```bash
 npm run build      # Compile TypeScript
-npm test           # Run all 304 tests
+npm test           # Run all tests (1,312+ passing)
 npm run dev        # Development mode with source maps
 npm run lint       # Lint source code
 npm run clean      # Remove dist/

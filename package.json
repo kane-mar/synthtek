@@ -8,7 +8,7 @@
     "synthtek": "dist/src/cli.js"
   },
   "scripts": {
-    "build": "find dist -type f -delete 2>/dev/null; tsc && cp src/webui/frontend.html dist/src/webui/frontend.html",
+    "build": "tsc && cp src/webui/frontend.html dist/src/webui/frontend.html",
     "start": "node dist/src/cli.js",
     "dev": "node --enable-source-maps src/cli.ts",
     "test": "npm run build && node --test --test-concurrency=4 --test-skip-pattern='/webui-e2e-playwright/' dist/tests/**/*.test.js",

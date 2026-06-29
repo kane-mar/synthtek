@@ -59,22 +59,19 @@ src/
 │   ├── secrets.ts      # Secret resolution (uppercase-safe)
 │   ├── hot-reload.ts   # File watcher for live config updates
 │   └── multi-instance.ts
-├── core/               # Built-in tools
+├── core/               # Core services + built-in tools
+│   ├── cli-validation.ts  # CLI input validation
+│   ├── config.ts       # Config service implementation
 │   ├── executor.ts     # Shell command execution
 │   ├── filesystem.ts   # File read/write
+│   ├── logger.ts       # Structured logging (JSON, rotation, per-plugin)
 │   ├── search.ts       # Glob + grep file search
-│   ├── spawner.ts      # Sub-process spawning
-│   └── messenger.ts    # Cross-channel messaging
-├── logging/            # Structured logging
-│   ├── logger.ts       # Core logger
-│   ├── rotation.ts     # File rotation (10MB default, gzip)
-│   └── plugins.ts      # Per-plugin log isolation
+│   └── types.ts        # Core type definitions
 ├── plugins/            # Plugin system
-│   ├── manager.ts      # Lifecycle orchestration
+│   ├── manager.ts      # Lifecycle orchestration + topological sort
 │   ├── loader.ts       # Dynamic module loading
 │   ├── discovery.ts    # Directory scanning
-│   ├── resolver.ts     # Topological sort (Kahn's algorithm)
-│   └── validator.ts    # JSON Schema config validation
+│   └── types.ts        # Plugin type definitions
 └── providers/          # AI provider implementations
     ├── openai/         # GPT-4, GPT-3.5
     ├── anthropic/      # Claude
@@ -122,7 +119,7 @@ interface AIProvider {
 }
 ```
 
-Supported: OpenAI, Anthropic, OpenRouter, Ollama, LM Studio, llama.cpp.
+Supported: OpenAI, Anthropic, OpenRouter, Azure, Gemini, Mistral, DeepSeek, Qwen, vLLM, Ollama, LM Studio, llama.cpp.
 
 ### Configuration (`src/config/`)
 
@@ -134,14 +131,14 @@ Flexible multi-source configuration:
 - Hot-reload via file watcher
 - Multi-instance support
 
-### Logging (`src/logging/`)
+### Logging (`src/core/logger.ts`)
 
-Structured logging with isolation:
+Structured logging with isolation — implemented in the core module:
 
-- JSON format output
+- JSON format output via `SimpleLogger`
 - 4 levels: debug, info, warn, error
 - File rotation (10MB max, 5 files, gzip compression)
-- Per-plugin log file isolation
+- Per-plugin log file isolation via `PluginLoggerManager`
 
 ## Extension Points
 

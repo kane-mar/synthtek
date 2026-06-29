@@ -28,6 +28,7 @@ import { getSystemPrompt } from "../../config/agent-config.js";
 import { ChatService } from "../../messaging/chat-service.js";
 import { ConversationStore } from "../../messaging/conversation-store.js";
 import type { ChatMessage, LLMProviderConfig } from "../../messaging/types.js";
+import type { ProviderType } from "../../providers/types.js";
 import { config, logger } from "../cli-context.js";
 
 // ── Provider Loader ──────────────────────────────────────────────────────────
@@ -598,7 +599,7 @@ class ChatTUI {
 						.filter(([k]) => !k.includes(":")) // skip alias keys
 						.map(
 							([k, v]) =>
-								`  ${color(k, C.green)}${v.desc ? " — " + v.desc : ""}`,
+								`  ${color(k, C.green)}${v.desc ? ` — ${v.desc}` : ""}`,
 						);
 					this.writeContent(
 						[
@@ -852,16 +853,18 @@ export function registerChatCommand(program: Command): void {
 
 								registerDefaultProviders();
 								const registry = getRegistry();
-								// eslint-disable-next-line @typescript-eslint/no-explicit-any
-								const provider = registry.create(activeProvider.type as any, {
-									provider: activeProvider.type,
-									apiKey: activeProvider.apiKey,
-									baseUrl: activeProvider.baseUrl,
-									model: activeProvider.defaultModel || opts.model,
-									maxTokens: activeProvider.maxTokens,
-									temperature: activeProvider.temperature,
-									timeout: activeProvider.timeoutMs,
-								});
+								const provider = registry.create(
+									activeProvider.type as ProviderType,
+									{
+										provider: activeProvider.type,
+										apiKey: activeProvider.apiKey,
+										baseUrl: activeProvider.baseUrl,
+										model: activeProvider.defaultModel || opts.model,
+										maxTokens: activeProvider.maxTokens,
+										temperature: activeProvider.temperature,
+										timeout: activeProvider.timeoutMs,
+									},
+								);
 
 								const agent = new AgentLoop({
 									systemPrompt,

@@ -90,7 +90,7 @@ function validateOutput(
 	content: string,
 	schema: Record<string, unknown>,
 ): string | null {
-	if (!schema || !schema.type) return null;
+	if (!schema?.type) return null;
 
 	const expectedType = String(schema.type);
 	let actualType: string;
@@ -216,8 +216,7 @@ export class ToolRegistry {
 
 		// Truncate oversized content
 		if (!result.error && result.content.length > maxLength) {
-			result.content =
-				result.content.slice(0, Math.max(0, maxLength - 1)) + "…";
+			result.content = `${result.content.slice(0, Math.max(0, maxLength - 1))}…`;
 		}
 
 		// Validate output schema

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "duckducksearch": {
+      "source": "xsailor511/duckduck-web-search",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "fd82d7962c2eee16292a772782e3537fd0aeb8ddee7371b419a3e057322508d6"
+    }
+  }
+}
