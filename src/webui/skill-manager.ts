@@ -193,7 +193,7 @@ export class SkillManager {
 			// Install skill via skills.sh CLI (skip prompts with -y --all)
 			execSync(`npx --yes skills@latest add "${parsed}" -y --all 2>&1`, {
 				encoding: "utf-8",
-				timeout: 60_000,
+				timeout: 120_000,
 			});
 
 			// After installation, mark as enabled
@@ -205,9 +205,15 @@ export class SkillManager {
 
 			return { success: true };
 		} catch (err: unknown) {
-			const message =
-				err instanceof Error ? err.message : "Unknown installation error";
-			return { success: false, error: message };
+			const message = err instanceof Error ? err.message : "Unknown installation error";
+			// Try to get the stderr/stdout for better diagnostics
+			const stderr = (err as { stderr?: string })?.stderr || "";
+			const stdout = (err as { stdout?: string })?.stdout || "";
+			const detail = stderr || stdout || "";
+			const cleaned = detail
+				? message.replace(detail, "").trim() + " — " + detail.split("\n").slice(-3).join("; ").trim()
+				: message;
+			return { success: false, error: cleaned.slice(0, 500) };
 		}
 	}
 

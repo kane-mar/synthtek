@@ -12,6 +12,7 @@ if [ -n "$SYNTHTEK_WORKSPACE" ]; then
   HOME="$SYNTHTEK_WORKSPACE"
   export HOME
   mkdir -p "$HOME/.npm" 2>/dev/null || true
+  chown -R synthtek:synthtek "$HOME/.npm" 2>/dev/null || true
 fi
 
 # Bridge skills from skills.sh install path (~/.agents/skills/) to
