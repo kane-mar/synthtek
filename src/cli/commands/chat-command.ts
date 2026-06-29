@@ -389,9 +389,10 @@ class ChatTUI {
 	private writeRaw(text: string): void {
 		const h = tHeight();
 		const scrollBottom = Math.max(1, h - STATUS_ROWS);
-		// Move to the bottom of the scrollable region and write
+		// Write newline first to scroll the region, then the text fills
+		// the new blank line at the bottom — avoids trailing blank lines.
 		cursorMove(scrollBottom, 1);
-		process.stdout.write(`${text}\n`);
+		process.stdout.write(`\n${text}`);
 		// After writing, the scroll region may have scrolled.
 		// Redraw the bottom bar so it's not clobbered.
 		this.drawBottomBar();
