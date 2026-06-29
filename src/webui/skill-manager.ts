@@ -223,10 +223,13 @@ export class SkillManager {
 			if (/github\.com$/i.test(url.hostname)) {
 				const parts = url.pathname.replace(/^\//, "").split("/");
 				if (parts.length >= 2) {
-					const owner = parts[0], repo = parts[1];
+					const owner = parts[0],
+						repo = parts[1];
 					const treeIdx = parts.indexOf("tree");
 					if (treeIdx !== -1 && parts.length > treeIdx + 2) {
-						return owner + "/" + repo + "@" + parts.slice(treeIdx + 2).join("/");
+						return (
+							owner + "/" + repo + "@" + parts.slice(treeIdx + 2).join("/")
+						);
 					}
 					return owner + "/" + repo;
 				}
