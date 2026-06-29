@@ -13,9 +13,11 @@ import {
 	readFileSync,
 	rmSync,
 	statSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
+import * as os from "node:os";
 import type { SkillInfo } from "./types.js";
 
 /** Name of the state file that tracks enabled/disabled status */
@@ -186,15 +188,164 @@ export class SkillManager {
 		return { ...skill, enabled: !skill.enabled };
 	}
 
-	// ── INSTALL FROM SKILLS.SH ──────────────────────────────────────────
+	// ── INSTALL ─────────────────────────────────────────────────────────
 
 	install(source: string): { success: boolean; error?: string } {
 		try {
-			// Parse full URLs into owner/repo format
 			const parsed = this.parseSourceUrl(source);
 
-			// Use the globally installed `skills` CLI if available, fall back to npx
-			// Pre-installed in the Docker image for fast first-use
+			// Split owner/repo from optional @skill-path
+			const atIdx = parsed.indexOf("@");
+			const repoPath = atIdx >= 0 ? parsed.substring(0, atIdx) : parsed;
+			const skillPath = atIdx >= 0 ? parsed.substring(atIdx + 1) : "";
+
+			// Also handle owner/repo/skill-name format (3+ segments without @)
+			const segments = repoPath.split("/");
+			const hasDirectSkillPath = segments.length >= 3;
+			const finalSkillPath = skillPath || (hasDirectSkillPath ? segments.slice(2).join("/") : "");
+			const finalRepoPath = hasDirectSkillPath && !skillPath ? segments.slice(0, 2).join("/") : repoPath;
+			const finalSegments = finalRepoPath.split("/");
+
+			if (finalSegments.length >= 2 && finalSkillPath) {
+				// Specific skill → direct install (avoids buggy skills CLI @filter)
+				return this.installDirect(finalSegments[0], finalSegments[1], finalSkillPath);
+			}
+
+			// For bare owner/repo, use the skills CLI (it works for bulk installs)
+			return this.installViaCli(parsed);
+		} catch (err: unknown) {
+			const message = err instanceof Error ? err.message : "Unknown installation error";
+			return { success: false, error: message };
+		}
+	}
+
+	/**
+	 * Install a specific skill directly by cloning the repo and copying the
+	 * SKILL.md directory — avoids the buggy @filter in skills CLI v1.5.x.
+	 */
+	private installDirect(owner: string, repo: string, skillPath: string): { success: boolean; error?: string } {
+		const tmpDir = join(os.tmpdir(), `synthtek-skill-${Date.now()}`);
+		try {
+			const cloneUrl = `https://github.com/${owner}/${repo}.git`;
+			mkdirSync(tmpDir, { recursive: true });
+
+			execSync(`git clone --depth 1 "${cloneUrl}" "${tmpDir}" 2>&1`, {
+				encoding: "utf-8",
+				timeout: 120_000,
+			});
+
+			// Search for SKILL.md matching the requested skill name
+			const skillDirs = this.findSkillDir(tmpDir, skillPath);
+			if (!skillDirs.length) {
+				// Fall back to searching within a `skills/` subdirectory
+				const nested = this.findSkillDir(join(tmpDir, "skills"), skillPath);
+				if (!nested.length) {
+					rmSync(tmpDir, { recursive: true, force: true });
+					return { success: false, error: `Skill "${skillPath}" not found in ${owner}/${repo}. Check the skill name and path.` };
+				}
+				return this.copySkill(nested[0], skillPath);
+			}
+
+			return this.copySkill(skillDirs[0], skillPath);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : "Unknown error";
+			return { success: false, error: message };
+		} finally {
+			try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+		}
+	}
+
+	/**
+	 * Find a skill directory by name under a root directory.
+	 * Supports nested paths like "skills/debugger" or simple names like "debugger".
+	 */
+	private findSkillDir(root: string, skillName: string): string[] {
+		const results: string[] = [];
+
+		// Handle nested paths like "skills/debugger" — join root with the path
+		const searchRoot = join(root, skillName);
+		if (existsSync(searchRoot) && existsSync(join(searchRoot, "SKILL.md"))) {
+			results.push(searchRoot);
+			return results;
+		}
+
+		// Also try just the last segment of the path (e.g. "debugger" from "skills/debugger")
+		const lastSegment = skillName.split("/").pop() || skillName;
+		if (lastSegment !== skillName) {
+			return this.findSkillDir(root, lastSegment);
+		}
+
+		if (!existsSync(root)) return results;
+
+		const scan = (dir: string) => {
+			let entries: string[];
+			try { entries = readdirSync(dir); } catch { return; }
+			for (const entry of entries) {
+				const full = join(dir, entry);
+				try {
+					const st = statSync(full);
+					if (st.isDirectory()) {
+						if (entry === skillName && existsSync(join(full, "SKILL.md"))) {
+							results.push(full);
+						} else {
+							scan(full);
+						}
+					}
+				} catch { /* skip unreadable */ }
+			}
+		};
+		scan(root);
+		return results;
+	}
+
+	/**
+	 * Copy a skill directory into the agents skills directory and create a symlink.
+	 */
+	private copySkill(skillDir: string, skillName: string): { success: boolean; error?: string } {
+		const targetDir = join(this.skillsDir, "..", ".agents", "skills", skillName);
+		mkdirSync(targetDir, { recursive: true });
+
+		// Copy all files from the skill directory
+		const copyFiles = (src: string, dst: string) => {
+			mkdirSync(dst, { recursive: true });
+			const entries = readdirSync(src, { withFileTypes: true });
+			for (const entry of entries) {
+				const s = join(src, entry.name);
+				const d = join(dst, entry.name);
+				if (entry.isDirectory()) {
+					copyFiles(s, d);
+				} else {
+					writeFileSync(d, readFileSync(s));
+				}
+			}
+		};
+		copyFiles(skillDir, targetDir);
+
+		// Create symlink in skills/ dir
+		const agentsSkillsDir = join(this.skillsDir, "..", ".agents", "skills");
+		const linkPath = join(this.skillsDir, skillName);
+		const relativeTarget = relative(this.skillsDir, join(agentsSkillsDir, skillName));
+		if (!existsSync(linkPath)) {
+			try {
+				mkdirSync(this.skillsDir, { recursive: true });
+				symlinkSync(relativeTarget, linkPath);
+			} catch (e) {
+				// If symlink fails, that's OK — the install still works
+			}
+		}
+
+		// Mark as enabled
+		this.state.set(skillName, true);
+		this.saveState();
+
+		return { success: true };
+	}
+
+	/**
+	 * Install via the skills.sh CLI (for bare owner/repo sources).
+	 */
+	private installViaCli(parsed: string): { success: boolean; error?: string } {
+		try {
 			const cmd = existsSync("/usr/local/bin/skills")
 				? `skills add "${parsed}" -y --all 2>&1`
 				: `npx --yes skills@latest add "${parsed}" -y --all 2>&1`;
@@ -214,19 +365,16 @@ export class SkillManager {
 			return { success: true };
 		} catch (err: unknown) {
 			const message = err instanceof Error ? err.message : "Unknown installation error";
-			// Try to get stderr/stdout for diagnostics
 			const stderr = ((err as { stderr?: string })?.stderr || "");
 			const stdout = ((err as { stdout?: string })?.stdout || "");
 			const raw = (stderr || stdout || "")
 				.replace(/\x1B\[[0-9;?]*[a-zA-Z]/g, "")
 				.replace(/\x1B\][0-9;]*[a-zA-Z]?/g, "")
-				.replace(/[■◒◓◑◐◌]/g, "")   // spinner chars
+				.replace(/[■◒◓◑◐◌]/g, "")
 				.trim();
-			// Extract meaningful lines (skip blank/escape artifacts, spinner, borders)
 			const lines = raw.split("\n").filter((l: string) =>
 				l.trim() && !l.includes("?25") && !l.match(/^[│└┌├─━┃┏┗┓┛]*$/)
 			);
-			// Look for fatal/error lines first, fall back to last 3 lines
 			const fatal = lines.find((l: string) => /fatal|error|✗/i.test(l));
 			const summary = fatal || lines.slice(-3).join(" • ");
 			const display = message + (summary ? " — " + summary : "");
