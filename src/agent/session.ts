@@ -25,6 +25,8 @@ export interface AgentSessionConfig {
 	systemPrompt?: string;
 	/** Maximum tool calls per message */
 	maxToolCalls?: number;
+	/** Maximum tokens in LLM response */
+	maxTokens?: number;
 	/** Response format */
 	responseFormat?: "markdown" | "json" | "plain" | "structured";
 	/** Additional AgentLoop config overrides */
@@ -54,6 +56,7 @@ export class AgentSession {
 		this.config = {
 			systemPrompt: config.systemPrompt || "You are a helpful AI assistant.",
 			maxToolCalls: config.maxToolCalls ?? 15,
+			maxTokens: config.maxTokens ?? 4096,
 			responseFormat: config.responseFormat ?? "markdown",
 			loopConfig: config.loopConfig ?? {},
 			workspaceDir: config.workspaceDir ?? process.env.SYNTHTEK_WORKSPACE ?? process.cwd(),

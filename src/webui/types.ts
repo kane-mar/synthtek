@@ -189,4 +189,8 @@ export interface CronJob {
 export interface AgentConfig {
 	systemPrompt: string;
 	language: string;
+	maxToolCalls: number;
+	maxRetries: number;
+	temperature: number;
+	maxTokens: number;
 }

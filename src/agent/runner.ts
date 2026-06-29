@@ -102,18 +102,31 @@ export class AgentRunner {
 		if (!provider) return null;
 		let session = this.sessions.get(conversationId);
 		if (!session) {
+			// Read agent parameters from shared config
+			const { getAgentConfig } = require("../config/agent-config.js");
+			const agentCfg = getAgentConfig();
 			session = new AgentSession(provider, {
 				systemPrompt: this.systemPrompt,
-				maxToolCalls: 20,
+				maxToolCalls: agentCfg.maxToolCalls,
+				maxTokens: agentCfg.maxTokens,
 				responseFormat: "markdown",
 				autoPersist: true,
+				loopConfig: {
+					retry: {
+						maxRetries: agentCfg.maxRetries,
+						initialDelay: 1000,
+						maxDelay: 10000,
+						multiplier: 2,
+					},
+					temperature: agentCfg.temperature,
+				},
 				workspaceDir:
 					this.config.workspaceDir ??
 					process.env.SYNTHTEK_WORKSPACE ??
 					process.cwd(),
 			});
 			this.sessions.set(conversationId, session);
-			this.logger.debug(`Created session for ${conversationId}`);
+			this.logger.debug(`Created session for ${conversationId} (maxToolCalls=${agentCfg.maxToolCalls}, temp=${agentCfg.temperature})`);
 		}
 		return session;
 	}

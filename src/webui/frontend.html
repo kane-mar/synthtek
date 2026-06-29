@@ -1171,7 +1171,7 @@ async function renderConfigThemes(el) {
 
 // ── Agent Config ──────────────────────────────────────────────────────────
 async function renderConfigAgent(el) {
-  let config = { systemPrompt: '', language: 'English' };
+  let config = { systemPrompt: '', language: 'English', maxToolCalls: 20, maxRetries: 3, temperature: 0.7, maxTokens: 4096 };
   try { config = await fetchJSONGet(`${API}/config/agent`); } catch{}
 
   el.innerHTML = '<div id="config-agent">' +
@@ -1206,6 +1206,36 @@ async function renderConfigAgent(el) {
         '<div class="char-count"><span id="prompt-chars">'+config.systemPrompt.length+'</span> characters</div>' +
       '</div>' +
 
+      '<hr style="border:none;border-top:1px solid var(--border);margin:20px 0">' +
+      '<h4 style="margin-bottom:12px">Agent Parameters</h4>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+
+        '<div class="form-group">' +
+          '<label for="agent-max-tool-calls">Max Tool Calls</label>' +
+          '<input type="number" class="form-input" id="agent-max-tool-calls" min="1" max="100" value="'+config.maxToolCalls+'">' +
+          '<p style="color:var(--text-dim);font-size:11px;margin-top:4px">Maximum tool calls per message before the agent responds.</p>' +
+        '</div>' +
+
+        '<div class="form-group">' +
+          '<label for="agent-max-retries">Max Retries</label>' +
+          '<input type="number" class="form-input" id="agent-max-retries" min="0" max="10" value="'+config.maxRetries+'">' +
+          '<p style="color:var(--text-dim);font-size:11px;margin-top:4px">Retry attempts when an LLM call fails.</p>' +
+        '</div>' +
+
+        '<div class="form-group">' +
+          '<label for="agent-temperature">Temperature</label>' +
+          '<input type="number" class="form-input" id="agent-temperature" min="0" max="2" step="0.1" value="'+config.temperature+'">' +
+          '<p style="color:var(--text-dim);font-size:11px;margin-top:4px">LLM creativity (0.0 = deterministic, 2.0 = very creative).</p>' +
+        '</div>' +
+
+        '<div class="form-group">' +
+          '<label for="agent-max-tokens">Max Tokens</label>' +
+          '<input type="number" class="form-input" id="agent-max-tokens" min="64" max="32000" step="64" value="'+config.maxTokens+'">' +
+          '<p style="color:var(--text-dim);font-size:11px;margin-top:4px">Maximum tokens in the LLM response.</p>' +
+        '</div>' +
+
+      '</div>' +
+
       '<div style="display:flex;align-items:center;margin-top:16px">' +
         '<button class="btn btn-primary" id="save-agent-btn">Save</button>' +
         '<span class="save-status" id="save-status"></span>' +
@@ -1224,11 +1254,15 @@ async function renderConfigAgent(el) {
     const status = el.querySelector('#save-status');
     const lang = el.querySelector('#agent-language').value;
     const prompt = el.querySelector('#agent-prompt').value;
+    const maxToolCalls = parseInt(el.querySelector('#agent-max-tool-calls').value, 10) || 20;
+    const maxRetries = parseInt(el.querySelector('#agent-max-retries').value, 10) || 3;
+    const temperature = parseFloat(el.querySelector('#agent-temperature').value) || 0.7;
+    const maxTokens = parseInt(el.querySelector('#agent-max-tokens').value, 10) || 4096;
     btn.disabled = true;
     status.textContent = 'Saving...';
     status.className = 'save-status show';
     try {
-      await fetchJSONPut(`${API}/config/agent`, { systemPrompt: prompt, language: lang });
+      await fetchJSONPut(`${API}/config/agent`, { systemPrompt: prompt, language: lang, maxToolCalls, maxRetries, temperature, maxTokens });
       status.textContent = '✓ Saved';
       status.style.color = 'var(--green, #22c55e)';
     } catch(e) {

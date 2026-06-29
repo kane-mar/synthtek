@@ -71,6 +71,10 @@ export class WebUIBackend {
 	private agentConfig: import("./types.js").AgentConfig = {
 		systemPrompt: getSharedAgentConfig().systemPrompt,
 		language: getSharedAgentConfig().language,
+		maxToolCalls: getSharedAgentConfig().maxToolCalls,
+		maxRetries: getSharedAgentConfig().maxRetries,
+		temperature: getSharedAgentConfig().temperature,
+		maxTokens: getSharedAgentConfig().maxTokens,
 	};
 	private startedAt: number | null = null;
 
@@ -665,6 +669,10 @@ export class WebUIBackend {
 		const shared = getSharedAgentConfig();
 		this.agentConfig.systemPrompt = shared.systemPrompt;
 		this.agentConfig.language = shared.language;
+		this.agentConfig.maxToolCalls = shared.maxToolCalls;
+		this.agentConfig.maxRetries = shared.maxRetries;
+		this.agentConfig.temperature = shared.temperature;
+		this.agentConfig.maxTokens = shared.maxTokens;
 		return { ...this.agentConfig };
 	}
 
@@ -679,6 +687,18 @@ export class WebUIBackend {
 		}
 		if (update.language !== undefined && typeof update.language !== "string") {
 			return { valid: false, error: "language must be a string" };
+		}
+		if (update.maxToolCalls !== undefined && typeof update.maxToolCalls !== "number") {
+			return { valid: false, error: "maxToolCalls must be a number" };
+		}
+		if (update.maxRetries !== undefined && typeof update.maxRetries !== "number") {
+			return { valid: false, error: "maxRetries must be a number" };
+		}
+		if (update.temperature !== undefined && typeof update.temperature !== "number") {
+			return { valid: false, error: "temperature must be a number" };
+		}
+		if (update.maxTokens !== undefined && typeof update.maxTokens !== "number") {
+			return { valid: false, error: "maxTokens must be a number" };
 		}
 		return { valid: true };
 	}
@@ -699,10 +719,26 @@ export class WebUIBackend {
 		if (update.language !== undefined) {
 			this.agentConfig.language = update.language;
 		}
+		if (update.maxToolCalls !== undefined) {
+			this.agentConfig.maxToolCalls = update.maxToolCalls;
+		}
+		if (update.maxRetries !== undefined) {
+			this.agentConfig.maxRetries = update.maxRetries;
+		}
+		if (update.temperature !== undefined) {
+			this.agentConfig.temperature = update.temperature;
+		}
+		if (update.maxTokens !== undefined) {
+			this.agentConfig.maxTokens = update.maxTokens;
+		}
 		// Persist to shared config (writes to disk, propagates to AgentLoop, CLI, etc.)
 		setSharedAgentConfig({
 			systemPrompt: this.agentConfig.systemPrompt,
 			language: this.agentConfig.language,
+			maxToolCalls: this.agentConfig.maxToolCalls,
+			maxRetries: this.agentConfig.maxRetries,
+			temperature: this.agentConfig.temperature,
+			maxTokens: this.agentConfig.maxTokens,
 		});
 		return this.getAgentConfig();
 	}
@@ -711,6 +747,10 @@ export class WebUIBackend {
 		const defaults = resetSharedAgentConfig();
 		this.agentConfig.systemPrompt = defaults.systemPrompt;
 		this.agentConfig.language = defaults.language;
+		this.agentConfig.maxToolCalls = defaults.maxToolCalls;
+		this.agentConfig.maxRetries = defaults.maxRetries;
+		this.agentConfig.temperature = defaults.temperature;
+		this.agentConfig.maxTokens = defaults.maxTokens;
 		return { ...this.agentConfig };
 	}
 

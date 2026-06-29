@@ -49,6 +49,10 @@ const DEFAULT_PROMPT_HASH = hashString(DEFAULT_SYSTEM_PROMPT);
 const DEFAULT_CONFIG: AgentPersistedConfig = {
 	systemPrompt: DEFAULT_SYSTEM_PROMPT,
 	language: DEFAULT_LANGUAGE,
+	maxToolCalls: 20,
+	maxRetries: 3,
+	temperature: 0.7,
+	maxTokens: 4096,
 };
 
 // ── Persisted shape ─────────────────────────────────────────────────────────
@@ -56,6 +60,14 @@ const DEFAULT_CONFIG: AgentPersistedConfig = {
 export interface AgentPersistedConfig {
 	systemPrompt: string;
 	language: string;
+	/** Maximum tool calls per message before agent responds */
+	maxToolCalls: number;
+	/** Maximum retries on LLM call failure */
+	maxRetries: number;
+	/** LLM temperature (0.0–2.0) */
+	temperature: number;
+	/** Maximum tokens in LLM response */
+	maxTokens: number;
 	/** Hash of DEFAULT_SYSTEM_PROMPT at time of save. Stale when code changes. */
 	defaultPromptHash?: string;
 }
@@ -112,6 +124,10 @@ export function getAgentConfig(): AgentPersistedConfig {
 			cachedConfig = {
 				systemPrompt: parsed.systemPrompt ?? DEFAULT_CONFIG.systemPrompt,
 				language: parsed.language ?? DEFAULT_CONFIG.language,
+				maxToolCalls: parsed.maxToolCalls ?? DEFAULT_CONFIG.maxToolCalls,
+				maxRetries: parsed.maxRetries ?? DEFAULT_CONFIG.maxRetries,
+				temperature: parsed.temperature ?? DEFAULT_CONFIG.temperature,
+				maxTokens: parsed.maxTokens ?? DEFAULT_CONFIG.maxTokens,
 			};
 			return { ...cachedConfig };
 		}
@@ -128,6 +144,10 @@ export function setAgentConfig(
 	const merged: AgentPersistedConfig = {
 		systemPrompt: update.systemPrompt ?? current.systemPrompt,
 		language: update.language ?? current.language,
+		maxToolCalls: update.maxToolCalls ?? current.maxToolCalls,
+		maxRetries: update.maxRetries ?? current.maxRetries,
+		temperature: update.temperature ?? current.temperature,
+		maxTokens: update.maxTokens ?? current.maxTokens,
 		defaultPromptHash: DEFAULT_PROMPT_HASH,
 	};
 

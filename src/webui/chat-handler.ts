@@ -82,12 +82,26 @@ export async function handleChatCompletion(
 		const systemContent = chatReq.system || "You are a helpful AI assistant.";
 		const sessionId = (chatReq as Record<string, unknown>).sessionId as string | undefined;
 
+		// Read agent parameters from shared config
+		const { getAgentConfig } = await import("../config/agent-config.js");
+		const agentCfg = getAgentConfig();
+
 		// Create session — autoPersist off because backend.addMessage handles storage
 		const agent = new AgentSession(llmProvider, {
 			systemPrompt: systemContent,
-			maxToolCalls: 15,
+			maxToolCalls: agentCfg.maxToolCalls,
+			maxTokens: agentCfg.maxTokens,
 			responseFormat: "markdown",
 			autoPersist: false,
+			loopConfig: {
+				retry: {
+					maxRetries: agentCfg.maxRetries,
+					initialDelay: 1000,
+					maxDelay: 10000,
+					multiplier: 2,
+				},
+				temperature: agentCfg.temperature,
+			},
 			onResult: () => {},
 		});
 
