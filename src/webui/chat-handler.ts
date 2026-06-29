@@ -86,6 +86,9 @@ export async function handleChatCompletion(
 		const { getAgentConfig } = await import("../config/agent-config.js");
 		const agentCfg = getAgentConfig();
 
+		// Collect tool calls as they happen
+		const madeToolCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+
 		// Create session — autoPersist off because backend.addMessage handles storage
 		const agent = new AgentSession(llmProvider, {
 			systemPrompt: systemContent,
@@ -101,6 +104,11 @@ export async function handleChatCompletion(
 					multiplier: 2,
 				},
 				temperature: agentCfg.temperature,
+			},
+			hooks: {
+				onBeforeToolCall: (toolCall) => {
+					madeToolCalls.push({ name: toolCall.name, args: toolCall.arguments });
+				},
 			},
 			onResult: () => {},
 		});
@@ -131,6 +139,7 @@ export async function handleChatCompletion(
 			content: result.response,
 			model: providerConfig.model,
 			toolCallsMade: result.toolCallsMade,
+			toolCalls: madeToolCalls,
 		});
 	} catch (err: unknown) {
 		const message = err instanceof Error ? err.message : "Unknown error";

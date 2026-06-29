@@ -13,10 +13,10 @@
  */
 
 import { ConversationStore } from "../messaging/conversation-store.js";
-import type { LLMProvider } from "../providers/types.js";
-import { registerBuiltinTools } from "./builtin-tools.js";
 import { AgentLoop } from "./loop.js";
-import type { AgentLoopConfig, AgentLoopResult } from "./types.js";
+import type { AgentHooks, AgentLoopConfig, AgentLoopResult } from "./types.js";
+import { registerBuiltinTools } from "./builtin-tools.js";
+import type { LLMProvider } from "../providers/types.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -31,6 +31,8 @@ export interface AgentSessionConfig {
 	responseFormat?: "markdown" | "json" | "plain" | "structured";
 	/** Additional AgentLoop config overrides */
 	loopConfig?: Partial<AgentLoopConfig>;
+	/** Lifecycle hooks (onBeforeMessage, onAfterToolCall, etc.) */
+	hooks?: AgentHooks;
 	/** Workspace directory for ConversationStore */
 	workspaceDir?: string;
 	/** Whether to auto-persist messages to ConversationStore (default true) */
@@ -59,6 +61,7 @@ export class AgentSession {
 			maxTokens: config.maxTokens ?? 4096,
 			responseFormat: config.responseFormat ?? "markdown",
 			loopConfig: config.loopConfig ?? {},
+			hooks: config.hooks ?? {},
 			workspaceDir: config.workspaceDir ?? process.env.SYNTHTEK_WORKSPACE ?? process.cwd(),
 			autoPersist: config.autoPersist ?? true,
 			onResult: config.onResult ?? (() => {}),
@@ -73,12 +76,15 @@ export class AgentSession {
 	 * Called once at construction; can be called again to reset state.
 	 */
 	private createLoop(): AgentLoop {
-		const loop = new AgentLoop({
-			systemPrompt: this.config.systemPrompt,
-			maxToolCalls: this.config.maxToolCalls,
-			responseFormat: this.config.responseFormat,
-			...this.config.loopConfig,
-		});
+		const loop = new AgentLoop(
+			{
+				systemPrompt: this.config.systemPrompt,
+				maxToolCalls: this.config.maxToolCalls,
+				responseFormat: this.config.responseFormat,
+				...this.config.loopConfig,
+			},
+			this.config.hooks,
+		);
 		registerBuiltinTools(loop);
 		return loop;
 	}

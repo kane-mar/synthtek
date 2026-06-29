@@ -730,7 +730,7 @@ function renderChat(el) {
       hideThinking();
 
       if (response.content) {
-        appendMsg(msgs, 'assistant', response.content);
+        appendMsg(msgs, 'assistant', response.content, response.toolCalls);
         _cachedMessages.push({ role: 'assistant', content: response.content });
         await fetchJSONPost(`${API}/messages`,{sessionId,role:'assistant',content:response.content}).catch(()=>{});
       } else {
@@ -760,11 +760,20 @@ function renderChat(el) {
     if (el) el.remove();
   }
 
-  function appendMsg(container, role, content) {
+  function appendMsg(container, role, content, toolCalls) {
     hideThinking();
     const d=document.createElement('div'); d.className=`msg msg-${role}`;
     if (role==='assistant') {
-      d.innerHTML = renderMarkdown(content);
+      const inner = document.createElement('div');
+      inner.innerHTML = renderMarkdown(content);
+      d.appendChild(inner);
+      // Show tool calls in grey below the message body
+      if (toolCalls && toolCalls.length > 0) {
+        const tcDiv = document.createElement('div');
+        tcDiv.style.cssText = 'margin-top:6px;font-size:12px;color:var(--text-dim,#888);line-height:1.5';
+        tcDiv.textContent = '🛠 ' + toolCalls.map(tc => tc.name + '(' + Object.keys(tc.args||{}).join(', ') + ')').join(', ');
+        d.appendChild(tcDiv);
+      }
     } else {
       d.textContent = content;
     }
