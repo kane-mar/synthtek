@@ -845,8 +845,7 @@ export function registerChatCommand(program: Command): void {
 						},
 						{
 							completionHandler: async (_, messages) => {
-								const { AgentLoop } = await import("../../agent/index.js");
-								const { registerBuiltinTools } = await import("../../agent/builtin-tools.js");
+								const { AgentSession } = await import("../../agent/session.js");
 								const { getRegistry, registerDefaultProviders } = await import(
 									"../../providers/index.js"
 								);
@@ -866,33 +865,19 @@ export function registerChatCommand(program: Command): void {
 									},
 								);
 
-								const agent = new AgentLoop({
+								const agent = new AgentSession(provider, {
 									systemPrompt,
 									maxToolCalls: 20,
-									model: activeProvider.defaultModel || opts.model,
+									autoPersist: false,
 								});
-								registerBuiltinTools(agent);
 
-								// Pre-load history for context
-								const historyMessages = messages.slice(0, -1) as Array<{ role: string; content: string }>;
-								agent.loadHistory(
-									historyMessages.map((m) => ({ role: m.role as "user" | "assistant" | "system", content: m.content || "" })),
+								// Provide full message history (AgentSession uses all but last as history)
+								const result = await agent.processMessage(
+									messages[messages.length - 1]?.content ?? "",
+									undefined,
+									messages.slice(0, -1) as Array<{ role: string; content: string }>,
 								);
-
-								await agent.start();
-								try {
-									const result = await agent.processMessage(
-										messages[messages.length - 1] as {
-											role: "user" | "assistant" | "system";
-											content: string;
-											metadata?: Record<string, unknown>;
-										},
-										provider,
-									);
-									return { content: result.response };
-								} finally {
-									await agent.stop();
-								}
+								return { content: result.response };
 							},
 						},
 					);

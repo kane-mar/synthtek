@@ -2,13 +2,12 @@
  * Chat Completion Handler
  *
  * Handles POST /api/chat/completions — runs the user message through
- * the AgentLoop so the LLM can use tools before responding.
+ * AgentSession (which wraps AgentLoop + tools + conversation store).
  * Reports outcomes to the AnalyticsTracker.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { AgentLoop } from "../agent/loop.js";
-import { registerBuiltinTools } from "../agent/builtin-tools.js";
+import { AgentSession } from "../agent/session.js";
 import { getRegistry } from "../providers/index.js";
 import type {
 	ChatCompletionRequest,
@@ -73,8 +72,7 @@ export async function handleChatCompletion(
 
 		const llmProvider: LLMProvider = registry.create(providerType, providerConfig);
 
-		// ── Agent Loop ────────────────────────────────────────────
-		// Extract messages: all but the last are history, last is the new user message
+		// ── AgentSession ──────────────────────────────────────────
 		const allMessages = chatReq.messages || [];
 		const lastMessage = allMessages.length > 0 ? allMessages[allMessages.length - 1] : null;
 		if (!lastMessage || lastMessage.role !== "user") {
@@ -82,28 +80,21 @@ export async function handleChatCompletion(
 		}
 
 		const systemContent = chatReq.system || "You are a helpful AI assistant.";
+		const sessionId = (chatReq as Record<string, unknown>).sessionId as string | undefined;
 
-		// Create agent loop and register tools
-		const agentLoop = new AgentLoop({
+		// Create session — autoPersist off because backend.addMessage handles storage
+		const agent = new AgentSession(llmProvider, {
 			systemPrompt: systemContent,
 			maxToolCalls: 15,
 			responseFormat: "markdown",
-			retry: { maxRetries: 2, initialDelay: 1000, maxDelay: 10000, multiplier: 2 },
+			autoPersist: false,
+			onResult: () => {},
 		});
-		registerBuiltinTools(agentLoop);
 
-		// Pre-load conversation history (all messages except the last)
-		const historyMessages = allMessages.slice(0, -1) as Array<{ role: string; content: string }>;
-		agentLoop.loadHistory(
-			historyMessages.map((m) => ({ role: m.role as "user" | "assistant" | "system", content: m.content || "" })),
-		);
-
-		// Run the agent loop
+		// Provide history (all messages except the last) + process the new message
+		const history = allMessages.slice(0, -1) as Array<{ role: string; content: string }>;
 		const startTime = Date.now();
-		const result = await agentLoop.processMessage(
-			{ role: "user", content: lastMessage.content || "" },
-			llmProvider,
-		);
+		const result = await agent.processMessage(lastMessage.content || "", undefined, history);
 
 		// Track analytics
 		backend.analytics.trackRequest({
@@ -117,8 +108,7 @@ export async function handleChatCompletion(
 		});
 		backend.analytics.trackProviderEvent(providerLabel, "success");
 
-		// Store assistant response in session
-		const sessionId = (chatReq as Record<string, unknown>).sessionId as string | undefined;
+		// Store assistant response in backend session
 		if (sessionId) {
 			backend.addMessage(sessionId, { role: "assistant", content: result.response });
 		}

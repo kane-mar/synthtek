@@ -9,6 +9,7 @@ export { HeartbeatManager } from "./heartbeat.js";
 export { AgentLoop } from "./loop.js";
 export type { ResponseFormat } from "./response-formatter.js";
 export { ResponseFormatter } from "./response-formatter.js";
+export { AgentSession } from "./session.js";
 export { SubagentSpawner } from "./subagent.js";
 export type { ToolDefinition, ToolHandler } from "./tools.js";
 export { ToolRegistry } from "./tools.js";
