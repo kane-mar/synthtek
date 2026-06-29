@@ -292,6 +292,7 @@ blockquote{border-left:3px solid var(--accent);padding:4px 12px;margin:8px 0;col
 const API = '/api';
 let _currentPage = 'chat';
 let sessionId = null;
+let _cachedMessages = []; // cache chat messages across page navigations
 let modalDirty = false;
 
 // ── Fetch helpers ────────────────────────────────────────────────────────
@@ -381,18 +382,22 @@ async function renderConvList() {
 async function switchConv(newId) {
   if (newId === sessionId) return;
   sessionId = newId;
-  
+  // Persist across page navigations
+  try { sessionStorage.setItem('synthtek_sessionId', sessionId); } catch {}
+
   const msgs = document.getElementById('chat-messages');
   if (!msgs) return;
   msgs.innerHTML = '';
-  
+
   try {
     const history = await fetchJSONGet(`${API}/messages?sessionId=${sessionId}`);
-    for(const m of history) appendMsg(msgs, m.role, m.content);
+    _cachedMessages = Array.isArray(history) ? history.map(m => ({ role: m.role, content: m.content })) : [];
+    for(const m of _cachedMessages) appendMsg(msgs, m.role, m.content);
   } catch(e) {
+    _cachedMessages = [];
     appendMsg(msgs, 'assistant', `Error: ${e.message}`);
   }
-  
+
   renderConvList();
 }
 
@@ -413,6 +418,8 @@ async function deleteConv(id) {
   // If we deleted the active session, switch to the most recent one
   if (wasActive) {
     sessionId = null;
+    _cachedMessages = [];
+    try { sessionStorage.removeItem('synthtek_sessionId'); } catch {}
     const msgs = document.getElementById('chat-messages');
     if (msgs) msgs.innerHTML = '';
     // Reload sessions and pick the first
@@ -619,6 +626,11 @@ function fmtDuration(ms) {
 }
 
 function renderChat(el) {
+  // Restore cached sessionId if we have one
+  if (!sessionId) {
+    try { sessionId = sessionStorage.getItem('synthtek_sessionId'); } catch {}
+  }
+
   el.innerHTML = '<div style="display:flex;flex-direction:column;height:100%">' +
     '<div id="chat-messages" role="log" aria-live="polite" aria-relevant="additions"></div>' +
     '<div id="chat-input-bar">' +
@@ -632,14 +644,37 @@ function renderChat(el) {
   const input = document.getElementById('msg-input');
   const sendBtn = document.getElementById('send-btn');
 
+  // Restore cached messages immediately to avoid empty flash
+  if (_cachedMessages.length > 0 && sessionId) {
+    for (const m of _cachedMessages) appendMsg(msgs, m.role, m.content);
+  }
+
   (async () => {
     try {
       const sessions = await fetchJSONGet(`${API}/sessions`);
-      if(Array.isArray(sessions) && sessions.length>0) sessionId=sessions[0].id;
-      else { const s=await fetchJSONPost(`${API}/sessions`,{userId:'web'}); sessionId=s.id; }
+      if(Array.isArray(sessions) && sessions.length>0) {
+        // Prefer the cached sessionId if it still exists on the server
+        const cachedExists = sessionId && sessions.some(s => s.id === sessionId);
+        if (!cachedExists) sessionId = sessions[0].id;
+      } else {
+        const s=await fetchJSONPost(`${API}/sessions`,{userId:'web'});
+        sessionId = s.id;
+        _cachedMessages = [];
+      }
+      // Persist sessionId across page navigations
+      try { sessionStorage.setItem('synthtek_sessionId', sessionId); } catch {}
+
       if (!sessionId) { appendMsg(msgs,'assistant','Failed to create a chat session.'); return; }
-      const history = await fetchJSONGet(`${API}/messages?sessionId=${sessionId}`);
-      for(const m of history) appendMsg(msgs, m.role, m.content);
+
+      // Only fetch from API if we don't have cached messages or they're stale
+      const fresh = await fetchJSONGet(`${API}/messages?sessionId=${sessionId}`);
+      if (fresh && Array.isArray(fresh) && fresh.length > 0) {
+        // Update cache
+        _cachedMessages = fresh.map(m => ({ role: m.role, content: m.content }));
+        // Re-render with fresh data
+        msgs.innerHTML = '';
+        for (const m of _cachedMessages) appendMsg(msgs, m.role, m.content);
+      }
       // Render conversation list and start auto-refresh
       renderConvList();
       startConvListRefresh();
@@ -654,6 +689,8 @@ function renderChat(el) {
     const text=input.value.trim(); if(!text||!sessionId) return;
     appendMsg(msgs,'user',text); input.value=''; sendBtn.disabled=true;
     showThinking();
+    // Cache user message
+    _cachedMessages.push({ role: 'user', content: text });
 
     try {
       await fetchJSONPost(`${API}/messages`,{sessionId,role:'user',content:text});
@@ -694,6 +731,7 @@ function renderChat(el) {
 
       if (response.content) {
         appendMsg(msgs, 'assistant', response.content);
+        _cachedMessages.push({ role: 'assistant', content: response.content });
         await fetchJSONPost(`${API}/messages`,{sessionId,role:'assistant',content:response.content}).catch(()=>{});
       } else {
         throw new Error(response.error || 'Unknown error');
