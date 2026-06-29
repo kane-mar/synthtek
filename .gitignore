@@ -46,3 +46,4 @@ test-results/
 *.tsbuildinfo
 @eaDir/
 config/conversations.json
+data/agent-config.json
