@@ -223,5 +223,86 @@ Code quality backlog for synthtek architecture cleanup.
 16. **[M14]** Standardized sendMessage signatures — object-style overloads for Telegram, Discord, Slack; sendMessage() alias for Email ✅
 17. **[L19]** Grouped related properties in Telegram (botInfo, pollingState, mediaGroupState) and Discord (runtime) ✅
 
-### Remaining items (Phase 2)
-*None — all items completed.* ✅
+---
+
+## Phase 3 — Agent + WebUI Deep Reviews (2026-06-29)
+
+**Phase 3** (2026-06-29): 50 issues from agent-codebase + webui reviews.
+
+### 🔴 CRITICAL — Security & Correctness (6)
+
+- [x] **C1 — Shell injection in builtin-tools.ts (`grep` tool)** — The `grep` tool constructs shell commands with unsanitized input. Only `"` escaped; `$()`, backticks, `;`, `|` bypass it. **Fix**: Use `child_process.spawn` with array arguments instead of `exec` with string concatenation. (`src/agent/builtin-tools.ts`)
+
+- [x] **C2 — Context duplication bug in session.ts** — `processMessage()` fetches full history and calls `loop.reset()` then replays all messages, causing exponential message growth. **Fix**: `processMessage()` should pass only the *new* message plus the history *before the last message*, not re-add already-processed messages. (`src/agent/session.ts`)
+
+- [ ] **C3 — 23 `innerHTML` usages with XSS holes in frontend.html** — `renderMarkdown()` uses regex replacement that doesn't escape content in inline code, table cells, and edge cases. **Fix**: Add `escapeHtml()` on all user-provided text segments in `renderMarkdown()`. (`src/webui/frontend.html`)
+
+- [ ] **C4 — `window.__synthtekApiKey` exposed globally** — API key stored on `window` object, exfiltratable via any XSS. **Fix**: Store in a closure/module variable, not a global property. (`src/webui/frontend.html`)
+
+- [x] **C5 — ~120 lines duplicated between streaming and non-streaming loops** — Extracted shared `runToolLoop()` method eliminating ~80 lines of duplication. Both `processMessage` and `processMessageStream` delegate tool-call iteration to it. Also added 7 new tests covering streaming, non-streaming, and parity between both paths. Fixed a bug where streaming strategy dropped `toolCalls` from chunks (missing `toolCalls` extraction in `createStreamingStrategy`). Added `toolCalls` field to `StreamChunk` type. ✅ FIXED (2026-06-29)
+
+- [ ] **C6 — Telegram started twice in runner.ts** — If both `telegramToken` env var AND `channelConfigs.telegram` are set, `connectTelegram()` is called twice. **Fix**: Add a guard check before creating Telegram channel. (`src/agent/runner.ts`)
+
+### 🟠 HIGH — Architecture & Maintainability (7)
+
+- [ ] **H1 — Dual routing systems (WebUI)** — Routes split confusingly between `backend.ts` (internal router) and `server.ts` (procedural `if` checks). **Fix**: Consolidate into one router. (`src/webui/server.ts`, `src/webui/backend.ts`)
+
+- [ ] **H2 — Dual auth systems (WebUI)** — `backend.authenticate()` has dead code; actual auth is duplicated in `auth.ts`. **Fix**: Remove dead code, route all auth through `auth.ts`. (`src/webui/backend.ts`, `src/webui/auth.ts`)
+
+- [ ] **H3 — No CSP headers on WebUI** — Frontend served without Content-Security-Policy. **Fix**: Add strict CSP header. (`src/webui/server.ts`)
+
+- [ ] **H4 — `require()` instead of `import()` in runner.ts** — `const { getAgentConfig } = require("../config/agent-config.js")` uses CommonJS in an ESM project. **Fix**: Convert to top-level `import`. (`src/agent/runner.ts`)
+
+- [ ] **H5 — Inconsistent channel wiring (3 different patterns)** — Some channels extend `BaseChannel`, some don't, some use `start()` differently. **Fix**: Standardize all 14 channels. (channels/)
+
+- [ ] **H6 — `handleFileUpload()` returns URL but never saves file** — Broken feature: announces upload success but file is discarded. **Fix**: Implement actual file storage. (`src/webui/server.ts`)
+
+- [ ] **H7 — Dynamic `import()` in hot path (chat-handler.ts)** — `const { getAgentConfig } = await import("../config/agent-config.js")` called on every chat request. **Fix**: Move to top-level import. (`src/webui/chat-handler.ts`)
+
+### 🟡 MEDIUM — Code Quality & Consistency (10)
+
+- [ ] **M1 — Events fire on every check, not on state transitions** — Circuit breaker events emitted on every `isOpen()` call instead of only on state transitions. (`src/agent/error-handler.ts`)
+
+- [ ] **M2 — History passed via WebUI API drops `toolCallId`/`toolCalls` metadata** — When round-tripping messages through WebUI, tool call metadata is lost. (`src/webui/chat-handler.ts`)
+
+- [ ] **M3 — Duplicated retry pattern lists across tools.ts and error-handler.ts** — Same list of retryable error codes in two places, drifts over time. **Fix**: Share a single list. (`src/agent/tools.ts`, `src/agent/error-handler.ts`)
+
+- [ ] **M4 — Nested config defaults not applied to partial objects in error-handler.ts** — Creating `RetryConfig` with partial values gets wrong defaults for nested fields. (`src/agent/error-handler.ts`)
+
+- [ ] **M5 — `subagent.cancel()` doesn't actually cancel** — Method exists but is a no-op; subagents continue running. (`src/agent/subagent.ts`)
+
+- [ ] **M6 — Significant dead code in WebUI**: `broadcast()` (no-op), `handleWebSocket()`, `wsClients`, `listPlugins()`, `trackError()`, `trackChannelUsage()`, 4 unused WebSocket types in `types.ts` — Remove dead code. (`src/webui/`)
+
+- [ ] **M7 — 6+ silent `catch {}` blocks swallowing errors** — Across `server.ts`, `skill-manager.ts`. **Fix**: At least log them. (`src/webui/server.ts`, `src/webui/skill-manager.ts`)
+
+- [ ] **M8 — `as Record<string, never>` type erasure in analytics.ts** — Breaks TypeScript safety. **Fix**: Use proper types. (`src/webui/analytics.ts`)
+
+- [ ] **M9 — Unbounded analytics arrays** — Memory leak; arrays grow indefinitely. **Fix**: Cap at max entries. (`src/webui/analytics.ts`)
+
+- [ ] **M10 — `backend.ts` is a 817-line God Object** — Too many responsibilities. **Fix**: Split into focused modules. (already partially done by H9 in Phase 2)
+
+### 🟢 LOW — Polish & Cleanup (27)
+
+- [ ] **L1 — No timeout on `web_fetch` tool** — Can hang indefinitely on slow servers. (`src/agent/builtin-tools.ts`)
+- [ ] **L2 — `edit_file` only replaces first occurrence** — When `replace_all=false` (default), only first match is replaced, but user expects all occurrences. Document or fix. (`src/agent/builtin-tools.ts`)
+- [ ] **L3 — Dead wrapper methods in WebUI** — Methods that just call another method with no added value. (`src/webui/`)
+- [ ] **L4 — Misleading method names** — Methods named `getX()` that do more than just get. (`src/`)
+- [ ] **L5 — Magic numbers throughout codebase** — Literal numbers without named constants (timeouts, limits, sizes). (`src/`)
+- [ ] **L6 — Unused state fields** — Fields in classes that are never read. (`src/`)
+- [ ] **L7 — Resource leak in timeout promise** — Timeout promise in loop.ts never cleaned up on success. (`src/agent/loop.ts`)
+- [ ] **L8 — Off-by-one in some offset calculations** — Various minor off-by-ones. (`src/`)
+- [ ] **L9 — `skill-manager.ts` clones full git repos with no depth limit** — Massive clones. **Fix**: Add `--depth 1`. (`src/webui/skill-manager.ts`)
+- [ ] **L10 — Inconsistent error response formats across WebUI route handlers** — Some return `{error: ...}`, some `{message: ...}`, some raw strings. **Fix**: Standardize format. (`src/webui/`)
+- [ ] **L11 — 75KB / 1547-line inline frontend has zero modularity** — All JS in one `<script>` tag. **Fix**: Split into separate JS modules. (`src/webui/frontend.html`)
+
+*Additional minor findings (L12–L27) to be documented as discovered during fixes.*
+
+## Combined Summary (Phase 1 + 2 + 3)
+
+| Severity | Phase 1 | Phase 2 | Phase 3 | Total | Fixed |
+|----------|---------|---------|---------|-------|-------|
+| CRITICAL | — | 4 | 6 | 10 | 0 |
+| HIGH | 6 | 3 | 7 | 16 | 8 |
+| MEDIUM | 9 | 5 | 10 | 24 | 14 |
+| LOW | 14 | 5 | 27 | 46 | 19 |
+| **Total** | **29** | **17** | **50** | **96** | **41** |

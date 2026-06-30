@@ -372,6 +372,9 @@ export class AgentLoop {
 						if (chunk.usage) {
 							tokens = chunk.usage.totalTokens;
 						}
+						if (chunk.toolCalls && chunk.toolCalls.length > 0) {
+							toolCalls = chunk.toolCalls;
+						}
 					}
 
 					this.recordSuccess();
@@ -414,20 +417,25 @@ export class AgentLoop {
 	}
 
 	/**
-	 * Shared agent loop execution. Handles context management, tool calls,
-	 * and result building. The LLM call strategy abstracts streaming vs non-streaming.
+	 * Shared tool-call loop — the core "LLM decides → tools execute → repeat"
+	 * cycle used by both streaming and non-streaming paths.
+	 *
+	 * Returns the accumulated response content, tool call count, errors,
+	 * and whether the non-streaming caller should short-circuit on error.
 	 */
-	private async executeAgentLoop(
+	private async runToolLoop(
 		message: AgentMessage,
 		llmStrategy: LlmCallStrategy,
-		onLlmError: (
+		onError: (
 			errorMsg: string,
 			errors: string[],
 			toolCallsMade: number,
-			startTime: number,
-		) => AgentLoopResult,
-	): Promise<AgentLoopResult> {
-		const startTime = Date.now();
+		) => { shouldReturn: boolean; errorResult?: AgentLoopResult },
+	): Promise<{
+		responseContent: string;
+		toolCallsMade: number;
+		errors: string[];
+	}> {
 		const errors: string[] = [];
 		let toolCallsMade = 0;
 
@@ -477,7 +485,11 @@ export class AgentLoop {
 				const errorMsg = error instanceof Error ? error.message : String(error);
 				errors.push(`LLM call failed after retries: ${errorMsg}`);
 				this.state = "error";
-				return onLlmError(errorMsg, errors, toolCallsMade, startTime);
+				const { shouldReturn } = onError(errorMsg, errors, toolCallsMade);
+				if (shouldReturn) {
+					return { responseContent: "", toolCallsMade, errors };
+				}
+				continue;
 			}
 
 			// Call after-LLM hook
@@ -512,6 +524,38 @@ export class AgentLoop {
 			responseContent =
 				responseContent ||
 				`I've made ${this.config.maxToolCalls} tool calls. The task may be too complex. Please try breaking it down.`;
+		}
+
+		return { responseContent, toolCallsMade, errors };
+	}
+
+	/**
+	 * Non-streaming agent loop execution.
+	 * Delegates the tool-call loop to runToolLoop and wraps the result.
+	 */
+	private async executeAgentLoop(
+		message: AgentMessage,
+		llmStrategy: LlmCallStrategy,
+		onLlmError: (
+			errorMsg: string,
+			errors: string[],
+			toolCallsMade: number,
+			startTime: number,
+		) => AgentLoopResult,
+	): Promise<AgentLoopResult> {
+		const startTime = Date.now();
+		const { responseContent, toolCallsMade, errors } = await this.runToolLoop(
+			message,
+			llmStrategy,
+			(_errorMsg, _errs, _made) => {
+				return { shouldReturn: true };
+			},
+		);
+
+		// If runToolLoop returned early due to an error, build the error result
+		if (this.state === "error") {
+			const lastError = errors[errors.length - 1] || "Unknown error";
+			return onLlmError(lastError, errors, toolCallsMade, startTime);
 		}
 
 		return this.buildAgentLoopResult(

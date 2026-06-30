@@ -118,6 +118,12 @@ export interface StreamChunk {
 		completionTokens: number;
 		totalTokens: number;
 	};
+	/** Tool calls requested by the LLM (present on function-call chunks) */
+	toolCalls?: Array<{
+		id: string;
+		name: string;
+		arguments: Record<string, unknown>;
+	}>;
 }
 
 // ─── Provider Interface ─────────────────────────────────────────────────────
