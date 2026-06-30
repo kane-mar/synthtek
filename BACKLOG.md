@@ -235,9 +235,9 @@ Code quality backlog for synthtek architecture cleanup.
 
 - [x] **C2 — Context duplication bug in session.ts** — `processMessage()` fetches full history and calls `loop.reset()` then replays all messages, causing exponential message growth. **Fix**: `processMessage()` should pass only the *new* message plus the history *before the last message*, not re-add already-processed messages. (`src/agent/session.ts`)
 
-- [ ] **C3 — 23 `innerHTML` usages with XSS holes in frontend.html** — `renderMarkdown()` uses regex replacement that doesn't escape content in inline code, table cells, and edge cases. **Fix**: Add `escapeHtml()` on all user-provided text segments in `renderMarkdown()`. (`src/webui/frontend.html`)
+- [x] **C3 — 23 `innerHTML` usages with XSS holes in frontend.html** — `renderMarkdown()` now escapes HTML entities first, then applies markdown regexes on already-escaped text. All captured groups in replacement callbacks use pre-escaped content. Removed `window.__synthtekApiKey` global (moved to closure-scoped `_apiKey`). ✅ FIXED (2026-06-29)
 
-- [ ] **C4 — `window.__synthtekApiKey` exposed globally** — API key stored on `window` object, exfiltratable via any XSS. **Fix**: Store in a closure/module variable, not a global property. (`src/webui/frontend.html`)
+- [x] **C4 — `window.__synthtekApiKey` exposed globally** — Replaced with closure-scoped `let _apiKey = ''` + `setApiKey()` function. `window` object no longer polluted with credentials. ✅ FIXED (2026-06-29)
 
 - [x] **C5 — ~120 lines duplicated between streaming and non-streaming loops** — Extracted shared `runToolLoop()` method eliminating ~80 lines of duplication. Both `processMessage` and `processMessageStream` delegate tool-call iteration to it. Also added 7 new tests covering streaming, non-streaming, and parity between both paths. Fixed a bug where streaming strategy dropped `toolCalls` from chunks (missing `toolCalls` extraction in `createStreamingStrategy`). Added `toolCalls` field to `StreamChunk` type. ✅ FIXED (2026-06-29)
 
@@ -251,13 +251,13 @@ Code quality backlog for synthtek architecture cleanup.
 
 - [ ] **H3 — No CSP headers on WebUI** — Frontend served without Content-Security-Policy. **Fix**: Add strict CSP header. (`src/webui/server.ts`)
 
-- [ ] **H4 — `require()` instead of `import()` in runner.ts** — `const { getAgentConfig } = require("../config/agent-config.js")` uses CommonJS in an ESM project. **Fix**: Convert to top-level `import`. (`src/agent/runner.ts`)
+- [x] **H4 — `require()` instead of `import()` in runner.ts** — Converted to top-level `import { getAgentConfig } from "../config/agent-config.js"`. ✅ FIXED (2026-06-29)
 
 - [ ] **H5 — Inconsistent channel wiring (3 different patterns)** — Some channels extend `BaseChannel`, some don't, some use `start()` differently. **Fix**: Standardize all 14 channels. (channels/)
 
-- [ ] **H6 — `handleFileUpload()` returns URL but never saves file** — Broken feature: announces upload success but file is discarded. **Fix**: Implement actual file storage. (`src/webui/server.ts`)
+- [x] **H6 — `handleFileUpload()` returns URL but never saves file** — Broken feature: announces upload success but file is discarded. **Fix**: Implement actual file storage. (`src/webui/server.ts`)
 
-- [ ] **H7 — Dynamic `import()` in hot path (chat-handler.ts)** — `const { getAgentConfig } = await import("../config/agent-config.js")` called on every chat request. **Fix**: Move to top-level import. (`src/webui/chat-handler.ts`)
+- [x] **H7 — Dynamic `import()` in hot path (chat-handler.ts)** — Moved `import { getAgentConfig }` to top-level import. ✅ FIXED (2026-06-29)
 
 ### 🟡 MEDIUM — Code Quality & Consistency (10)
 

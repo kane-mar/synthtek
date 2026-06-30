@@ -305,16 +305,19 @@ async function fetchJSON(url, init) {
   return r.json();
 }
 
+// ── API Key (closure-scoped, not on window) ──────────────────────────
+let _apiKey = '';
+
+function setApiKey(key) { _apiKey = key; }
+
 async function fetchJSONGet(url) {
-  const apiKey = typeof window !== 'undefined' && window.__synthtekApiKey;
-  const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+  const headers = _apiKey ? { Authorization: `Bearer ${_apiKey}` } : {};
   return fetchJSON(url, { headers });
 }
 
 async function fetchJSONPost(url, body) {
-  const apiKey = typeof window !== 'undefined' && window.__synthtekApiKey;
   const headers = { 'Content-Type': 'application/json' };
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+  if (_apiKey) headers.Authorization = `Bearer ${_apiKey}`;
   return fetchJSON(url, {
     method: 'POST',
     headers,
@@ -323,9 +326,8 @@ async function fetchJSONPost(url, body) {
 }
 
 async function fetchJSONPut(url, body) {
-  const apiKey = typeof window !== 'undefined' && window.__synthtekApiKey;
   const headers = { 'Content-Type': 'application/json' };
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+  if (_apiKey) headers.Authorization = `Bearer ${_apiKey}`;
   return fetchJSON(url, {
     method: 'PUT',
     headers,
@@ -334,8 +336,7 @@ async function fetchJSONPut(url, body) {
 }
 
 async function fetchJSONDelete(url) {
-  const apiKey = typeof window !== 'undefined' && window.__synthtekApiKey;
-  const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+  const headers = _apiKey ? { Authorization: `Bearer ${_apiKey}` } : {};
   return fetchJSON(url, { method: 'DELETE', headers });
 }
 
@@ -784,9 +785,12 @@ function renderChat(el) {
   // Uses RegExp with hex escapes to avoid template literal conflicts with backticks
   function renderMarkdown(text) {
     if (!text) return '';
-    var h = text;
+    // Escape HTML entities first to prevent XSS from raw content,
+    // then apply markdown regexes that wrap matched portions in safe HTML tags.
+    // Captured groups are already escaped, so callbacks must NOT re-escape.
+    var h = escapeHtml(text);
     // Code blocks -- match three backticks
-    h = h.replace(/\x60\x60\x60(\w*)\n?([\s\S]*?)\x60\x60\x60/g, (_, lang, code) => `<pre class="code-block${lang?` language-${lang}`:''}"><code>${escapeHtml(code.trim())}</code></pre>`);
+    h = h.replace(/\x60\x60\x60(\w*)\n?([\s\S]*?)\x60\x60\x60/g, (_, lang, code) => `<pre class="code-block${lang?` language-${lang}`:''}"><code>${code.trim()}</code></pre>`);
     // Inline code -- match single backticks
     h = h.replace(/\x60([^\x60]+)\x60/g, '<code>$1</code>');
     // Bold **text**
@@ -804,7 +808,7 @@ function renderChat(el) {
     h = h.replace(/^- (.+)$/gm, '<li>$1</li>');
     h = h.replace(/((?:<li>.*<\/li>)+)/g, '<ul>$1</ul>');
     // Ordered lists
-    h = h.replace(/^d+. (.+)$/gm, '<li>$1</li>');
+    h = h.replace(/^(\d+)\. (.+)$/gm, (_, n, t) => '<li>'+t+'</li>');
     h = h.replace(/((?:<li>.*<\/li>)+)/g, '<ol>$1</ol>');
     // Horizontal rule
     h = h.replace(/^---+$/gm, '<hr>');

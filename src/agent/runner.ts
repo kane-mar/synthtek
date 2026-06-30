@@ -9,7 +9,7 @@
  * tool availability and seamless cross-interface conversations.
  */
 
-import { getSystemPrompt } from "../config/agent-config.js";
+import { getAgentConfig, getSystemPrompt } from "../config/agent-config.js";
 import { SimpleLogger } from "../core/logger.js";
 import type { ChannelConfigs } from "../messaging/channel-configs.js";
 import {
@@ -104,7 +104,6 @@ export class AgentRunner {
 		let session = this.sessions.get(conversationId);
 		if (!session) {
 			// Read agent parameters from shared config
-			const { getAgentConfig } = require("../config/agent-config.js");
 			const agentCfg = getAgentConfig();
 			session = new AgentSession(provider, {
 				systemPrompt: this.systemPrompt,

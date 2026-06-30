@@ -8,6 +8,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { AgentSession } from "../agent/session.js";
+import { getAgentConfig } from "../config/agent-config.js";
 import { getRegistry } from "../providers/index.js";
 import type {
 	ChatCompletionRequest,
@@ -104,7 +105,6 @@ export async function handleChatCompletion(
 			| undefined;
 
 		// Read agent parameters from shared config
-		const { getAgentConfig } = await import("../config/agent-config.js");
 		const agentCfg = getAgentConfig();
 
 		// Collect tool calls as they happen
