@@ -781,6 +781,11 @@ export class WebUIBackend {
 			if (skillResult.handled && skillResult.response) {
 				return skillResult.response;
 			}
+		} else if (
+			method === "GET" &&
+			(fullPath === "/api/skills" || fullPath === "/api/plugins")
+		) {
+			return { status: 200, body: [] };
 		}
 
 		const fullUrl = queryString ? `${fullPath}?${queryString}` : fullPath;

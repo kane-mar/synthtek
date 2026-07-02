@@ -29,6 +29,7 @@ export class WebSocketChannel {
 	private readonly _sessions: Map<string, WebSocketSession> = new Map();
 	private readonly _clients: Map<string, WebSocketClient> = new Map();
 	private _running = false;
+	private messageHandlers: Array<(msg: WebSocketMessage) => Promise<void>> = [];
 
 	constructor(config?: Partial<WebSocketChannelConfig>) {
 		this._config = { ...DEFAULT_CONFIG, ...config };
@@ -159,17 +160,68 @@ export class WebSocketChannel {
 		return true;
 	}
 
+	// ─── Handler Registration (standard interface for AgentRunner) ──────────
+
+	/**
+	 * Register a handler for incoming messages.
+	 * Called by AgentRunner.wireChannel() for agent loop integration.
+	 */
+	onMessage(handler: (msg: WebSocketMessage) => Promise<void>): void {
+		this.messageHandlers.push(handler);
+	}
+
 	// ─── Lifecycle ────────────────────────────────────────────────────────────
 
-	async start(): Promise<void> {
+	/**
+	 * Connect / start the WebSocket server.
+	 * Compatible with AgentRunner.wireChannel() duck-type interface.
+	 */
+	async connect(): Promise<void> {
 		this._running = true;
 		// In a real implementation, this would start the WebSocket server
 	}
 
-	async stop(): Promise<void> {
+	/**
+	 * Disconnect / stop the WebSocket server.
+	 * Compatible with AgentRunner.wireChannel() duck-type interface.
+	 */
+	async disconnect(): Promise<void> {
 		this._running = false;
 		// In a real implementation, this would close all connections
 		this._clients.clear();
+	}
+
+	/**
+	 * Send a message via the WebSocket channel.
+	 * Compatible with AgentRunner.wireChannel() duck-type interface.
+	 */
+	async sendMessage(options: {
+		text?: string;
+		content?: string;
+		body?: string;
+		sessionId?: string;
+	}): Promise<boolean> {
+		const content = options.text ?? options.content ?? options.body ?? "";
+		const message: WebSocketMessage = {
+			type: "chat",
+			content,
+			timestamp: Date.now(),
+		};
+		if (options.sessionId) {
+			return this.sendToSession(options.sessionId, message);
+		}
+		this.broadcast(message);
+		return true;
+	}
+
+	/** Legacy alias for connect() — kept for backward compatibility */
+	async start(): Promise<void> {
+		return this.connect();
+	}
+
+	/** Legacy alias for disconnect() — kept for backward compatibility */
+	async stop(): Promise<void> {
+		return this.disconnect();
 	}
 
 	get isRunning(): boolean {

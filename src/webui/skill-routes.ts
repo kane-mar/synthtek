@@ -14,6 +14,14 @@ export function handleSkillRoutes(
 	body: unknown,
 	skillManager: SkillManager,
 ): { handled: boolean; response?: APIResponse } {
+	// GET /api/plugins (legacy alias for /api/skills)
+	if (method === "GET" && path === "/api/plugins") {
+		return {
+			handled: true,
+			response: { status: 200, body: skillManager.list() },
+		};
+	}
+
 	// GET /api/skills
 	if (method === "GET" && path === "/api/skills") {
 		return {

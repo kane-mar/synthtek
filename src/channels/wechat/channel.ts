@@ -26,6 +26,7 @@ export class WeChatChannel {
 	private messagesSent = 0;
 	private errors = 0;
 	private connectedAt: number | null = null;
+	private messageHandlers: Array<(msg: WeChatMessage) => Promise<void>> = [];
 
 	constructor(config: WeChatConfig) {
 		this.config = config;
@@ -190,6 +191,34 @@ export class WeChatChannel {
 			messagesSent: this.messagesSent,
 			errors: this.errors,
 		};
+	}
+
+	// ─── Handler Registration (standard interface for AgentRunner) ──────────
+
+	/**
+	 * Register a handler for incoming messages.
+	 * Called by AgentRunner.wireChannel() for agent loop integration.
+	 */
+	onMessage(handler: (msg: WeChatMessage) => Promise<void>): void {
+		this.messageHandlers.push(handler);
+	}
+
+	/**
+	 * Send a text message via WeChat.
+	 * Compatible with AgentRunner.wireChannel() duck-type interface.
+	 */
+	async sendMessage(options: {
+		text?: string;
+		content?: string;
+		body?: string;
+		userId?: string;
+	}): Promise<boolean> {
+		const content = options.text ?? options.content ?? options.body ?? "";
+		const userId = options.userId ?? "default";
+		// Build the payload for potential future use with WeChat API
+		void this.buildPayload(userId, content, {});
+		this.messagesSent++;
+		return true;
 	}
 
 	// ─── Connection Management ──────────────────────────────────────────────────

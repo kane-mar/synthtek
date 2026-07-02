@@ -206,6 +206,8 @@ export class AgentRunner {
 			promises.push(this.startWhatsApp(channelConfigs.whatsapp));
 		if (channelConfigs.websocket)
 			promises.push(this.startWebSocket(channelConfigs.websocket));
+		if (channelConfigs.wechat)
+			promises.push(this.startWeChat(channelConfigs.wechat));
 
 		await Promise.all(promises);
 		this.logger.info("All channels started");
@@ -229,17 +231,16 @@ export class AgentRunner {
 	// ── Channel Wiring ──────────────────────────────────────────────────────
 
 	/**
-	 * Wire a generic channel using duck-typed interface.
-	 * Each channel gets its own conversation ID derived from channelName + chat ID.
-	 */
-	/**
-	 * Wire a generic channel.
+	 * Wire a generic channel via Duck-typed interface.
+	 * All 14 channel start methods delegate to this for consistent lifecycle:
+	 *   onMessage → handleMessage → sendResponse
+	 *   connect (awaited)
+	 *   disconnect on stop
+	 *
 	 * Each channel has unique message/send option types, so the interface
-	 * uses `any` for message and options — this is a pragmatic trade-off since
-	 * there is no shared base type across all 14 channel implementations.
-	 * Config types remain strictly typed via the startXxx methods.
+	 * pragmatically uses `any` for message and options.
 	 */
-	private wireChannel(
+	private async wireChannel(
 		channel: {
 			onMessage: (handler: (msg: any) => Promise<void>) => void;
 			connect: () => Promise<void>;
@@ -248,7 +249,7 @@ export class AgentRunner {
 		},
 		channelName: string,
 		getChatId: (msg: any) => string,
-	): void {
+	): Promise<void> {
 		this.activeChannels.add(channel as { disconnect: () => Promise<void> });
 		channel.onMessage(async (msg: any) => {
 			const content = String(msg.text ?? msg.content ?? "");
@@ -259,7 +260,7 @@ export class AgentRunner {
 				`${channelName}:${chatId}`,
 				async (text) => {
 					try {
-						await channel.sendMessage({ text, content: text, body: text });
+						await channel.sendMessage({ text, content: text });
 					} catch (err: unknown) {
 						this.logger.error(`${channelName} send error`, {
 							error: err instanceof Error ? err.message : "send failed",
@@ -268,85 +269,33 @@ export class AgentRunner {
 				},
 			);
 		});
-		channel.connect().catch((err: unknown) => {
-			this.logger.error(`${channelName} connection failed`, {
-				error: err instanceof Error ? err.message : "connect failed",
-			});
-		});
-		this.logger.info(`${channelName} channel wired`);
+		await channel.connect();
+		this.logger.info(`${channelName} channel started`);
 	}
 
 	private async startTelegram(
 		config: NonNullable<ChannelConfigs["telegram"]>,
 	): Promise<void> {
 		const { TelegramChannel } = await import("../channels/telegram/channel.js");
-		const channel = new TelegramChannel(config);
-		this.activeChannels.add(channel);
-		channel.onMessage(async (msg: any) => {
-			const text = msg.text ?? "";
-			if (!text) return;
-			const chatId = msg.chatId ?? msg.fromId ?? "unknown";
-			await this.handleMessage(text, `telegram:${chatId}`, async (response) => {
-				await channel.sendMessage({ chatId: String(chatId), text: response });
-			});
-		});
-		await channel.connect();
-		this.logger.info("telegram channel started");
+		await this.wireChannel(new TelegramChannel(config), "telegram", (m) =>
+			String(m.chatId ?? m.fromId ?? "unknown"),
+		);
 	}
 
 	private async startDiscord(
 		config: NonNullable<ChannelConfigs["discord"]>,
 	): Promise<void> {
 		const { DiscordChannel } = await import("../channels/discord/channel.js");
-		const channel = new DiscordChannel(config);
-		this.activeChannels.add(channel);
-		channel.onMessage(async (msg: any) => {
-			const content = msg.text ?? "";
-			if (!content) return;
-			await this.handleMessage(
-				content,
-				`discord:${msg.channelId ?? msg.fromId ?? "unknown"}`,
-				async (text) => {
-					await channel.sendMessage({ channelId: msg.channelId, text });
-				},
-			);
-		});
-		await channel.connect();
-		this.logger.info("discord channel started");
-	}
-
-	private async startEmail(
-		config: NonNullable<ChannelConfigs["email"]>,
-	): Promise<void> {
-		const { EmailChannel } = await import("../channels/email/channel.js");
-		const channel = new EmailChannel(config);
-		this.activeChannels.add(channel);
-		channel.onMessage(async (msg: any) => {
-			const content = msg.text ?? msg.content ?? "";
-			if (!content) return;
-			await this.handleMessage(
-				content,
-				`email:${msg.from ?? "unknown"}`,
-				async (text) => {
-					try {
-						await channel.sendEmail({ to: "", subject: "", text });
-					} catch (err: unknown) {
-						this.logger.error("email send error", {
-							error: err instanceof Error ? err.message : "send failed",
-						});
-					}
-				},
-			);
-		});
-		await channel.connect();
-		this.logger.info("email channel started");
+		await this.wireChannel(new DiscordChannel(config), "discord", (m) =>
+			String(m.channelId ?? m.fromId ?? "unknown"),
+		);
 	}
 
 	private async startSlack(
 		config: NonNullable<ChannelConfigs["slack"]>,
 	): Promise<void> {
 		const { SlackChannel } = await import("../channels/slack/channel.js");
-		this.wireChannel(new SlackChannel(config), "slack", (m) =>
+		await this.wireChannel(new SlackChannel(config), "slack", (m) =>
 			String(m.channel ?? m.user ?? "unknown"),
 		);
 	}
@@ -355,7 +304,7 @@ export class AgentRunner {
 		config: NonNullable<ChannelConfigs["matrix"]>,
 	): Promise<void> {
 		const { MatrixChannel } = await import("../channels/matrix/channel.js");
-		this.wireChannel(new MatrixChannel(config), "matrix", (m) =>
+		await this.wireChannel(new MatrixChannel(config), "matrix", (m) =>
 			String(m.roomId ?? m.sender ?? "unknown"),
 		);
 	}
@@ -364,7 +313,7 @@ export class AgentRunner {
 		config: NonNullable<ChannelConfigs["feishu"]>,
 	): Promise<void> {
 		const { FeishuChannel } = await import("../channels/feishu/channel.js");
-		this.wireChannel(new FeishuChannel(config), "feishu", (m) =>
+		await this.wireChannel(new FeishuChannel(config), "feishu", (m) =>
 			String(m.chatId ?? m.sender?.id ?? "unknown"),
 		);
 	}
@@ -373,7 +322,7 @@ export class AgentRunner {
 		config: NonNullable<ChannelConfigs["wecom"]>,
 	): Promise<void> {
 		const { WeComChannel } = await import("../channels/wecom/channel.js");
-		this.wireChannel(new WeComChannel(config), "wecom", (m) =>
+		await this.wireChannel(new WeComChannel(config), "wecom", (m) =>
 			String(m.chatId ?? m.from ?? "unknown"),
 		);
 	}
@@ -382,7 +331,7 @@ export class AgentRunner {
 		config: NonNullable<ChannelConfigs["qq"]>,
 	): Promise<void> {
 		const { QQChannel } = await import("../channels/qq/channel.js");
-		this.wireChannel(new QQChannel(config), "qq", (m) =>
+		await this.wireChannel(new QQChannel(config), "qq", (m) =>
 			String(m.groupId ?? m.userId ?? "unknown"),
 		);
 	}
@@ -391,8 +340,17 @@ export class AgentRunner {
 		config: NonNullable<ChannelConfigs["dingtalk"]>,
 	): Promise<void> {
 		const { DingTalkChannel } = await import("../channels/dingtalk/channel.js");
-		this.wireChannel(new DingTalkChannel(config), "dingtalk", (m) =>
+		await this.wireChannel(new DingTalkChannel(config), "dingtalk", (m) =>
 			String(m.chatId ?? m.senderId ?? "unknown"),
+		);
+	}
+
+	private async startEmail(
+		config: NonNullable<ChannelConfigs["email"]>,
+	): Promise<void> {
+		const { EmailChannel } = await import("../channels/email/channel.js");
+		await this.wireChannel(new EmailChannel(config), "email", (m) =>
+			String(m.from ?? m.content ?? "unknown"),
 		);
 	}
 
@@ -400,7 +358,7 @@ export class AgentRunner {
 		config: NonNullable<ChannelConfigs["teams"]>,
 	): Promise<void> {
 		const { TeamsChannel } = await import("../channels/teams/channel.js");
-		this.wireChannel(new TeamsChannel(config), "teams", (m) =>
+		await this.wireChannel(new TeamsChannel(config), "teams", (m) =>
 			String(m.conversation?.id ?? m.from?.id ?? "unknown"),
 		);
 	}
@@ -409,16 +367,28 @@ export class AgentRunner {
 		config: NonNullable<ChannelConfigs["whatsapp"]>,
 	): Promise<void> {
 		const { WhatsAppChannel } = await import("../channels/whatsapp/channel.js");
-		this.wireChannel(new WhatsAppChannel(config), "whatsapp", (m) =>
+		await this.wireChannel(new WhatsAppChannel(config), "whatsapp", (m) =>
 			String(m.from ?? m.phoneNumber ?? "unknown"),
 		);
 	}
 
 	private async startWebSocket(
-		_config: NonNullable<ChannelConfigs["websocket"]>,
+		config: NonNullable<ChannelConfigs["websocket"]>,
 	): Promise<void> {
-		this.logger.info(
-			"WebSocket channel configured — wiring pending (uses start/stop API instead of connect/disconnect)",
+		const { WebSocketChannel } = await import(
+			"../channels/websocket/channel.js"
+		);
+		await this.wireChannel(new WebSocketChannel(config), "websocket", (m) =>
+			String(m.sessionId ?? m.clientId ?? "unknown"),
+		);
+	}
+
+	private async startWeChat(
+		config: NonNullable<ChannelConfigs["wechat"]>,
+	): Promise<void> {
+		const { WeChatChannel } = await import("../channels/wechat/channel.js");
+		await this.wireChannel(new WeChatChannel(config), "wechat", (m) =>
+			String(m.userId ?? m.msgId ?? "unknown"),
 		);
 	}
 

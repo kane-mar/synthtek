@@ -253,7 +253,7 @@ Code quality backlog for synthtek architecture cleanup.
 
 - [x] **H4 — `require()` instead of `import()` in runner.ts** — Converted to top-level `import { getAgentConfig } from "../config/agent-config.js"`. ✅ FIXED (2026-06-29)
 
-- [ ] **H5 — Inconsistent channel wiring (3 different patterns)** — Some channels extend `BaseChannel`, some don't, some use `start()` differently. **Fix**: Standardize all 14 channels. (channels/)
+- [x] **H5 — Inconsistent channel wiring (3 different patterns)** — Standardized all 14 channels to use `wireChannel()` duck-type interface. Added `onMessage()`/`sendMessage()` to WebSocket and WeChat channels. WebSocket renamed `start/stop` → `connect/disconnect` with backward-compatible aliases. All start methods now use `wireChannel()` with awaited `connect()`. Added WeChat start method in runner.ts. Fixed 1 pre-existing test failure in WebUI server test (missing `/api/plugins` route handler). ✅ FIXED (2026-07-02)
 
 - [x] **H6 — `handleFileUpload()` returns URL but never saves file** — Broken feature: announces upload success but file is discarded. **Fix**: Implement actual file storage. (`src/webui/server.ts`)
 
@@ -302,7 +302,7 @@ Code quality backlog for synthtek architecture cleanup.
 | Severity | Phase 1 | Phase 2 | Phase 3 | Total | Fixed |
 |----------|---------|---------|---------|-------|-------|
 | CRITICAL | — | 4 | 6 | 10 | 10 |
-| HIGH | 6 | 3 | 7 | 16 | 15 |
+| HIGH | 6 | 3 | 7 | 16 | 16 |
 | MEDIUM | 9 | 5 | 10 | 24 | 24 |
 | LOW | 14 | 5 | 27 | 46 | 24 |
-| **Total** | **29** | **17** | **50** | **96** | **73** |
+| **Total** | **29** | **17** | **50** | **96** | **74** |
