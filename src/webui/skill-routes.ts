@@ -2,36 +2,31 @@
  * Skill API Routes
  *
  * Handles CRUD operations for installed skills.
- * Routes: GET/POST/DELETE /api/skills, POST /api/skills/:name/toggle
+ * Returns APIResponse objects compatible with WebUIBackend's router.
  */
 
-import type { ServerResponse } from "node:http";
-import { sendJson } from "./helpers.js";
 import type { SkillManager } from "./skill-manager.js";
+import type { APIResponse } from "./types.js";
 
 export function handleSkillRoutes(
 	method: string,
 	path: string,
 	body: unknown,
-	res: ServerResponse,
 	skillManager: SkillManager,
-): boolean {
+): { handled: boolean; response?: APIResponse } {
 	// GET /api/skills
 	if (method === "GET" && path === "/api/skills") {
-		sendJson(res, 200, skillManager.list());
-		return true;
+		return { handled: true, response: { status: 200, body: skillManager.list() } };
 	}
 
 	// POST /api/skills/install
 	if (method === "POST" && path === "/api/skills/install") {
 		const { source } = body as { source?: string };
 		if (!source || typeof source !== "string") {
-			sendJson(res, 400, { error: "source is required" });
-			return true;
+			return { handled: true, response: { status: 400, body: { error: "source is required" } } };
 		}
 		const result = skillManager.install(source);
-		sendJson(res, result.success ? 200 : 500, result);
-		return true;
+		return { handled: true, response: { status: result.success ? 200 : 500, body: result } };
 	}
 
 	// POST /api/skills/:name/toggle
@@ -40,11 +35,9 @@ export function handleSkillRoutes(
 		const name = decodeURIComponent(toggleMatch[1]);
 		const skill = skillManager.toggle(name);
 		if (!skill) {
-			sendJson(res, 404, { error: `Skill "${name}" not found` });
-			return true;
+			return { handled: true, response: { status: 404, body: { error: `Skill "${name}" not found` } } };
 		}
-		sendJson(res, 200, skill);
-		return true;
+		return { handled: true, response: { status: 200, body: skill } };
 	}
 
 	// DELETE /api/skills/:name
@@ -52,9 +45,8 @@ export function handleSkillRoutes(
 	if (deleteMatch && method === "DELETE") {
 		const name = decodeURIComponent(deleteMatch[1]);
 		const result = skillManager.delete(name);
-		sendJson(res, result.success ? 200 : 404, result);
-		return true;
+		return { handled: true, response: { status: result.success ? 200 : 404, body: result } };
 	}
 
-	return false;
+	return { handled: false };
 }

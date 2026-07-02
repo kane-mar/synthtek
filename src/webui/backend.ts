@@ -12,6 +12,8 @@ import {
 } from "../config/agent-config.js";
 import { ConversationStore } from "../messaging/conversation-store.js";
 import { AnalyticsTracker } from "./analytics.js";
+import { handleProviderRoutes } from "./provider-routes.js";
+import { handleSkillRoutes } from "./skill-routes.js";
 import type {
 	AnalyticsSummary,
 	APIResponse,
@@ -20,10 +22,11 @@ import type {
 	Message,
 	Session,
 	ToolInfo,
-	WebSocketClient,
 	WebUIConfig,
 	WebUIStats,
 } from "./types.js";
+import type { ProviderManager } from "./provider-manager.js";
+import type { SkillManager } from "./skill-manager.js";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -66,7 +69,6 @@ export class WebUIBackend {
 	private readonly config: WebUIConfig;
 	private readonly sessions: Map<string, Session> = new Map();
 	private readonly cronJobs: Map<string, CronJob> = new Map();
-	private readonly wsClients: Map<string, WebSocketClient> = new Map();
 	private readonly routes: RouteEntry[] = [];
 	private agentConfig: import("./types.js").AgentConfig = {
 		systemPrompt: getSharedAgentConfig().systemPrompt,
@@ -78,7 +80,12 @@ export class WebUIBackend {
 	};
 	private startedAt: number | null = null;
 
-	constructor(config: WebUIConfig, workspaceDir?: string) {
+	constructor(
+		config: WebUIConfig,
+		workspaceDir?: string,
+		private providerManager?: ProviderManager,
+		private skillManager?: SkillManager,
+	) {
 		this.config = config;
 		this.analytics = new AnalyticsTracker();
 		this.conversationStore = new ConversationStore(
@@ -131,7 +138,7 @@ export class WebUIBackend {
 		this.getWithPrefix("/api/messages", (_body, params) => {
 			const url = new URL(params._fullPath, "http://localhost");
 			const sessionId = url.searchParams.get("sessionId") ?? "";
-			return { status: 200, body: this.getMessages(sessionId) };
+			return { status: 200, body: this.syncAndGetMessages(sessionId) };
 		});
 
 		this.post("/api/messages", (body) => {
@@ -398,7 +405,12 @@ export class WebUIBackend {
 
 	addMessage(
 		sessionId: string,
-		msg: { role: "user" | "assistant" | "system"; content: string },
+		msg: {
+			role: string;
+			content: string;
+			toolCallId?: string;
+			toolCalls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
+		},
 	): Message | null {
 		// Load or create session from store (source of truth)
 		const session = this.getSession(sessionId);
@@ -409,9 +421,11 @@ export class WebUIBackend {
 		const message: Message = {
 			id: generateId(),
 			sessionId,
-			role: msg.role,
+			role: msg.role as Message["role"],
 			content: msg.content,
 			timestamp: Date.now(),
+			toolCallId: msg.toolCallId,
+			toolCalls: msg.toolCalls,
 		};
 
 		session.messages.push(message);
@@ -419,14 +433,18 @@ export class WebUIBackend {
 
 		// Persist to shared store
 		this.conversationStore.addMessage(sessionId, {
-			role: msg.role,
+			role: msg.role as "user" | "assistant" | "system",
 			content: msg.content,
 		});
 
 		return message;
 	}
 
-	getMessages(sessionId: string): Message[] {
+	/**
+	 * Get messages for a session, syncing from the conversation store first.
+	 * Note: syncs state from the persistent store before returning.
+	 */
+	syncAndGetMessages(sessionId: string): Message[] {
 		// Always load from store (source of truth)
 		const conv = this.conversationStore.get(sessionId);
 		if (conv) {
@@ -445,13 +463,7 @@ export class WebUIBackend {
 
 	// ── Authentication ─────────────────────────────────────────────────────────
 
-	authenticate(key: string): boolean {
-		// If no API key is configured, allow all requests (open mode)
-		if (!this.config.apiKey) {
-			return true;
-		}
-		return key === this.config.apiKey;
-	}
+
 
 	// ── File Upload Handling ───────────────────────────────────────────────────
 
@@ -509,10 +521,6 @@ export class WebUIBackend {
 
 	// ── Plugins ────────────────────────────────────────────────────────────────
 
-	listPlugins(): unknown[] {
-		return []; // Standalone WebUI has no plugin system — always empty
-	}
-
 	// ── Sanitized Config ───────────────────────────────────────────────────────
 
 	getSanitizedConfig(): Record<string, unknown> {
@@ -548,27 +556,6 @@ export class WebUIBackend {
 		return summary;
 	}
 
-	// ── WebSocket Support ──────────────────────────────────────────────────────
-
-	handleWebSocket(clientId: string, sessionId: string): WebSocketClient {
-		const client: WebSocketClient = {
-			id: clientId,
-			sessionId,
-			connected: true,
-		};
-
-		this.wsClients.set(clientId, client);
-		return client;
-	}
-
-	broadcast(sessionId: string, data: unknown): void {
-		for (const client of this.wsClients.values()) {
-			if (client.sessionId === sessionId && client.connected) {
-				// In a real implementation, this would send to the WebSocket
-				void data;
-			}
-		}
-	}
 
 	// ── Tools ──────────────────────────────────────────────────────────────────
 
@@ -769,6 +756,32 @@ export class WebUIBackend {
 		body: unknown,
 		queryString?: string,
 	): APIResponse {
+		// Check provider CRUD routes first
+		if (this.providerManager) {
+			const providerResult = handleProviderRoutes(
+				method,
+				fullPath,
+				body,
+				this.providerManager,
+			);
+			if (providerResult.handled && providerResult.response) {
+				return providerResult.response;
+			}
+		}
+
+		// Check skill routes
+		if (this.skillManager) {
+			const skillResult = handleSkillRoutes(
+				method,
+				fullPath,
+				body,
+				this.skillManager,
+			);
+			if (skillResult.handled && skillResult.response) {
+				return skillResult.response;
+			}
+		}
+
 		const fullUrl = queryString ? `${fullPath}?${queryString}` : fullPath;
 
 		for (const route of this.routes) {
@@ -804,9 +817,5 @@ export class WebUIBackend {
 	async stop(): Promise<void> {
 		this.status = "stopped";
 		this.startedAt = null;
-		for (const client of this.wsClients.values()) {
-			client.connected = false;
-		}
-		this.wsClients.clear();
 	}
 }

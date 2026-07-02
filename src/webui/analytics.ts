@@ -36,6 +36,7 @@ interface TrackErrorInput {
 }
 
 export class AnalyticsTracker {
+	private static readonly MAX_REQUESTS = 10_000;
 	private requests: LLMRequestRecord[] = [];
 	private errors: ErrorRecord[] = [];
 	private channelUsage: Map<string, { sent: number; received: number }> =
@@ -57,6 +58,9 @@ export class AnalyticsTracker {
 			errorMessage: input.errorMessage,
 		};
 		this.requests.push(record);
+		if (this.requests.length > AnalyticsTracker.MAX_REQUESTS) {
+			this.requests = this.requests.slice(-AnalyticsTracker.MAX_REQUESTS);
+		}
 
 		// Track by endpoint
 		const ep = input.endpoint || "/api/chat/completions";
@@ -75,6 +79,9 @@ export class AnalyticsTracker {
 			timestamp: Date.now(),
 		};
 		this.errors.push(record);
+		if (this.errors.length > AnalyticsTracker.MAX_REQUESTS) {
+			this.errors = this.errors.slice(-AnalyticsTracker.MAX_REQUESTS);
+		}
 	}
 
 	trackChannelUsage(channel: string, sent: number, received: number): void {
@@ -295,7 +302,17 @@ export class AnalyticsTracker {
 			stats.set(ev.provider, s);
 		}
 
-		const result: Record<string, unknown> = {};
+		const result: Record<
+			string,
+			{
+				requests1m: number;
+				requests5m: number;
+				rateLimits1m: number;
+				rateLimits5m: number;
+				errorRate: number;
+				status: "healthy" | "degraded" | "throttled";
+			}
+		> = {};
 		for (const [provider, s] of stats) {
 			const status =
 				s.rl1m > 0
@@ -312,7 +329,7 @@ export class AnalyticsTracker {
 				status,
 			};
 		}
-		return result as Record<string, never>;
+		return result;
 	}
 
 	/** Clear all provider events (for testing) */

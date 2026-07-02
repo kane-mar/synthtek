@@ -272,7 +272,9 @@ export class SkillManager {
 		} finally {
 			try {
 				rmSync(tmpDir, { recursive: true, force: true });
-			} catch {}
+			} catch {
+				console.warn(`[SkillManager] Failed to clean up temp directory: ${tmpDir}`);
+			}
 		}
 	}
 

@@ -109,8 +109,9 @@ export async function handleChatCompletion(
 
 		// Collect tool calls as they happen
 		const madeToolCalls: Array<{
+			id: string;
 			name: string;
-			args: Record<string, unknown>;
+			arguments: Record<string, unknown>;
 		}> = [];
 
 		// Create session — autoPersist off because backend.addMessage handles storage
@@ -131,7 +132,11 @@ export async function handleChatCompletion(
 			},
 			hooks: {
 				onBeforeToolCall: (toolCall) => {
-					madeToolCalls.push({ name: toolCall.name, args: toolCall.arguments });
+					madeToolCalls.push({
+						id: toolCall.id,
+						name: toolCall.name,
+						arguments: toolCall.arguments,
+					});
 				},
 			},
 			onResult: () => {},
@@ -141,6 +146,8 @@ export async function handleChatCompletion(
 		const history = allMessages.slice(0, -1) as Array<{
 			role: string;
 			content: string;
+			toolCallId?: string;
+			toolCalls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
 		}>;
 		const startTime = Date.now();
 		const result = await agent.processMessage(

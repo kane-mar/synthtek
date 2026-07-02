@@ -143,7 +143,7 @@ export function registerBuiltinTools(agent: AgentLoop): void {
 		{
 			name: "edit_file",
 			description:
-				"Edit a file by replacing old_text with new_text. Supports partial matching.",
+				"Edit a file by replacing old_text with new_text. Replaces ALL occurrences of old_text. Supports minor whitespace/line-ending differences.",
 			parameters: {
 				type: "object",
 				properties: {

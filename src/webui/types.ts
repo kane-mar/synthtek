@@ -21,9 +21,17 @@ export interface Session {
 export interface Message {
 	id: string;
 	sessionId: string;
-	role: "user" | "assistant" | "system";
+	role: "user" | "assistant" | "system" | "tool";
 	content: string;
 	timestamp: number;
+	/** ID for tool call responses (when role is "tool") */
+	toolCallId?: string;
+	/** Tool calls from the assistant (when role is "assistant") */
+	toolCalls?: Array<{
+		id: string;
+		name: string;
+		arguments: Record<string, unknown>;
+	}>;
 }
 
 export interface WebUIStats {
@@ -41,12 +49,6 @@ export interface FileUploadResult {
 export interface APIResponse {
 	status: number;
 	body: unknown;
-}
-
-export interface WebSocketClient {
-	id: string;
-	sessionId: string;
-	connected: boolean;
 }
 
 // ── Analytics ───────────────────────────────────────────────────────────────
@@ -122,35 +124,6 @@ export interface AnalyticsSummary {
 	};
 	uptime: number;
 }
-
-// ── WebSocket Message Protocol ──────────────────────────────────────────────
-
-export interface WebSocketMessage {
-	type:
-		| "message"
-		| "stream_start"
-		| "stream_chunk"
-		| "stream_end"
-		| "error"
-		| "ping"
-		| "pong"
-		| "session_update";
-	sessionId?: string;
-	data?: unknown;
-}
-
-export interface WebSocketSendOptions {
-	url: string;
-	sessionId: string;
-	apiKey?: string;
-	pollingInterval?: number; // ms, 0 = no polling fallback
-}
-
-export type WebSocketEventHandler = (event: WebSocketMessage) => void;
-export type WebSocketStatusHandler = (
-	connected: boolean,
-	error?: string,
-) => void;
 
 // ── Tools ───────────────────────────────────────────────────────────────────
 

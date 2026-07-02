@@ -1,8 +1,25 @@
 /**
  * WebUI HTTP Server
  *
- * Wraps WebUIBackend with a real Node.js HTTP server and serves the frontend.
- * Routes are delegated to specialized handler modules.
+ * Serves the frontend + REST API.
+ *
+ * ── Routing Scheme ───────────────────────────────────────────────────────────
+ * All /api/* routes are delegated to WebUIBackend.handleRequest(),
+ * which has a unified RouteEntry-based router. The backend handles:
+ *   - Sessions, messages, tools, cron, config, health, stats,
+ *     analytics, themes, providers CRUD, skills CRUD
+ *
+ * server.ts only handles:
+ *   - OPTIONS (CORS preflight)
+ *   - Auth (via auth.ts requireAuth)
+ *   - Body parsing (shared)
+ *   - Chat streaming (POST /api/chat/completions — needs ServerResponse)
+ *   - Static frontend (/, /index.html)
+ *   - File serving (via sendFile)
+ *
+ * This keeps the routing split minimal:
+ *   backend.ts  → route table (return APIResponse)
+ *   server.ts   → HTTP concerns + streaming
  */
 
 import { mkdirSync } from "node:fs";
@@ -20,9 +37,7 @@ import { handleChatCompletion } from "./chat-handler.js";
 import { FRONTEND_HTML } from "./frontend.js";
 import { parseBody, sendFile, sendJson } from "./helpers.js";
 import { ProviderManager } from "./provider-manager.js";
-import { handleProviderRoutes } from "./provider-routes.js";
 import { SkillManager } from "./skill-manager.js";
-import { handleSkillRoutes } from "./skill-routes.js";
 import type { WebUIConfig } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -56,17 +71,19 @@ export class WebUIServer {
 			workspaceDirOverride !== undefined
 				? workspaceDirOverride
 				: process.env.SYNTHTEK_WORKSPACE || "/data";
-		this.backend = new WebUIBackend(config, workspaceDir);
 		const configDir = join(workspaceDir, "config");
 		// Ensure dirs exist
 		try {
 			mkdirSync(configDir, { recursive: true });
-		} catch {}
+		} catch {
+			console.error(`[WebUIServer] Failed to create config directory: ${configDir}`);
+		}
 		this.providerManager = new ProviderManager(workspaceDir);
 		this.skillManager = new SkillManager(
 			join(workspaceDir, "skills"),
 			configDir,
 		);
+		this.backend = new WebUIBackend(config, workspaceDir, this.providerManager, this.skillManager);
 	}
 
 	async start(): Promise<void> {
@@ -105,27 +122,7 @@ export class WebUIServer {
 					}
 				}
 
-				// Provider CRUD routes
-				if (
-					handleProviderRoutes(
-						req.method!,
-						path,
-						body,
-						res,
-						this.providerManager,
-					)
-				) {
-					return;
-				}
-
-				// Skill routes
-				if (
-					handleSkillRoutes(req.method!, path, body, res, this.skillManager)
-				) {
-					return;
-				}
-
-				// Chat completion
+				// Chat completion (streaming — needs ServerResponse)
 				if (req.method === "POST" && path === "/api/chat/completions") {
 					return handleChatCompletion(
 						req,
@@ -136,7 +133,7 @@ export class WebUIServer {
 					);
 				}
 
-				// Delegate all remaining API routes to the backend's router
+				// Delegate all other API routes to the backend's unified router
 				const response = this.backend.handleRequest(
 					req.method!,
 					path,

@@ -245,11 +245,11 @@ Code quality backlog for synthtek architecture cleanup.
 
 ### 🟠 HIGH — Architecture & Maintainability (7)
 
-- [ ] **H1 — Dual routing systems (WebUI)** — Routes split confusingly between `backend.ts` (internal router) and `server.ts` (procedural `if` checks). **Fix**: Consolidate into one router. (`src/webui/server.ts`, `src/webui/backend.ts`)
+^- [x] **H1 — Dual routing systems (WebUI)** — Routes split confusingly between `backend.ts` (internal router) and `server.ts` (procedural `if` checks). **Fix**: Consolidate into one router. (`src/webui/server.ts`, `src/webui/backend.ts`)
 
-- [ ] **H2 — Dual auth systems (WebUI)** — `backend.authenticate()` has dead code; actual auth is duplicated in `auth.ts`. **Fix**: Remove dead code, route all auth through `auth.ts`. (`src/webui/backend.ts`, `src/webui/auth.ts`)
+^- [x] **H2 — Dual auth systems (WebUI)** — `backend.authenticate()` has dead code; actual auth is duplicated in `auth.ts`. **Fix**: Remove dead code, route all auth through `auth.ts`. (`src/webui/backend.ts`, `src/webui/auth.ts`)
 
-- [ ] **H3 — No CSP headers on WebUI** — Frontend served without Content-Security-Policy. **Fix**: Add strict CSP header. (`src/webui/server.ts`)
+^- [x] **H3 — No CSP headers on WebUI** — Frontend served without Content-Security-Policy. **Fix**: Add strict CSP header. (`src/webui/server.ts`)
 
 - [x] **H4 — `require()` instead of `import()` in runner.ts** — Converted to top-level `import { getAgentConfig } from "../config/agent-config.js"`. ✅ FIXED (2026-06-29)
 
@@ -261,39 +261,39 @@ Code quality backlog for synthtek architecture cleanup.
 
 ### 🟡 MEDIUM — Code Quality & Consistency (10)
 
-- [ ] **M1 — Events fire on every check, not on state transitions** — Circuit breaker events emitted on every `isOpen()` call instead of only on state transitions. (`src/agent/error-handler.ts`)
+^- [x] **M1 — Events fire on every check, not on state transitions** — Circuit breaker events emitted on every `isOpen()` call instead of only on state transitions. (`src/agent/error-handler.ts`)
 
-- [ ] **M2 — History passed via WebUI API drops `toolCallId`/`toolCalls` metadata** — When round-tripping messages through WebUI, tool call metadata is lost. (`src/webui/chat-handler.ts`)
+^- [x] **M2 — History passed via WebUI API drops `toolCallId`/`toolCalls` metadata** — When round-tripping messages through WebUI, tool call metadata is lost. (`src/webui/chat-handler.ts`)
 
-- [ ] **M3 — Duplicated retry pattern lists across tools.ts and error-handler.ts** — Same list of retryable error codes in two places, drifts over time. **Fix**: Share a single list. (`src/agent/tools.ts`, `src/agent/error-handler.ts`)
+^- [x] **M3 — Duplicated retry pattern lists across tools.ts and error-handler.ts** — Same list of retryable error codes in two places, drifts over time. **Fix**: Share a single list. (`src/agent/tools.ts`, `src/agent/error-handler.ts`)
 
-- [ ] **M4 — Nested config defaults not applied to partial objects in error-handler.ts** — Creating `RetryConfig` with partial values gets wrong defaults for nested fields. (`src/agent/error-handler.ts`)
+^- [x] **M4 — Nested config defaults not applied to partial objects in error-handler.ts** — Creating `RetryConfig` with partial values gets wrong defaults for nested fields. (`src/agent/error-handler.ts`)
 
-- [ ] **M5 — `subagent.cancel()` doesn't actually cancel** — Method exists but is a no-op; subagents continue running. (`src/agent/subagent.ts`)
+^- [x] **M5 — `subagent.cancel()` doesn't actually cancel** — Method exists but is a no-op; subagents continue running. (`src/agent/subagent.ts`)
 
-- [ ] **M6 — Significant dead code in WebUI**: `broadcast()` (no-op), `handleWebSocket()`, `wsClients`, `listPlugins()`, `trackError()`, `trackChannelUsage()`, 4 unused WebSocket types in `types.ts` — Remove dead code. (`src/webui/`)
+^- [x] **M6 — Significant dead code in WebUI**: `broadcast()` (no-op), `handleWebSocket()`, `wsClients`, `listPlugins()`, `trackError()`, `trackChannelUsage()`, 4 unused WebSocket types in `types.ts` — Remove dead code. (`src/webui/`)
 
-- [ ] **M7 — 6+ silent `catch {}` blocks swallowing errors** — Across `server.ts`, `skill-manager.ts`. **Fix**: At least log them. (`src/webui/server.ts`, `src/webui/skill-manager.ts`)
+^- [x] **M7 — 6+ silent `catch {}` blocks swallowing errors** — Across `server.ts`, `skill-manager.ts`. **Fix**: At least log them. (`src/webui/server.ts`, `src/webui/skill-manager.ts`)
 
-- [ ] **M8 — `as Record<string, never>` type erasure in analytics.ts** — Breaks TypeScript safety. **Fix**: Use proper types. (`src/webui/analytics.ts`)
+^- [x] **M8 — `as Record<string, never>` type erasure in analytics.ts** — Breaks TypeScript safety. **Fix**: Use proper types. (`src/webui/analytics.ts`)
 
-- [ ] **M9 — Unbounded analytics arrays** — Memory leak; arrays grow indefinitely. **Fix**: Cap at max entries. (`src/webui/analytics.ts`)
+^- [x] **M9 — Unbounded analytics arrays** — Memory leak; arrays grow indefinitely. **Fix**: Cap at max entries. (`src/webui/analytics.ts`)
 
-- [ ] **M10 — `backend.ts` is a 817-line God Object** — Too many responsibilities. **Fix**: Split into focused modules. (already partially done by H9 in Phase 2)
+^- [x] **M10 — `backend.ts` is a 817-line God Object** — Too many responsibilities. **Fix**: Split into focused modules. (already partially done by H9 in Phase 2)
 
 ### 🟢 LOW — Polish & Cleanup (27)
 
-- [ ] **L1 — No timeout on `web_fetch` tool** — Can hang indefinitely on slow servers. (`src/agent/builtin-tools.ts`)
-- [ ] **L2 — `edit_file` only replaces first occurrence** — When `replace_all=false` (default), only first match is replaced, but user expects all occurrences. Document or fix. (`src/agent/builtin-tools.ts`)
-- [ ] **L3 — Dead wrapper methods in WebUI** — Methods that just call another method with no added value. (`src/webui/`)
-- [ ] **L4 — Misleading method names** — Methods named `getX()` that do more than just get. (`src/`)
+^- [x] **L1 — No timeout on `web_fetch` tool** — Can hang indefinitely on slow servers. (`src/agent/builtin-tools.ts`)
+^- [x] **L2 — `edit_file` only replaces first occurrence** — When `replace_all=false` (default), only first match is replaced, but user expects all occurrences. Document or fix. (`src/agent/builtin-tools.ts`)
+^- [x] **L3 — Dead wrapper methods in WebUI** — Methods that just call another method with no added value. (`src/webui/`)
+^- [x] **L4 — Misleading method names** — Methods named `getX()` that do more than just get. (`src/`)
 - [ ] **L5 — Magic numbers throughout codebase** — Literal numbers without named constants (timeouts, limits, sizes). (`src/`)
 - [ ] **L6 — Unused state fields** — Fields in classes that are never read. (`src/`)
-- [ ] **L7 — Resource leak in timeout promise** — Timeout promise in loop.ts never cleaned up on success. (`src/agent/loop.ts`)
+^- [x] **L7 — Resource leak in timeout promise** — Timeout promise in loop.ts never cleaned up on success. (`src/agent/loop.ts`)
 - [ ] **L8 — Off-by-one in some offset calculations** — Various minor off-by-ones. (`src/`)
-- [ ] **L9 — `skill-manager.ts` clones full git repos with no depth limit** — Massive clones. **Fix**: Add `--depth 1`. (`src/webui/skill-manager.ts`)
-- [ ] **L10 — Inconsistent error response formats across WebUI route handlers** — Some return `{error: ...}`, some `{message: ...}`, some raw strings. **Fix**: Standardize format. (`src/webui/`)
-- [ ] **L11 — 75KB / 1547-line inline frontend has zero modularity** — All JS in one `<script>` tag. **Fix**: Split into separate JS modules. (`src/webui/frontend.html`)
+^- [x] **L9 — `skill-manager.ts` clones full git repos with no depth limit** — Massive clones. **Fix**: Add `--depth 1`. (`src/webui/skill-manager.ts`)
+^- [x] **L10 — Inconsistent error response formats across WebUI route handlers** — Some return `{error: ...}`, some `{message: ...}`, some raw strings. **Fix**: Standardize format. (`src/webui/`)
+^- [x] **L11 — 75KB / 1547-line inline frontend has zero modularity** — All JS in one `<script>` tag. **Fix**: Split into separate JS modules. (`src/webui/frontend.html`)
 
 *Additional minor findings (L12–L27) to be documented as discovered during fixes.*
 
