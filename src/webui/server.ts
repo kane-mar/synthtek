@@ -70,7 +70,7 @@ export class WebUIServer {
 		const workspaceDir =
 			workspaceDirOverride !== undefined
 				? workspaceDirOverride
-				: process.env.SYNTHTEK_WORKSPACE || "/data";
+				: process.env.SYNTHTEK_WORKSPACE || process.cwd();
 		const configDir = join(workspaceDir, "config");
 		// Ensure dirs exist
 		try {

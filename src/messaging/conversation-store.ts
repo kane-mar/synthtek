@@ -46,7 +46,13 @@ export class ConversationStore {
 	constructor(workspaceDir: string) {
 		const dir = join(workspaceDir, "config");
 		if (!existsSync(dir)) {
-			mkdirSync(dir, { recursive: true });
+			try {
+				mkdirSync(dir, { recursive: true });
+			} catch {
+				console.error(
+					`[ConversationStore] Failed to create directory: ${dir}`,
+				);
+			}
 		}
 		this.filePath = join(dir, "conversations.json");
 	}
