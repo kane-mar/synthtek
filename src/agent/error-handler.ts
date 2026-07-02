@@ -182,38 +182,4 @@ export class AgentErrorHandler {
 		// half-open: allow one request through
 		return false;
 	}
-
-	// ─── Error Message Formatting ─────────────────────────────────────────────
-
-	formatErrorMessage(
-		category: ErrorCategory,
-		error: Error,
-		attempt: number,
-	): string {
-		const prefix = this.categoryPrefix(category);
-		const retryInfo =
-			attempt > 0 ? ` (attempt ${attempt}/${this.maxRetries})` : "";
-		return `${prefix}: ${error.message}${retryInfo}`;
-	}
-
-	private categoryPrefix(category: ErrorCategory): string {
-		const prefixes: Record<ErrorCategory, string> = {
-			provider: "Provider error",
-			tool: "Tool error",
-			context: "Context error",
-			rate_limit: "Rate limit",
-			timeout: "Timeout",
-			network: "Network error",
-			circuit_breaker: "Circuit breaker open",
-			max_retries: "Max retries exceeded",
-			max_tool_calls: "Max tool calls exceeded",
-			invalid_tool_args: "Invalid tool arguments",
-			tool_timeout: "Tool timeout",
-			tool_not_found: "Tool not found",
-			tool_permission_denied: "Tool permission denied",
-			tool_rate_limited: "Tool rate limited",
-			unknown: "Unknown error",
-		};
-		return prefixes[category];
-	}
 }

@@ -849,6 +849,9 @@ export function registerChatCommand(program: Command): void {
 								const { getRegistry, registerDefaultProviders } = await import(
 									"../../providers/index.js"
 								);
+								const { getAgentConfig } = await import(
+									"../../config/agent-config.js"
+								);
 
 								registerDefaultProviders();
 								const registry = getRegistry();
@@ -865,10 +868,21 @@ export function registerChatCommand(program: Command): void {
 									},
 								);
 
+								const agentCfg = getAgentConfig();
 								const agent = new AgentSession(provider, {
-									systemPrompt,
-									maxToolCalls: 20,
+									systemPrompt: agentCfg.systemPrompt,
+									maxToolCalls: agentCfg.maxToolCalls,
+									maxTokens: agentCfg.maxTokens,
 									autoPersist: false,
+									loopConfig: {
+										temperature: agentCfg.temperature,
+										retry: {
+											maxRetries: agentCfg.maxRetries,
+											initialDelay: 1000,
+											maxDelay: 10000,
+											multiplier: 2,
+										},
+									},
 								});
 
 								// Provide full message history (AgentSession uses all but last as history)

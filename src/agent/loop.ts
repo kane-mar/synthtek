@@ -3,6 +3,7 @@
  * Handles the message-in → LLM-decides → tools-execute → response-out cycle.
  */
 
+import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { getSystemPrompt } from "../config/agent-config.js";
 import type { LLMProvider, StreamChunk } from "../providers/types.js";
@@ -62,9 +63,15 @@ function toToolCalls(parsed: unknown, offset: number): ToolCall[] {
 			"name" in item &&
 			"arguments" in item
 		) {
-			const tool = item as { id?: string; name: unknown; arguments: unknown };
+			const tool = item as {
+				id?: string;
+				name: unknown;
+				arguments: unknown;
+			};
 			calls.push({
-				id: tool.id || `call_${Date.now()}_${offset + calls.length}`,
+				id:
+					tool.id ||
+					`call_${randomUUID().slice(0, 8)}_${offset + calls.length}`,
 				name: String(tool.name),
 				arguments: tool.arguments as Record<string, unknown>,
 			});
@@ -142,6 +149,29 @@ export class AgentLoop {
 		this.running = false;
 		this.errorHandler = new AgentErrorHandler(this.config);
 		this.responseFormatter = new ResponseFormatter(this.config);
+	}
+
+	// ── Runtime Config Update ─────────────────────────────────────────────────
+
+	/**
+	 * Update agent loop config at runtime.
+	 * Only the provided properties are changed; existing config is preserved.
+	 * This propagates to the next LLM call — no need to recreate the session.
+	 */
+	updateConfig(update: Partial<AgentLoopConfig>): void {
+		// Update config (only provided fields)
+		Object.assign(this.config, update);
+
+		// Recreate subsystems that depend on config
+		if (update.contextWindow) {
+			this.context = new ContextWindowManager(this.config.contextWindow);
+		}
+		if (update.retry || update.circuitBreaker) {
+			this.errorHandler = new AgentErrorHandler(this.config);
+		}
+		if (update.responseFormat) {
+			this.responseFormatter = new ResponseFormatter(this.config);
+		}
 	}
 
 	// ── Lifecycle ────────────────────────────────────────────────────────────

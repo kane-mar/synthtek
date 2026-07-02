@@ -4,6 +4,8 @@ Code quality backlog for synthtek architecture cleanup.
 
 **Phase 1** (2026-06-26): 29 issues from initial architecture review — **29 fixed, 0 remaining.** ✅
 **Phase 2** (2026-07-01): 17 issues from comprehensive codebase review — **17 fixed, 0 remaining.** ✅
+**Phase 3** (2026-07-01): 96 issues from deep codebase scan — **96 fixed, 0 remaining.** ✅
+**Phase 4** (2026-07-02): 5 issues from scheduled architecture review — **5 fixed, 0 remaining.** ✅
 
 ---
 
@@ -316,10 +318,28 @@ Code quality backlog for synthtek architecture cleanup.
 
 ## Combined Summary (Phase 1 + 2 + 3)
 
-| Severity | Phase 1 | Phase 2 | Phase 3 | Total | Fixed |
-|----------|---------|---------|---------|-------|-------|
-| CRITICAL | — | 4 | 6 | 10 | 10 |
-| HIGH | 6 | 3 | 7 | 16 | 16 |
-| MEDIUM | 9 | 5 | 10 | 24 | 24 |
-| LOW | 14 | 5 | 27 | 46 | 46 |
-| **Total** | **29** | **17** | **50** | **96** | **96** |
+---
+
+## Phase 4 — Scheduled Architecture Review (2026-07-02)
+
+### MEDIUM
+
+- [x] **P4-M1 — Consolidate 14 near-identical channel start methods** — Runner.ts had 14 `startTelegram()`, `startDiscord()`, etc. methods (200+ lines) each doing dynamic import → instantiation → wire with unique getChatId. Replaced with `CHANNEL_REGISTRY` static array + `startAllChannels()` + `startSingleChannel()`. Eliminated ~190 lines. ✅ FIXED (2026-07-02)
+
+- [x] **P4-M2 — Replace `Date.now()` collision-prone IDs with `randomUUID()`** — `toToolCalls()` used `Date.now()` for generated tool call IDs, risking collisions under concurrency. Changed to `randomUUID().slice(0, 8)`. ✅ FIXED (2026-07-02)
+
+### LOW
+
+- [x] **P4-L1 — Remove dead `formatErrorMessage` method** — `AgentErrorHandler.formatErrorMessage()` and private `categoryPrefix()` were defined (30 lines) but never called from any production code. Only referenced in test. Removed both method and associated tests (3 subtests removed). ✅ FIXED (2026-07-02)
+
+- [x] **P4-L2 — Replace unsafe `(error as any).code` cast** — `tools.ts` used `(error as any).code === "TIMEOUT"` to detect timeout errors. Replaced with proper `"code" in error && (error as { code: string }).code === "TIMEOUT"` type guard. ✅ FIXED (2026-07-02)
+
+- [x] **P4-L3 — Document architecture changes** — Updated `ARCHITECTURE.md` to reflect consolidated channel registration, removed dead code, and updated test counts. ✅ FIXED (2026-07-02)
+
+| Severity | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Total | Fixed |
+|----------|---------|---------|---------|---------|-------|-------|
+| CRITICAL | — | 4 | 6 | — | 10 | 10 |
+| HIGH | 6 | 3 | 7 | — | 16 | 16 |
+| MEDIUM | 9 | 5 | 10 | 2 | 26 | 26 |
+| LOW | 14 | 5 | 27 | 3 | 49 | 49 |
+| **Total** | **29** | **17** | **50** | **5** | **101** | **101** |

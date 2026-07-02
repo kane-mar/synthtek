@@ -250,7 +250,9 @@ export class ToolRegistry {
 			} catch (error: unknown) {
 				const message = error instanceof Error ? error.message : String(error);
 				const isTimeout =
-					error instanceof Error && (error as any).code === "TIMEOUT";
+					error instanceof Error &&
+					"code" in error &&
+					(error as { code: string }).code === "TIMEOUT";
 				lastError = error instanceof Error ? error : new Error(String(error));
 
 				// Timeout

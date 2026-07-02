@@ -96,6 +96,40 @@ export class AgentRunner {
 		}
 	}
 
+	/**
+	 * Sync all cached sessions with the current shared config.
+	 * Call this after `setAgentConfig()` to propagate changes to running sessions.
+	 */
+	syncAllSessions(): void {
+		const agentCfg = getAgentConfig();
+		for (const [_id, session] of this.sessions) {
+			session.updateConfig({
+				maxToolCalls: agentCfg.maxToolCalls,
+				maxTokens: agentCfg.maxTokens,
+				loopConfig: {
+					retry: {
+						maxRetries: agentCfg.maxRetries,
+						initialDelay: 1000,
+						maxDelay: 10000,
+						multiplier: 2,
+					},
+					temperature: agentCfg.temperature,
+				},
+			});
+		}
+		this.logger.debug(
+			`Synced ${this.sessions.size} sessions with shared config`,
+		);
+	}
+
+	/**
+	 * Clear all cached sessions (they will be recreated on next message).
+	 */
+	clearSessions(): void {
+		this.sessions.clear();
+		this.logger.debug("Cleared all sessions");
+	}
+
 	// ── Session Management ──────────────────────────────────────────────────
 
 	private getOrCreateSession(conversationId: string): AgentSession | null {
@@ -172,44 +206,15 @@ export class AgentRunner {
 			return;
 		}
 
-		const promises: Array<Promise<void>> = [];
-
-		// Prefer channelConfigs over legacy telegramToken config
-		if (channelConfigs.telegram) {
-			promises.push(this.startTelegram(channelConfigs.telegram));
-		} else if (this.config.telegramToken) {
-			promises.push(
-				this.startTelegram({
-					token: this.config.telegramToken,
-					webhookUrl: this.config.telegramWebhookUrl,
-				}),
-			);
+		// Wrap legacy telegramToken config into channelConfigs for unified handling
+		if (!channelConfigs.telegram && this.config.telegramToken) {
+			(channelConfigs as Record<string, unknown>).telegram = {
+				token: this.config.telegramToken,
+				webhookUrl: this.config.telegramWebhookUrl,
+			};
 		}
-		if (channelConfigs.discord)
-			promises.push(this.startDiscord(channelConfigs.discord));
-		if (channelConfigs.slack)
-			promises.push(this.startSlack(channelConfigs.slack));
-		if (channelConfigs.matrix)
-			promises.push(this.startMatrix(channelConfigs.matrix));
-		if (channelConfigs.feishu)
-			promises.push(this.startFeishu(channelConfigs.feishu));
-		if (channelConfigs.wecom)
-			promises.push(this.startWeCom(channelConfigs.wecom));
-		if (channelConfigs.qq) promises.push(this.startQQ(channelConfigs.qq));
-		if (channelConfigs.dingtalk)
-			promises.push(this.startDingTalk(channelConfigs.dingtalk));
-		if (channelConfigs.email)
-			promises.push(this.startEmail(channelConfigs.email));
-		if (channelConfigs.teams)
-			promises.push(this.startTeams(channelConfigs.teams));
-		if (channelConfigs.whatsapp)
-			promises.push(this.startWhatsApp(channelConfigs.whatsapp));
-		if (channelConfigs.websocket)
-			promises.push(this.startWebSocket(channelConfigs.websocket));
-		if (channelConfigs.wechat)
-			promises.push(this.startWeChat(channelConfigs.wechat));
 
-		await Promise.all(promises);
+		await this.startAllChannels(channelConfigs);
 		this.logger.info("All channels started");
 	}
 
@@ -232,7 +237,7 @@ export class AgentRunner {
 
 	/**
 	 * Wire a generic channel via Duck-typed interface.
-	 * All 14 channel start methods delegate to this for consistent lifecycle:
+	 * All channel start methods delegate to this for consistent lifecycle:
 	 *   onMessage → handleMessage → sendResponse
 	 *   connect (awaited)
 	 *   disconnect on stop
@@ -273,123 +278,147 @@ export class AgentRunner {
 		this.logger.info(`${channelName} channel started`);
 	}
 
-	private async startTelegram(
-		config: NonNullable<ChannelConfigs["telegram"]>,
+	/** Channel descriptor for consolidated dynamic import + wiring */
+	private static readonly CHANNEL_REGISTRY: Array<{
+		key: keyof ChannelConfigs;
+		name: string;
+		path: string;
+		className: string;
+		getChatId: (msg: any) => string;
+	}> = [
+		{
+			key: "telegram",
+			name: "telegram",
+			path: "../channels/telegram/channel.js",
+			className: "TelegramChannel",
+			getChatId: (m) => String(m.chatId ?? m.fromId ?? "unknown"),
+		},
+		{
+			key: "discord",
+			name: "discord",
+			path: "../channels/discord/channel.js",
+			className: "DiscordChannel",
+			getChatId: (m) => String(m.channelId ?? m.fromId ?? "unknown"),
+		},
+		{
+			key: "slack",
+			name: "slack",
+			path: "../channels/slack/channel.js",
+			className: "SlackChannel",
+			getChatId: (m) => String(m.channel ?? m.user ?? "unknown"),
+		},
+		{
+			key: "matrix",
+			name: "matrix",
+			path: "../channels/matrix/channel.js",
+			className: "MatrixChannel",
+			getChatId: (m) => String(m.roomId ?? m.sender ?? "unknown"),
+		},
+		{
+			key: "feishu",
+			name: "feishu",
+			path: "../channels/feishu/channel.js",
+			className: "FeishuChannel",
+			getChatId: (m) => String(m.chatId ?? m.sender?.id ?? "unknown"),
+		},
+		{
+			key: "wecom",
+			name: "wecom",
+			path: "../channels/wecom/channel.js",
+			className: "WeComChannel",
+			getChatId: (m) => String(m.chatId ?? m.from ?? "unknown"),
+		},
+		{
+			key: "qq",
+			name: "qq",
+			path: "../channels/qq/channel.js",
+			className: "QQChannel",
+			getChatId: (m) => String(m.groupId ?? m.userId ?? "unknown"),
+		},
+		{
+			key: "dingtalk",
+			name: "dingtalk",
+			path: "../channels/dingtalk/channel.js",
+			className: "DingTalkChannel",
+			getChatId: (m) => String(m.chatId ?? m.senderId ?? "unknown"),
+		},
+		{
+			key: "email",
+			name: "email",
+			path: "../channels/email/channel.js",
+			className: "EmailChannel",
+			getChatId: (m) => String(m.from ?? m.content ?? "unknown"),
+		},
+		{
+			key: "teams",
+			name: "teams",
+			path: "../channels/teams/channel.js",
+			className: "TeamsChannel",
+			getChatId: (m) => String(m.conversation?.id ?? m.from?.id ?? "unknown"),
+		},
+		{
+			key: "whatsapp",
+			name: "whatsapp",
+			path: "../channels/whatsapp/channel.js",
+			className: "WhatsAppChannel",
+			getChatId: (m) => String(m.from ?? m.phoneNumber ?? "unknown"),
+		},
+		{
+			key: "websocket",
+			name: "websocket",
+			path: "../channels/websocket/channel.js",
+			className: "WebSocketChannel",
+			getChatId: (m) => String(m.sessionId ?? m.clientId ?? "unknown"),
+		},
+		{
+			key: "wechat",
+			name: "wechat",
+			path: "../channels/wechat/channel.js",
+			className: "WeChatChannel",
+			getChatId: (m) => String(m.userId ?? m.msgId ?? "unknown"),
+		},
+	];
+
+	/**
+	 * Start a single channel from the registry.
+	 * Dynamically imports the module, instantiates the channel class,
+	 * and wires it through the lifecycle.
+	 */
+	private async startSingleChannel(
+		channelConfig: unknown,
+		descriptor: (typeof AgentRunner.CHANNEL_REGISTRY)[number],
 	): Promise<void> {
-		const { TelegramChannel } = await import("../channels/telegram/channel.js");
-		await this.wireChannel(new TelegramChannel(config), "telegram", (m) =>
-			String(m.chatId ?? m.fromId ?? "unknown"),
+		const mod = await import(descriptor.path);
+		const ChannelClass = mod[descriptor.className] as new (
+			config: any,
+		) => {
+			onMessage: (handler: (msg: any) => Promise<void>) => void;
+			connect: () => Promise<void>;
+			disconnect: () => Promise<void>;
+			sendMessage: (options: any) => Promise<unknown>;
+		};
+		await this.wireChannel(
+			new ChannelClass(channelConfig),
+			descriptor.name,
+			descriptor.getChatId,
 		);
 	}
 
-	private async startDiscord(
-		config: NonNullable<ChannelConfigs["discord"]>,
+	/**
+	 * Start all configured channels from the registry.
+	 * Iterates the registry and starts each channel whose config is present.
+	 */
+	private async startAllChannels(
+		channelConfigs: ChannelConfigs,
 	): Promise<void> {
-		const { DiscordChannel } = await import("../channels/discord/channel.js");
-		await this.wireChannel(new DiscordChannel(config), "discord", (m) =>
-			String(m.channelId ?? m.fromId ?? "unknown"),
-		);
-	}
-
-	private async startSlack(
-		config: NonNullable<ChannelConfigs["slack"]>,
-	): Promise<void> {
-		const { SlackChannel } = await import("../channels/slack/channel.js");
-		await this.wireChannel(new SlackChannel(config), "slack", (m) =>
-			String(m.channel ?? m.user ?? "unknown"),
-		);
-	}
-
-	private async startMatrix(
-		config: NonNullable<ChannelConfigs["matrix"]>,
-	): Promise<void> {
-		const { MatrixChannel } = await import("../channels/matrix/channel.js");
-		await this.wireChannel(new MatrixChannel(config), "matrix", (m) =>
-			String(m.roomId ?? m.sender ?? "unknown"),
-		);
-	}
-
-	private async startFeishu(
-		config: NonNullable<ChannelConfigs["feishu"]>,
-	): Promise<void> {
-		const { FeishuChannel } = await import("../channels/feishu/channel.js");
-		await this.wireChannel(new FeishuChannel(config), "feishu", (m) =>
-			String(m.chatId ?? m.sender?.id ?? "unknown"),
-		);
-	}
-
-	private async startWeCom(
-		config: NonNullable<ChannelConfigs["wecom"]>,
-	): Promise<void> {
-		const { WeComChannel } = await import("../channels/wecom/channel.js");
-		await this.wireChannel(new WeComChannel(config), "wecom", (m) =>
-			String(m.chatId ?? m.from ?? "unknown"),
-		);
-	}
-
-	private async startQQ(
-		config: NonNullable<ChannelConfigs["qq"]>,
-	): Promise<void> {
-		const { QQChannel } = await import("../channels/qq/channel.js");
-		await this.wireChannel(new QQChannel(config), "qq", (m) =>
-			String(m.groupId ?? m.userId ?? "unknown"),
-		);
-	}
-
-	private async startDingTalk(
-		config: NonNullable<ChannelConfigs["dingtalk"]>,
-	): Promise<void> {
-		const { DingTalkChannel } = await import("../channels/dingtalk/channel.js");
-		await this.wireChannel(new DingTalkChannel(config), "dingtalk", (m) =>
-			String(m.chatId ?? m.senderId ?? "unknown"),
-		);
-	}
-
-	private async startEmail(
-		config: NonNullable<ChannelConfigs["email"]>,
-	): Promise<void> {
-		const { EmailChannel } = await import("../channels/email/channel.js");
-		await this.wireChannel(new EmailChannel(config), "email", (m) =>
-			String(m.from ?? m.content ?? "unknown"),
-		);
-	}
-
-	private async startTeams(
-		config: NonNullable<ChannelConfigs["teams"]>,
-	): Promise<void> {
-		const { TeamsChannel } = await import("../channels/teams/channel.js");
-		await this.wireChannel(new TeamsChannel(config), "teams", (m) =>
-			String(m.conversation?.id ?? m.from?.id ?? "unknown"),
-		);
-	}
-
-	private async startWhatsApp(
-		config: NonNullable<ChannelConfigs["whatsapp"]>,
-	): Promise<void> {
-		const { WhatsAppChannel } = await import("../channels/whatsapp/channel.js");
-		await this.wireChannel(new WhatsAppChannel(config), "whatsapp", (m) =>
-			String(m.from ?? m.phoneNumber ?? "unknown"),
-		);
-	}
-
-	private async startWebSocket(
-		config: NonNullable<ChannelConfigs["websocket"]>,
-	): Promise<void> {
-		const { WebSocketChannel } = await import(
-			"../channels/websocket/channel.js"
-		);
-		await this.wireChannel(new WebSocketChannel(config), "websocket", (m) =>
-			String(m.sessionId ?? m.clientId ?? "unknown"),
-		);
-	}
-
-	private async startWeChat(
-		config: NonNullable<ChannelConfigs["wechat"]>,
-	): Promise<void> {
-		const { WeChatChannel } = await import("../channels/wechat/channel.js");
-		await this.wireChannel(new WeChatChannel(config), "wechat", (m) =>
-			String(m.userId ?? m.msgId ?? "unknown"),
-		);
+		const promises: Array<Promise<void>> = [];
+		for (const desc of AgentRunner.CHANNEL_REGISTRY) {
+			const cfg = channelConfigs[desc.key];
+			if (cfg) {
+				promises.push(this.startSingleChannel(cfg, desc));
+			}
+		}
+		await Promise.all(promises);
 	}
 
 	// ── Legacy API ─────────────────────────────────────────────────────────

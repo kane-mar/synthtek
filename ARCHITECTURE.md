@@ -1,9 +1,10 @@
 # Architecture
 
-> **Last updated:** 2026-07-01  
-> **Tests:** 1,320 passing, 1 skipped, 482 suites (100% green)  
-> **E2E:** 6 Playwright WebUI tests passing against production build  
-> **Source:** 165 TypeScript files (~33,700 LOC)
+> **Last updated:** 2026-07-02  
+> **Tests:** 1,313 passing, 1 skipped, 481 suites (100% green) – all tests post-refactor pass  
+> **E2E:** 10 internal API e2e tests passing + 6 Playwright WebUI tests  
+> **Source:** 165 TypeScript files (~33,600 LOC)  
+> **Lint:** Clean (0 errors, 0 warnings) – Biome
 
 ---
 
@@ -47,11 +48,11 @@ Synthtek is a modular plugin-based AI agent framework built with Node.js (>=20.0
 |------|-------|----------------|
 | `session.ts` | 191 | Unified session interface wrapping loop + store + history |
 | `loop.ts` | 956 | Core message→LLM→tools→response cycle |
-| `runner.ts` | 448 | Wires channels + sessions + providers together |
+| `runner.ts` | ~260 | Wires channels + sessions + providers together (consolidated from 14 start methods → channel registry) |
 | `context.ts` | 160 | Context window management with compaction/trimming |
 | `tools.ts` | 348 | Tool registry with timeout, retry, validation |
 | `builtin-tools.ts` | ~455 | 8 built-in tools (read/write/edit file, exec, glob, grep, list_dir, web_fetch) |
-| `error-handler.ts` | 155 | Retry + circuit breaker state machine |
+| `error-handler.ts` | ~155 | Retry + circuit breaker state machine (dead code `formatErrorMessage` removed) |
 | `response-formatter.ts` | 140 | Response formatting (markdown/json/plain/structured) |
 | `subagent.ts` | 192 | Spawn child agents for parallel task execution |
 | `heartbeat.ts` | 100 | Periodic health checks |
@@ -150,21 +151,29 @@ cli.ts / Docker
   → ConfigLoader (load config files + env vars)
   → Logger setup
   → AgentRunner.start()
-    → [For each channel config]
-      → Channel.connect()
-    → [For each provider]
-      → Provider setup
+    → startAllChannels() via CHANNEL_REGISTRY (14 channels, dynamic import)
+      → For each configured channel:
+        → import(channelModule)
+        → wireChannel() → register onMessage handler → channel.connect()
+    → Provider setup (from config or fallback chain)
     → Ready to process messages
 ```
+
+### Channel Registration
+All 14 channels are registered in `AgentRunner.CHANNEL_REGISTRY` — a static array
+mapping channel name → import path → class name → getChatId extractor.
+`startAllChannels()` iterates the registry and starts only configured channels,
+eliminating 200+ lines of repetitive `startXxx` methods.
 
 ---
 
 ## Testing Strategy
 - **Test framework:** Node.js built-in `node --test`
 - **Test runner:** `npm test` (builds TypeScript, runs compiled JS)
-- **Tests:** 1,320 across 80 test files
-- **E2E:** Playwright tests for WebUI (`tests/e2e/*.spec.ts`)
+- **Tests:** 1,313 across 80 test files (after dead code removal)
+- **E2E:** Playwright tests for WebUI (`tests/e2e/*.spec.ts`); internal API e2e tests
 - **CI:** GitHub Actions (test + lint on push/PR, docker build on main)
+- **Lint:** Biome (`npm run lint`) – zero errors on 261 files
 
 ---
 

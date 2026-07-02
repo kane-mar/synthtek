@@ -227,58 +227,5 @@ describe("AgentErrorHandler", () => {
 		});
 	});
 
-	describe("error message formatting", () => {
-		it("formats provider error messages", () => {
-			handler = new AgentErrorHandler({
-				retry: {
-					maxRetries: 3,
-					initialDelay: 1000,
-					maxDelay: 10000,
-					multiplier: 2,
-				},
-			});
-			const msg = handler.formatErrorMessage(
-				"provider",
-				new Error("API failed"),
-				1,
-			);
-			ok(msg.includes("Provider error"));
-			ok(msg.includes("API failed"));
-		});
-
-		it("formats tool error messages", () => {
-			handler = new AgentErrorHandler({
-				retry: {
-					maxRetries: 3,
-					initialDelay: 1000,
-					maxDelay: 10000,
-					multiplier: 2,
-				},
-			});
-			const msg = handler.formatErrorMessage(
-				"tool",
-				new Error("Tool failed"),
-				0,
-			);
-			ok(msg.includes("Tool error"));
-			ok(msg.includes("Tool failed"));
-		});
-
-		it("formats context error messages", () => {
-			handler = new AgentErrorHandler({
-				retry: {
-					maxRetries: 3,
-					initialDelay: 1000,
-					maxDelay: 10000,
-					multiplier: 2,
-				},
-			});
-			const msg = handler.formatErrorMessage(
-				"context",
-				new Error("Context exceeded"),
-				0,
-			);
-			ok(msg.includes("Context error"));
-		});
-	});
+	// error message formatting removed — formatErrorMessage was dead code
 });

@@ -96,6 +96,41 @@ export class AgentSession {
 	}
 
 	/**
+	 * Update the agent session config at runtime.
+	 * This propagates to the internal AgentLoop so the next message
+	 * uses the updated settings without needing to recreate the session.
+	 *
+	 * Only the provided fields are updated; existing config is preserved.
+	 */
+	updateConfig(update: Partial<AgentSessionConfig>): void {
+		// Update our stored config
+		if (update.systemPrompt !== undefined) {
+			this.config.systemPrompt = update.systemPrompt;
+		}
+		if (update.maxToolCalls !== undefined) {
+			this.config.maxToolCalls = update.maxToolCalls;
+		}
+		if (update.maxTokens !== undefined) {
+			this.config.maxTokens = update.maxTokens;
+		}
+		if (update.responseFormat !== undefined) {
+			this.config.responseFormat = update.responseFormat;
+		}
+		if (update.loopConfig !== undefined) {
+			this.config.loopConfig = { ...this.config.loopConfig, ...update.loopConfig };
+		}
+
+		// Propagate to the internal AgentLoop
+		this.loop.updateConfig({
+			systemPrompt: this.config.systemPrompt,
+			maxToolCalls: this.config.maxToolCalls,
+			maxTokens: this.config.maxTokens,
+			responseFormat: this.config.responseFormat,
+			...this.config.loopConfig,
+		});
+	}
+
+	/**
 	 * Process a user message through the agent loop.
 	 *
 	 * @param content - The user's message text.
