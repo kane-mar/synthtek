@@ -3,20 +3,24 @@
 A modular, plugin-based AI agent framework built with Node.js and TypeScript.
 
 [![Tests](https://img.shields.io/badge/tests-1320%20passing-brightgreen)](https://github.com/synthtek/synthtek)
+[![E2E](https://img.shields.io/badge/e2e-6%2F6%20passing-brightgreen)](https://github.com/synthtek/synthtek)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node](https://img.shields.io/badge/Node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
+[![Node](https://img.shields.io/badge/Node-%3E%3D20.0.0-brightgreen)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
 
 ## Features
 
 - **Plugin System** — Topological dependency resolution, error boundaries, JSON Schema validation
-- **Multi-Provider** — OpenAI, Anthropic, OpenRouter, Azure, Gemini, Mistral, DeepSeek, Qwen, vLLM, Ollama, LM Studio, llama.cpp with unified interface
-- **Channel Integrations** — Telegram, Discord, Slack with full feature parity
-- **Agent Loop** — Streaming responses, tool calls, exponential backoff, circuit breaker, subagent spawning
-- **Configuration** — JSON/YAML files, env var overrides, secret management, hot-reload
+- **Multi-Provider** — 14 AI providers with unified interface (OpenAI, Anthropic, OpenRouter, DeepSeek, Gemini, Mistral, Azure, Ollama, LM Studio, llama.cpp, vLLM, Qwen, multimodal)
+- **Channel Integrations** — 14 channels (Telegram, Discord, Slack, Matrix, Email, Feishu, WeCom, QQ, DingTalk, WhatsApp, Teams, WeChat, WebSocket)
+- **Agent Loop** — Streaming responses, native tool calls, exponential backoff, circuit breaker, subagent spawning
+- **Configuration** — JSON/YAML files, env var overrides, AES-256-GCM secret management, hot-reload
 - **Logging** — Structured JSON output, file rotation, per-plugin isolation
+- **Security** — Encryption, rate limiting, sandboxing, access control, input sanitization
+- **Memory** — Entity extraction, knowledge graph, short/long-term memory with maintenance skills
+- **WebUI** — Full management interface with chat, analytics, skills, cron, and system config
 - **Docker Ready** — Multi-stage build, Compose profiles for dev/prod
-- **CI/CD** — GitHub Actions for testing, Docker publishing, automated releases
+- **CI/CD** — GitHub Actions for testing, linting, Docker publishing, deployment, and e2e testing
 
 ## Quick Start
 
@@ -103,10 +107,11 @@ npm run clean      # Remove dist/
 
 ## Project Stats
 
-- **~33,600 lines** of source code
-- **~24,300 lines** of tests
-- **165 source files**, **87 test files**
-- **1,320 tests passing** (100% green)
+- **~33,700 lines** of source code
+- **~23,000 lines** of tests
+- **165 source files**, **88 test files**
+- **1,320 tests passing** (100% green, 1 skipped)
+- **6 Playwright e2e tests** passing against production Docker build
 
 ## License
 

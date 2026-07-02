@@ -21,7 +21,10 @@ import type {
 
 export class SubagentSpawner {
 	private logger: SimpleLogger;
-	private activeSubagents: Map<string, SubagentResult>;
+	private activeSubagents: Map<
+		string,
+		{ result: SubagentResult; abort: AbortController }
+	>;
 	private maxConcurrent: number;
 
 	constructor(maxConcurrent: number = 5) {
@@ -145,13 +148,22 @@ export class SubagentSpawner {
 		let result: AgentLoopResult;
 		let status: SubagentResult["status"] = "completed";
 		const errors: string[] = [];
+		const abort = new AbortController();
 
 		const timeoutMs = (config.timeout ?? 300) * 1000; // default 300 seconds
 
 		try {
+			const cancellationPromise = new Promise<never>((_, reject) => {
+				abort.signal.addEventListener("abort", () => {
+					status = "cancelled";
+					reject(new Error("Subagent cancelled"));
+				});
+			});
+
 			const timeoutPromise = new Promise<never>((_, reject) => {
 				const timer = setTimeout(() => {
 					status = "timeout";
+					abort.abort();
 					reject(new Error(`Subagent timed out after ${config.timeout}s`));
 				}, timeoutMs);
 				if (timer.unref) timer.unref();
@@ -162,13 +174,17 @@ export class SubagentSpawner {
 				parentProvider,
 			);
 
-			result = await Promise.race([executionPromise, timeoutPromise]);
+			result = await Promise.race([
+				executionPromise,
+				timeoutPromise,
+				cancellationPromise,
+			]);
 		} catch (error) {
 			const errorMsg = error instanceof Error ? error.message : String(error);
 			errors.push(errorMsg);
-			status = "failed";
+			if (status === "completed") status = "failed";
 			result = {
-				response: `Subagent failed: ${errorMsg}`,
+				response: `Subagent ${status}: ${errorMsg}`,
 				tokensUsed: 0,
 				toolCallsMade: 0,
 				duration: 0,
@@ -189,8 +205,8 @@ export class SubagentSpawner {
 			status,
 		};
 
-		// Store the result
-		this.activeSubagents.set(id, subagentResult);
+		// Store result + abort handle for cancellation
+		this.activeSubagents.set(id, { result: subagentResult, abort });
 
 		// Clean up if not merging results
 		if (!config.mergeResults) {
@@ -214,14 +230,14 @@ export class SubagentSpawner {
 	 * Get the result of a subagent by ID.
 	 */
 	getResult(id: string): SubagentResult | undefined {
-		return this.activeSubagents.get(id);
+		return this.activeSubagents.get(id)?.result;
 	}
 
 	/**
 	 * Get all active subagent results.
 	 */
 	getResults(): SubagentResult[] {
-		return Array.from(this.activeSubagents.values());
+		return Array.from(this.activeSubagents.values()).map((e) => e.result);
 	}
 
 	/**
@@ -232,22 +248,20 @@ export class SubagentSpawner {
 	}
 
 	/**
-	 * Cancel a running subagent (if possible).
-	 * Note: Since subagents run synchronously in this implementation,
-	 * cancellation is limited. For true async cancellation, you'd need
-	 * AbortController integration.
+	 * Cancel a running subagent.
+	 * Uses AbortController to signal cancellation to the running loop.
 	 */
 	async cancel(id: string): Promise<boolean> {
-		const result = this.activeSubagents.get(id);
-		if (!result) {
+		const entry = this.activeSubagents.get(id);
+		if (!entry) {
 			return false;
 		}
 
 		// If the subagent has already completed, just remove it
-		if (result.status !== "completed" && result.status !== "failed") {
-			// In a real implementation, you'd use AbortController to cancel
-			// For now, mark as cancelled (the subagent will complete naturally)
-			this.activeSubagents.set(id, { ...result, status: "cancelled" });
+		if (entry.result.status !== "completed" && entry.result.status !== "failed") {
+			entry.abort.abort();
+			entry.result.status = "cancelled";
+			entry.result.response = `Subagent cancelled.`;
 		}
 
 		return true;

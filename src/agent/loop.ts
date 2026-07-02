@@ -182,18 +182,24 @@ export class AgentLoop {
 
 	/**
 	 * Record a successful LLM call (resets failure counter).
+	 * Emits event only on state transition.
 	 */
 	private recordSuccess(): void {
-		this.errorHandler.recordSuccess();
-		this.events.emit("agent:circuit_breaker:closed");
+		const changed = this.errorHandler.recordSuccess();
+		if (changed) {
+			this.events.emit("agent:circuit_breaker:closed");
+		}
 	}
 
 	/**
 	 * Record a failed LLM call (may open circuit breaker).
+	 * Emits event only on state transition.
 	 */
 	private recordFailure(): void {
-		this.errorHandler.recordFailure();
-		this.events.emit("agent:circuit_breaker:open");
+		const changed = this.errorHandler.recordFailure();
+		if (changed) {
+			this.events.emit("agent:circuit_breaker:open");
+		}
 	}
 
 	/**

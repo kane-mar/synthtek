@@ -8,50 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Logging module** (`src/logging/`): Complete structured logging system with:
-  - `RotatingFileLogger` — file-based logger with automatic size-based rotation, compression, and retention
-  - `PluginLoggerManager` — per-plugin log isolation with separate log files per plugin
-  - `LoggingServiceImpl` — composite logging service combining console + file output
-  - `ConsoleLogger` — ANSI-colored console output with JSON/text format support
-  - `PluginLogger` — wrapper that injects plugin context into log entries
-  - Full type definitions in `types.ts` (LogLevel, LogEntry, Logger interface, etc.)
-  - 12 passing tests covering all components
-- **Docker Compose** files for development and production:
-  - `docker-compose.yml` — base configuration with health checks, resource limits, non-root user
-  - `docker-compose.dev.yml` — development overrides with hot-reload volume mounts
-  - `docker-compose.prod.yml` — production overrides with log rotation
-- **Plugin system** completed:
-  - Topological sort (Kahn's algorithm) for dependency resolution
-  - Error boundaries for plugin isolation
-  - JSON Schema validation for plugin configuration
-  - 60/62 tests passing
-- **Provider Abstraction Layer**:
-  - OpenAI, Anthropic, OpenRouter, Ollama, LM Studio, llama.cpp providers
-  - Streaming support with `processMessageStream`
-  - Cost tracking across providers
-  - MultiProvider error aggregation
-- **Agent Loop**:
-  - Native `toolCalls` (no regex parsing)
-  - Exponential backoff retry
-  - Circuit breaker state machine
-  - Response formatting (markdown/json/plain/structured)
-  - 84 tests passing
-- **CI/CD**:
-  - `ci.yml` — testing, linting
-  - `docker.yml` — Docker publishing to GHCR
-- **Dockerfile** — multi-stage build with non-root user, health check
-- **TypeScript 5.x** with strict mode, ES2022 target, NodeNext module resolution
-- **Node.js built-in test runner** (replaced Vitest)
-- **Dependencies**: `dotenv`, `glob`
+- **Documentation**: Added e2e test results (6 Playwright tests passing) to README and ARCHITECTURE.md
+- **Documentation**: Expanded docs/ARCHITECTURE.md with full module map (14 channels, 14 providers, memory, security, MCP, WebUI, CLI)
 
 ### Changed
-- Renamed project from `nanobot-js` to **synthtek**
-- Switched from Vitest to Node's built-in `node --test` runner
-- Consolidated duplicate service implementations
-- Resolved conflicting `AgentConfig` interfaces
-
-### Removed
-- `api/` directory (removed per user preference)
+- **Runner type safety**: Replaced 14 `as any` casts in `src/agent/runner.ts` with proper `NonNullable<ChannelConfigs['channel']>` types for all channel start methods
+- **Telegram channel types**: Replaced `any` types in `src/channels/telegram/channel.ts` with `TelegramApiResponse<T>`, `TelegramChatMember`, and `Record<string, unknown>` for raw API response parsing
+- **Documentation**: Updated README.md badges, stats, and features list. Updated ARCHITECTURE.md date and test counts.
+- **Code cleanup**: Removed `src/@eaDir/` Synology artifact, root `.DS_Store` file
+- **Lint fix**: Applied Biome auto-format to `src/agent/loop.test.ts` and `src/agent/runner.ts`
+- **Type hygiene**: Added cross-reference comments between duplicate `AgentLoopConfig` types in `src/config/schema.ts` and `src/agent/types.ts`
 
 ## [0.1.0] — 2026-04-20
 

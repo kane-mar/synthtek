@@ -241,7 +241,7 @@ Code quality backlog for synthtek architecture cleanup.
 
 - [x] **C5 — ~120 lines duplicated between streaming and non-streaming loops** — Extracted shared `runToolLoop()` method eliminating ~80 lines of duplication. Both `processMessage` and `processMessageStream` delegate tool-call iteration to it. Also added 7 new tests covering streaming, non-streaming, and parity between both paths. Fixed a bug where streaming strategy dropped `toolCalls` from chunks (missing `toolCalls` extraction in `createStreamingStrategy`). Added `toolCalls` field to `StreamChunk` type. ✅ FIXED (2026-06-29)
 
-- [ ] **C6 — Telegram started twice in runner.ts** — If both `telegramToken` env var AND `channelConfigs.telegram` are set, `connectTelegram()` is called twice. **Fix**: Add a guard check before creating Telegram channel. (`src/agent/runner.ts`)
+^- [x] **C6 — Telegram started twice in runner.ts** — If both `telegramToken` env var AND `channelConfigs.telegram` are set, `connectTelegram()` is called twice. **Fix**: Add a guard check before creating Telegram channel. (`src/agent/runner.ts`)
 
 ### 🟠 HIGH — Architecture & Maintainability (7)
 

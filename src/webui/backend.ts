@@ -65,8 +65,8 @@ export class WebUIBackend {
 
 	private readonly config: WebUIConfig;
 	private readonly sessions: Map<string, Session> = new Map();
-	private readonly wsClients: Map<string, WebSocketClient> = new Map();
 	private readonly cronJobs: Map<string, CronJob> = new Map();
+	private readonly wsClients: Map<string, WebSocketClient> = new Map();
 	private readonly routes: RouteEntry[] = [];
 	private agentConfig: import("./types.js").AgentConfig = {
 		systemPrompt: getSharedAgentConfig().systemPrompt,
@@ -260,11 +260,6 @@ export class WebUIBackend {
 		this.get("/api/themes", (_body, _params) => ({
 			status: 200,
 			body: this.listThemes(),
-		}));
-
-		this.get("/api/plugins", (_body, _params) => ({
-			status: 200,
-			body: this.listPlugins(),
 		}));
 
 		this.get("/api/config", (_body, _params) => ({

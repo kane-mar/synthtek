@@ -46,17 +46,37 @@ src/
 │   ├── loop.ts         # Main message→LLM→tools→response cycle
 │   ├── context.ts      # Token-aware context window management
 │   ├── tools.ts        # Tool registry and execution
+│   ├── error-handler.ts # Retry + circuit breaker state machine
 │   ├── heartbeat.ts    # Keep-alive during long operations
 │   ├── subagent.ts     # Parallel task spawning
+│   ├── runner.ts       # Wires channels + sessions + providers
+│   ├── session.ts      # Unified session interface
+│   ├── response-formatter.ts # Markdown/json/plain/structured
+│   ├── builtin-tools.ts # 8 built-in workspace tools
 │   └── types.ts        # AgentMessage, ToolCall, AgentLoopConfig
-├── channels/           # Channel adapters
-│   ├── telegram/       # Telegram Bot API
-│   ├── discord/        # Discord.js
-│   └── slack/          # Slack Web API
+├── channels/           # Channel adapters (14 total)
+│   ├── telegram/       # Telegram Bot API (webhook + polling)
+│   ├── discord/        # Discord.js (embeds, threads, reactions)
+│   ├── slack/          # Slack Web API (blocks, threads)
+│   ├── matrix/         # Matrix protocol
+│   ├── email/          # IMAP/SMTP
+│   ├── feishu/         # Feishu/Lark
+│   ├── wecom/          # WeCom
+│   ├── qq/             # QQ
+│   ├── dingtalk/       # DingTalk
+│   ├── whatsapp/       # WhatsApp
+│   ├── teams/          # Microsoft Teams
+│   ├── wechat/         # WeChat
+│   ├── websocket/      # WebSocket channel
+│   └── base-channel.ts # Shared base class
+├── cli/                # CLI entry point (commander)
+│   ├── cli.ts          # Root CLI with 15 commands
+│   ├── cli-context.ts  # Lazy singletons
+│   └── commands/       # Individual command implementations
 ├── config/             # Configuration system
 │   ├── loader.ts       # JSON/YAML loading + env var merging
 │   ├── schema.ts       # Config validation
-│   ├── secrets.ts      # Secret resolution (uppercase-safe)
+│   ├── secrets.ts      # AES-256-GCM encryption for API keys
 │   ├── hot-reload.ts   # File watcher for live config updates
 │   └── multi-instance.ts
 ├── core/               # Core services + built-in tools
@@ -67,22 +87,70 @@ src/
 │   ├── logger.ts       # Structured logging (JSON, rotation, per-plugin)
 │   ├── search.ts       # Glob + grep file search
 │   └── types.ts        # Core type definitions
+├── mcp/                # Model Context Protocol
+│   ├── client.ts       # MCP client
+│   ├── server.ts       # MCP server
+│   ├── transport.ts    # Transport layer
+│   └── built-in-tools.ts
+├── media/              # Media processing
+│   ├── processor.ts    # Image/audio/video/document handling
+│   └── types.ts
+├── memory/             # Memory system
+│   ├── entity-extractor.ts # Entity extraction
+│   ├── knowledge-graph.ts  # Knowledge graph
+│   ├── long-term.ts    # Persistent memory
+│   ├── short-term.ts   # Context window memory
+│   ├── schema-manager.ts
+│   └── skills/         # Memory maintenance skills
+├── messaging/          # Message routing
+│   ├── chat-service.ts # Unified chat pipeline
+│   ├── conversation-store.ts
+│   └── types.ts
+├── performance/        # Performance optimizations
+│   ├── cache.ts        # Response caching
+│   ├── connection-pool.ts
+│   ├── streaming.ts    # Streaming integration
+│   └── parallel-executor.ts
 ├── plugins/            # Plugin system
 │   ├── manager.ts      # Lifecycle orchestration + topological sort
 │   ├── loader.ts       # Dynamic module loading
 │   ├── discovery.ts    # Directory scanning
 │   └── types.ts        # Plugin type definitions
-└── providers/          # AI provider implementations
-    ├── openai/         # GPT-4, GPT-3.5
-    ├── anthropic/      # Claude
-    ├── openrouter/     # Multi-model routing
-    ├── ollama/         # Local models
-    ├── lmstudio/       # Local models
-    ├── llamacpp/       # Local models
-    ├── registry.ts     # Provider registry
-    ├── fallback.ts     # Multi-provider fallback
-    └── types.ts        # Unified provider interface
+├── providers/          # AI provider implementations (14 providers)
+│   ├── openai/         # GPT-4, GPT-3.5
+│   ├── anthropic/      # Claude
+│   ├── openrouter/     # Multi-model routing
+│   ├── ollama/         # Local models
+│   ├── lmstudio/       # Local models
+│   ├── llamacpp/       # Local models
+│   ├── deepseek/       # DeepSeek
+│   ├── gemini/         # Google Gemini
+│   ├── mistral/        # Mistral AI
+│   ├── azure/          # Azure OpenAI
+│   ├── vllm/           # vLLM
+│   ├── qwen/           # Qwen
+│   ├── multimodal/     # Multimodal input
+│   ├── registry.ts     # Provider registry
+│   ├── fallback.ts     # Multi-provider fallback
+│   └── types.ts        # Unified provider interface
+├── security/           # Security module
+│   ├── encryption.ts   # AES-256-GCM + scrypt
+│   ├── rate-limiter.ts # Token bucket
+│   ├── access-control.ts # RBAC
+│   ├── sandbox.ts      # Command sandboxing
+│   └── sanitizer.ts    # Input sanitization
+├── skills/             # Skill system
+│   ├── built-in/       # Built-in skill registry
+│   └── injector.ts     # LangChain/exec/HTTP tool injection
+├── webui/              # Web management UI
+│   ├── server.ts       # HTTP server
+│   ├── backend.ts      # Business logic
+│   ├── auth.ts         # API key auth
+│   ├── frontend.html   # Single-page frontend
+│   └── ...handlers     # Chat, provider, skill routes
 ```
+
+> **Full architecture reference:** See [ARCHITECTURE.md](/ARCHITECTURE.md) at the project root.
 
 ## Core Modules
 

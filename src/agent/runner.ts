@@ -176,7 +176,7 @@ export class AgentRunner {
 
 		// Prefer channelConfigs over legacy telegramToken config
 		if (channelConfigs.telegram) {
-			promises.push(this.startTelegram(channelConfigs.telegram as any));
+			promises.push(this.startTelegram(channelConfigs.telegram));
 		} else if (this.config.telegramToken) {
 			promises.push(
 				this.startTelegram({
@@ -186,27 +186,26 @@ export class AgentRunner {
 			);
 		}
 		if (channelConfigs.discord)
-			promises.push(this.startDiscord(channelConfigs.discord as any));
+			promises.push(this.startDiscord(channelConfigs.discord));
 		if (channelConfigs.slack)
-			promises.push(this.startSlack(channelConfigs.slack as any));
+			promises.push(this.startSlack(channelConfigs.slack));
 		if (channelConfigs.matrix)
-			promises.push(this.startMatrix(channelConfigs.matrix as any));
+			promises.push(this.startMatrix(channelConfigs.matrix));
 		if (channelConfigs.feishu)
-			promises.push(this.startFeishu(channelConfigs.feishu as any));
+			promises.push(this.startFeishu(channelConfigs.feishu));
 		if (channelConfigs.wecom)
-			promises.push(this.startWeCom(channelConfigs.wecom as any));
-		if (channelConfigs.qq)
-			promises.push(this.startQQ(channelConfigs.qq as any));
+			promises.push(this.startWeCom(channelConfigs.wecom));
+		if (channelConfigs.qq) promises.push(this.startQQ(channelConfigs.qq));
 		if (channelConfigs.dingtalk)
-			promises.push(this.startDingTalk(channelConfigs.dingtalk as any));
+			promises.push(this.startDingTalk(channelConfigs.dingtalk));
 		if (channelConfigs.email)
-			promises.push(this.startEmail(channelConfigs.email as any));
+			promises.push(this.startEmail(channelConfigs.email));
 		if (channelConfigs.teams)
-			promises.push(this.startTeams(channelConfigs.teams as any));
+			promises.push(this.startTeams(channelConfigs.teams));
 		if (channelConfigs.whatsapp)
-			promises.push(this.startWhatsApp(channelConfigs.whatsapp as any));
+			promises.push(this.startWhatsApp(channelConfigs.whatsapp));
 		if (channelConfigs.websocket)
-			promises.push(this.startWebSocket(channelConfigs.websocket as any));
+			promises.push(this.startWebSocket(channelConfigs.websocket));
 
 		await Promise.all(promises);
 		this.logger.info("All channels started");
@@ -232,6 +231,13 @@ export class AgentRunner {
 	/**
 	 * Wire a generic channel using duck-typed interface.
 	 * Each channel gets its own conversation ID derived from channelName + chat ID.
+	 */
+	/**
+	 * Wire a generic channel.
+	 * Each channel has unique message/send option types, so the interface
+	 * uses `any` for message and options — this is a pragmatic trade-off since
+	 * there is no shared base type across all 14 channel implementations.
+	 * Config types remain strictly typed via the startXxx methods.
 	 */
 	private wireChannel(
 		channel: {
@@ -270,12 +276,11 @@ export class AgentRunner {
 		this.logger.info(`${channelName} channel wired`);
 	}
 
-	private async startTelegram(config: {
-		token: string;
-		webhookUrl?: string;
-	}): Promise<void> {
+	private async startTelegram(
+		config: NonNullable<ChannelConfigs["telegram"]>,
+	): Promise<void> {
 		const { TelegramChannel } = await import("../channels/telegram/channel.js");
-		const channel = new TelegramChannel(config as any);
+		const channel = new TelegramChannel(config);
 		this.activeChannels.add(channel);
 		channel.onMessage(async (msg: any) => {
 			const text = msg.text ?? "";
@@ -289,7 +294,9 @@ export class AgentRunner {
 		this.logger.info("telegram channel started");
 	}
 
-	private async startDiscord(config: any): Promise<void> {
+	private async startDiscord(
+		config: NonNullable<ChannelConfigs["discord"]>,
+	): Promise<void> {
 		const { DiscordChannel } = await import("../channels/discord/channel.js");
 		const channel = new DiscordChannel(config);
 		this.activeChannels.add(channel);
@@ -308,7 +315,9 @@ export class AgentRunner {
 		this.logger.info("discord channel started");
 	}
 
-	private async startEmail(config: any): Promise<void> {
+	private async startEmail(
+		config: NonNullable<ChannelConfigs["email"]>,
+	): Promise<void> {
 		const { EmailChannel } = await import("../channels/email/channel.js");
 		const channel = new EmailChannel(config);
 		this.activeChannels.add(channel);
@@ -333,81 +342,83 @@ export class AgentRunner {
 		this.logger.info("email channel started");
 	}
 
-	private async startSlack(config: any): Promise<void> {
+	private async startSlack(
+		config: NonNullable<ChannelConfigs["slack"]>,
+	): Promise<void> {
 		const { SlackChannel } = await import("../channels/slack/channel.js");
-		this.wireChannel(
-			new SlackChannel(config),
-			"slack",
-			(m) => m.channel ?? m.user ?? "unknown",
+		this.wireChannel(new SlackChannel(config), "slack", (m) =>
+			String(m.channel ?? m.user ?? "unknown"),
 		);
 	}
 
-	private async startMatrix(config: any): Promise<void> {
+	private async startMatrix(
+		config: NonNullable<ChannelConfigs["matrix"]>,
+	): Promise<void> {
 		const { MatrixChannel } = await import("../channels/matrix/channel.js");
-		this.wireChannel(
-			new MatrixChannel(config),
-			"matrix",
-			(m) => m.roomId ?? m.sender ?? "unknown",
+		this.wireChannel(new MatrixChannel(config), "matrix", (m) =>
+			String(m.roomId ?? m.sender ?? "unknown"),
 		);
 	}
 
-	private async startFeishu(config: any): Promise<void> {
+	private async startFeishu(
+		config: NonNullable<ChannelConfigs["feishu"]>,
+	): Promise<void> {
 		const { FeishuChannel } = await import("../channels/feishu/channel.js");
-		this.wireChannel(
-			new FeishuChannel(config),
-			"feishu",
-			(m) => m.chatId ?? m.sender?.id ?? "unknown",
+		this.wireChannel(new FeishuChannel(config), "feishu", (m) =>
+			String(m.chatId ?? m.sender?.id ?? "unknown"),
 		);
 	}
 
-	private async startWeCom(config: any): Promise<void> {
+	private async startWeCom(
+		config: NonNullable<ChannelConfigs["wecom"]>,
+	): Promise<void> {
 		const { WeComChannel } = await import("../channels/wecom/channel.js");
-		this.wireChannel(
-			new WeComChannel(config),
-			"wecom",
-			(m) => m.chatId ?? m.from ?? "unknown",
+		this.wireChannel(new WeComChannel(config), "wecom", (m) =>
+			String(m.chatId ?? m.from ?? "unknown"),
 		);
 	}
 
-	private async startQQ(config: any): Promise<void> {
+	private async startQQ(
+		config: NonNullable<ChannelConfigs["qq"]>,
+	): Promise<void> {
 		const { QQChannel } = await import("../channels/qq/channel.js");
-		this.wireChannel(
-			new QQChannel(config),
-			"qq",
-			(m) => m.groupId ?? m.userId ?? "unknown",
+		this.wireChannel(new QQChannel(config), "qq", (m) =>
+			String(m.groupId ?? m.userId ?? "unknown"),
 		);
 	}
 
-	private async startDingTalk(config: any): Promise<void> {
+	private async startDingTalk(
+		config: NonNullable<ChannelConfigs["dingtalk"]>,
+	): Promise<void> {
 		const { DingTalkChannel } = await import("../channels/dingtalk/channel.js");
-		this.wireChannel(
-			new DingTalkChannel(config),
-			"dingtalk",
-			(m) => m.chatId ?? m.senderId ?? "unknown",
+		this.wireChannel(new DingTalkChannel(config), "dingtalk", (m) =>
+			String(m.chatId ?? m.senderId ?? "unknown"),
 		);
 	}
 
-	private async startTeams(config: any): Promise<void> {
+	private async startTeams(
+		config: NonNullable<ChannelConfigs["teams"]>,
+	): Promise<void> {
 		const { TeamsChannel } = await import("../channels/teams/channel.js");
-		this.wireChannel(
-			new TeamsChannel(config),
-			"teams",
-			(m) => m.conversation?.id ?? m.from?.id ?? "unknown",
+		this.wireChannel(new TeamsChannel(config), "teams", (m) =>
+			String(m.conversation?.id ?? m.from?.id ?? "unknown"),
 		);
 	}
 
-	private async startWhatsApp(config: any): Promise<void> {
+	private async startWhatsApp(
+		config: NonNullable<ChannelConfigs["whatsapp"]>,
+	): Promise<void> {
 		const { WhatsAppChannel } = await import("../channels/whatsapp/channel.js");
-		this.wireChannel(
-			new WhatsAppChannel(config),
-			"whatsapp",
-			(m) => m.from ?? m.phoneNumber ?? "unknown",
+		this.wireChannel(new WhatsAppChannel(config), "whatsapp", (m) =>
+			String(m.from ?? m.phoneNumber ?? "unknown"),
 		);
 	}
 
-	private async startWebSocket(_config: any): Promise<void> {
+	private async startWebSocket(
+		_config: NonNullable<ChannelConfigs["websocket"]>,
+	): Promise<void> {
 		this.logger.info(
-			"WebSocket channel configured (start pending implementation)",
+			"WebSocket channel configured — wiring pending (uses start/stop API instead of connect/disconnect)",
 		);
 	}
 
@@ -443,6 +454,8 @@ export function createAgentRunnerFromEnv(): AgentRunner {
 		telegramToken: process.env.SYNTHTEK_TELEGRAM_TOKEN,
 		telegramWebhookUrl: process.env.SYNTHTEK_TELEGRAM_WEBHOOK_URL,
 		systemPrompt: process.env.SYNTHTEK_SYSTEM_PROMPT,
-		logLevel: (process.env.SYNTHTEK_LOG_LEVEL as any) ?? "info",
+		logLevel:
+			(process.env.SYNTHTEK_LOG_LEVEL as "debug" | "info" | "warn" | "error") ??
+			"info",
 	});
 }

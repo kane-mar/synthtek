@@ -13,6 +13,7 @@
  */
 
 import type { ToolCall, ToolResult } from "./types.js";
+import { isRetryable, classifyError } from "./retry.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -47,41 +48,8 @@ export type ToolHandler = (
 
 // ── Retryable Error Detection ────────────────────────────────────────────────
 
-const RETRYABLE_PATTERNS = [
-	/\brate\s*limit\b/i,
-	/\btoo\s*many\s*requests\b/i,
-	/\b429\b/,
-	/\b503\b/,
-	/\b502\b/,
-	/\btimeout\b/i,
-	/\btimed?\s*out\b/i,
-	/\bdeadline\b/i,
-	/\bunavailable\b/i,
-	/\boverloaded\b/i,
-	/\bretry\b/i,
-	/\bnetwork\s*error\b/i,
-	/\bconnection\b.*\b(refused|reset|closed|timeout)\b/i,
-];
-
-function isRetryable(errorMessage: string): boolean {
-	return RETRYABLE_PATTERNS.some((p) => p.test(errorMessage));
-}
-
-/** Map an error message to a machine-readable code. */
-function classifyError(message: string): string {
-	const lower = message.toLowerCase();
-	if (/rate\s*limit|too\s*many|429/.test(lower)) return "rate_limit";
-	if (/timeout|timed?\s*out|deadline/.test(lower)) return "timeout";
-	if (/unavailable|overloaded|503|502/.test(lower))
-		return "service_unavailable";
-	if (/network|connection\s*(refused|reset|closed|timeout)/.test(lower))
-		return "network";
-	if (/disabled/.test(lower)) return "disabled";
-	if (/unknown\s*tool/.test(lower)) return "unknown_tool";
-	if (/not\s*found|not found|enoent/.test(lower)) return "not_found";
-	if (/invalid|bad request|validation/.test(lower)) return "invalid_input";
-	return "handler_error";
-}
+// Note: isRetryable() and classifyError() imported from retry.ts
+// Legacy local definitions removed — they were duplicates of the shared module.
 
 // ── Output Schema Validator ─────────────────────────────────────────────────
 

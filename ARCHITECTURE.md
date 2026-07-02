@@ -1,8 +1,9 @@
 # Architecture
 
-> **Last updated:** 2026-06-29  
-> **Tests:** 1,320 passing, 482 suites  
-> **Source:** 165 TypeScript files (~33,600 LOC)
+> **Last updated:** 2026-07-01  
+> **Tests:** 1,320 passing, 1 skipped, 482 suites (100% green)  
+> **E2E:** 6 Playwright WebUI tests passing against production build  
+> **Source:** 165 TypeScript files (~33,700 LOC)
 
 ---
 

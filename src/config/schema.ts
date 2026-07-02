@@ -55,6 +55,13 @@ export interface ContextWindowConfig {
 	compactionStrategy: "trim" | "summarize" | "hybrid";
 }
 
+/**
+ * Agent Loop Config — used for config file validation and env-var construction.
+ *
+ * NOTE: The canonical type is defined in src/agent/types.ts with richer JSDoc.
+ * This version is simplified for serialization/validation purposes.
+ * Keep in sync with src/agent/types.ts#AgentLoopConfig.
+ */
 export interface AgentLoopConfig {
 	systemPrompt: string;
 	maxToolCalls: number;

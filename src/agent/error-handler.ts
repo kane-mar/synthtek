@@ -4,6 +4,7 @@
  */
 
 import type { AgentLoopConfig } from "./types.js";
+import { matchesPatterns, RETRYABLE_ERROR_PATTERNS, TIMEOUT_PATTERNS, NETWORK_PATTERNS } from "./retry.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -32,36 +33,15 @@ export interface CircuitBreakerState {
 
 // ─── Error Category Detection ────────────────────────────────────────────────
 
-const RETRYABLE_ERROR_PATTERNS: RegExp[] = [
-	/timeout/i,
-	/rate.?limit/i,
-	/too many requests/i,
-	/network/i,
-	/connection refused/i,
-	/econnreset/i,
-	/etimedout/i,
-	/eai_again/i,
-];
-
 const RATE_LIMIT_PATTERNS: RegExp[] = [
 	/rate.?limit/i,
 	/too many requests/i,
 	/429/i,
 ];
 
-const TIMEOUT_PATTERNS: RegExp[] = [/timeout/i, /etimedout/i];
-
-const NETWORK_PATTERNS: RegExp[] = [
-	/network/i,
-	/connection refused/i,
-	/econnreset/i,
-	/eai_again/i,
-	/enotfound/i,
-];
-
-function matchesPatterns(message: string, patterns: RegExp[]): boolean {
-	return patterns.some((p) => p.test(message));
-}
+// Note: RETRYABLE_ERROR_PATTERNS, TIMEOUT_PATTERNS, NETWORK_PATTERNS,
+// and matchesPatterns() imported from retry.ts — consolidated to eliminate
+// duplicated pattern lists that drift apart.
 
 // ─── AgentErrorHandler Class ─────────────────────────────────────────────────
 
@@ -81,24 +61,16 @@ export class AgentErrorHandler {
 	};
 
 	constructor(config: Partial<AgentLoopConfig>) {
-		const retry = config.retry ?? {
-			maxRetries: 3,
-			initialDelay: 1000,
-			maxDelay: 30000,
-			multiplier: 2,
-		};
-		this.maxRetries = retry.maxRetries;
-		this.initialDelay = retry.initialDelay;
-		this.maxDelay = retry.maxDelay;
-		this.multiplier = retry.multiplier;
-		this.retryablePatterns = retry.retryableErrors ?? RETRYABLE_ERROR_PATTERNS;
+		const retry = config.retry;
+		this.maxRetries = retry?.maxRetries ?? 3;
+		this.initialDelay = retry?.initialDelay ?? 1000;
+		this.maxDelay = retry?.maxDelay ?? 30000;
+		this.multiplier = retry?.multiplier ?? 2;
+		this.retryablePatterns = retry?.retryableErrors ?? RETRYABLE_ERROR_PATTERNS;
 
-		const cb = config.circuitBreaker ?? {
-			failureThreshold: 5,
-			recoveryTimeout: 60000,
-		};
-		this.failureThreshold = cb.failureThreshold;
-		this.recoveryTimeout = cb.recoveryTimeout;
+		const cb = config.circuitBreaker;
+		this.failureThreshold = cb?.failureThreshold ?? 5;
+		this.recoveryTimeout = cb?.recoveryTimeout ?? 60000;
 	}
 
 	/** Classify an error into a category based on its type hint and message */
@@ -163,17 +135,27 @@ export class AgentErrorHandler {
 
 	// ─── Circuit Breaker ──────────────────────────────────────────────────────
 
-	recordFailure(): void {
+	/**
+	 * Record a failed LLM call. Returns true if circuit breaker just opened.
+	 */
+	recordFailure(): boolean {
 		this.circuitBreaker.failures += 1;
 		this.circuitBreaker.lastFailureAt = Date.now();
-		if (this.circuitBreaker.failures >= this.failureThreshold) {
+		if (this.circuitBreaker.failures >= this.failureThreshold && this.circuitBreaker.state !== "open") {
 			this.circuitBreaker.state = "open";
+			return true; // state just transitioned to open
 		}
+		return false;
 	}
 
-	recordSuccess(): void {
+	/**
+	 * Record a successful LLM call. Returns true if circuit breaker state changed.
+	 */
+	recordSuccess(): boolean {
+		const wasOpen = this.circuitBreaker.state !== "closed";
 		this.circuitBreaker.failures = 0;
 		this.circuitBreaker.state = "closed";
+		return wasOpen; // true if it was open/closed/half-open and now closed
 	}
 
 	isCircuitOpen(): boolean {

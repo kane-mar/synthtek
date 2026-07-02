@@ -27,6 +27,20 @@ import type { WebUIConfig } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// ── CSP Header ──────────────────────────────────────────────────────────────
+
+/** Content-Security-Policy for frontend and API responses */
+const CSP_HEADER =
+	"default-src 'self'; " +
+	"script-src 'self' 'unsafe-inline'; " +
+	"style-src 'self' 'unsafe-inline'; " +
+	"img-src 'self' data: https:; " +
+	"connect-src 'self' ws: wss: https:; " +
+	"font-src 'self' data:; " +
+	"object-src 'none'; " +
+	"base-uri 'self'; " +
+	"form-action 'self';";
+
 // ── Server ──────────────────────────────────────────────────────────────────
 
 export class WebUIServer {
@@ -136,6 +150,9 @@ export class WebUIServer {
 			if (path === "/" || path === "/index.html") {
 				res.writeHead(200, {
 					"Content-Type": "text/html; charset=utf-8",
+					"Content-Security-Policy": CSP_HEADER,
+					"X-Content-Type-Options": "nosniff",
+					"X-Frame-Options": "DENY",
 					"Cache-Control": "no-cache, no-store, must-revalidate",
 					Pragma: "no-cache",
 					Expires: "0",

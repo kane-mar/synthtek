@@ -1,10 +1,11 @@
 /**
  * AgentLoop tests — integration-style via public API
  */
-import { describe, it } from "node:test";
+
 import assert from "node:assert/strict";
-import { AgentLoop } from "./loop.js";
+import { describe, it } from "node:test";
 import type { LLMProvider, StreamChunk } from "../providers/types.js";
+import { AgentLoop } from "./loop.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -20,7 +21,11 @@ function echoProvider(response: string): LLMProvider {
 		chatStream: async function* () {
 			// Yield content first, then done chunk (matches real provider behavior)
 			yield { delta: response, done: false };
-			yield { delta: "", done: true, usage: { promptTokens: 0, completionTokens: 10, totalTokens: 10 } };
+			yield {
+				delta: "",
+				done: true,
+				usage: { promptTokens: 0, completionTokens: 10, totalTokens: 10 },
+			};
 		},
 		listModels: async () => [],
 		healthCheck: async () => true,
@@ -29,7 +34,10 @@ function echoProvider(response: string): LLMProvider {
 }
 
 /** A fake provider that responds with a tool call, then a final response */
-function toolCallProvider(toolName: string, finalResponse: string): LLMProvider {
+function toolCallProvider(
+	toolName: string,
+	finalResponse: string,
+): LLMProvider {
 	let callCount = 0;
 	return {
 		name: "test-tool",
@@ -56,7 +64,11 @@ function toolCallProvider(toolName: string, finalResponse: string): LLMProvider 
 				yield { delta: "", done: true };
 			} else {
 				yield { delta: finalResponse, done: false };
-				yield { delta: "", done: true, usage: { promptTokens: 0, completionTokens: 10, totalTokens: 10 } };
+				yield {
+					delta: "",
+					done: true,
+					usage: { promptTokens: 0, completionTokens: 10, totalTokens: 10 },
+				};
 			}
 		},
 		listModels: async () => [],
@@ -71,7 +83,11 @@ describe("AgentLoop — processMessage (non-streaming)", () => {
 	it("returns a simple text response", async () => {
 		const loop = new AgentLoop({ systemPrompt: "Be helpful." });
 		loop.registerTool(
-			{ name: "ping", description: "test", parameters: { type: "object", properties: {} } },
+			{
+				name: "ping",
+				description: "test",
+				parameters: { type: "object", properties: {} },
+			},
 			async () => ({ content: "pong" }),
 		);
 
@@ -89,7 +105,11 @@ describe("AgentLoop — processMessage (non-streaming)", () => {
 	it("executes tool calls when LLM requests them", async () => {
 		const loop = new AgentLoop({ systemPrompt: "Be helpful." });
 		loop.registerTool(
-			{ name: "get_time", description: "Returns current time", parameters: { type: "object", properties: {} } },
+			{
+				name: "get_time",
+				description: "Returns current time",
+				parameters: { type: "object", properties: {} },
+			},
 			async () => ({ content: "12:00" }),
 		);
 
@@ -103,9 +123,16 @@ describe("AgentLoop — processMessage (non-streaming)", () => {
 	});
 
 	it("respects maxToolCalls limit", async () => {
-		const loop = new AgentLoop({ systemPrompt: "Be helpful.", maxToolCalls: 1 });
+		const loop = new AgentLoop({
+			systemPrompt: "Be helpful.",
+			maxToolCalls: 1,
+		});
 		loop.registerTool(
-			{ name: "ping", description: "test", parameters: { type: "object", properties: {} } },
+			{
+				name: "ping",
+				description: "test",
+				parameters: { type: "object", properties: {} },
+			},
 			async () => ({ content: "pong" }),
 		);
 
@@ -137,7 +164,9 @@ describe("AgentLoop — processMessage (non-streaming)", () => {
 		);
 
 		assert.ok(result.toolCallsMade >= 1);
-		assert.ok(result.errors.length > 0 || result.response.includes("tool call"));
+		assert.ok(
+			result.errors.length > 0 || result.response.includes("tool call"),
+		);
 	});
 });
 
@@ -153,7 +182,8 @@ describe("AgentLoop — processMessageStream (streaming)", () => {
 		let result: Awaited<ReturnType<typeof gen.next>>;
 		do {
 			result = await gen.next();
-			if (result.value && !(result.value as StreamChunk).done) chunks.push(result.value as StreamChunk);
+			if (result.value && !(result.value as StreamChunk).done)
+				chunks.push(result.value as StreamChunk);
 		} while (!result.done);
 
 		assert.ok(chunks.length > 0);
@@ -163,7 +193,11 @@ describe("AgentLoop — processMessageStream (streaming)", () => {
 	it("executes tool calls via streaming path", async () => {
 		const loop = new AgentLoop({ systemPrompt: "Be helpful." });
 		loop.registerTool(
-			{ name: "get_time", description: "Returns current time", parameters: { type: "object", properties: {} } },
+			{
+				name: "get_time",
+				description: "Returns current time",
+				parameters: { type: "object", properties: {} },
+			},
 			async () => ({ content: "12:00" }),
 		);
 
@@ -176,7 +210,8 @@ describe("AgentLoop — processMessageStream (streaming)", () => {
 		let result: Awaited<ReturnType<typeof gen.next>>;
 		do {
 			result = await gen.next();
-			if (result.value && !(result.value as StreamChunk).done) chunks.push(result.value as StreamChunk);
+			if (result.value && !(result.value as StreamChunk).done)
+				chunks.push(result.value as StreamChunk);
 		} while (!result.done);
 
 		assert.equal(result.value.response, "The time is 12:00.");
@@ -205,13 +240,20 @@ describe("AgentLoop — parity (streaming ≈ non-streaming)", () => {
 		const streamingResult = result.value;
 
 		assert.equal(streamingResult.response, nonStreamingResult.response);
-		assert.equal(streamingResult.toolCallsMade, nonStreamingResult.toolCallsMade);
+		assert.equal(
+			streamingResult.toolCallsMade,
+			nonStreamingResult.toolCallsMade,
+		);
 	});
 
 	it("produces same response with tool calls", async () => {
 		const loop1 = new AgentLoop({ systemPrompt: "Be helpful." });
 		loop1.registerTool(
-			{ name: "ping", description: "test", parameters: { type: "object", properties: {} } },
+			{
+				name: "ping",
+				description: "test",
+				parameters: { type: "object", properties: {} },
+			},
 			async () => ({ content: "pong" }),
 		);
 		const nonStreamingResult = await loop1.processMessage(
@@ -221,7 +263,11 @@ describe("AgentLoop — parity (streaming ≈ non-streaming)", () => {
 
 		const loop2 = new AgentLoop({ systemPrompt: "Be helpful." });
 		loop2.registerTool(
-			{ name: "ping", description: "test", parameters: { type: "object", properties: {} } },
+			{
+				name: "ping",
+				description: "test",
+				parameters: { type: "object", properties: {} },
+			},
 			async () => ({ content: "pong" }),
 		);
 		const gen = loop2.processMessageStream(
@@ -235,6 +281,9 @@ describe("AgentLoop — parity (streaming ≈ non-streaming)", () => {
 		const streamingResult = result.value;
 
 		assert.equal(streamingResult.response, nonStreamingResult.response);
-		assert.equal(streamingResult.toolCallsMade, nonStreamingResult.toolCallsMade);
+		assert.equal(
+			streamingResult.toolCallsMade,
+			nonStreamingResult.toolCallsMade,
+		);
 	});
 });

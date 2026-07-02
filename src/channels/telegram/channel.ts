@@ -20,9 +20,11 @@ import {
 	validateUrlTarget,
 } from "./format.js";
 import type {
+	TelegramApiResponse,
 	TelegramBotCommand,
 	TelegramCallbackQuery,
 	TelegramChannelInfo,
+	TelegramChatMember,
 	TelegramConfig,
 	TelegramInlineQuery,
 	TelegramMedia,
@@ -911,54 +913,60 @@ export class TelegramChannel extends BaseChannel<
 		chatId: number | string,
 	): Promise<TelegramChannelInfo | null> {
 		const response = await this.api.apiCallRaw("getChat", { chat_id: chatId });
-		const data = (await response.json()) as { ok: boolean; result?: any };
+		const data = (await response.json()) as TelegramApiResponse;
 
 		if (!data.ok || !data.result) return null;
 
-		const chat = data.result;
+		// Raw API response — parse at the boundary
+		const chat = data.result as Record<string, unknown>;
+		const photo = chat.photo as Record<string, string> | undefined;
+		const perms = chat.permissions as Record<string, boolean> | undefined;
+		const pinned = chat.pinned_message as Record<string, number> | undefined;
+
 		return {
-			id: chat.id,
-			type: chat.type,
-			title: chat.title,
-			username: chat.username,
-			firstName: chat.first_name,
-			lastName: chat.last_name,
-			photo: chat.photo
+			id: chat.id as number,
+			type: chat.type as TelegramChannelInfo["type"],
+			title: chat.title as string | undefined,
+			username: chat.username as string | undefined,
+			firstName: chat.first_name as string | undefined,
+			lastName: chat.last_name as string | undefined,
+			photo: photo
+				? { smallFileId: photo.small_file_id, bigFileId: photo.big_file_id }
+				: undefined,
+			bio: chat.bio as string | undefined,
+			description: chat.description as string | undefined,
+			inviteLink: chat.invite_link as string | undefined,
+			pinnedMessageId: pinned?.message_id,
+			permissions: perms
 				? {
-						smallFileId: chat.photo.small_file_id,
-						bigFileId: chat.photo.big_file_id,
+						canSendMessages: perms.can_send_messages,
+						canSendMediaMessages: perms.can_send_media_messages,
+						canSendPolls: perms.can_send_polls,
+						canSendOtherMessages: perms.can_send_other_messages,
+						canAddWebPagePreviews: perms.can_add_web_page_previews,
+						canChangeInfo: perms.can_change_info,
+						canInviteUsers: perms.can_invite_users,
+						canPinMessages: perms.can_pin_messages,
+						canManageTopics: perms.can_manage_topics,
 					}
 				: undefined,
-			bio: chat.bio,
-			description: chat.description,
-			inviteLink: chat.invite_link,
-			pinnedMessageId: chat.pinned_message?.message_id,
-			permissions: chat.permissions
-				? {
-						canSendMessages: chat.permissions.can_send_messages,
-						canSendMediaMessages: chat.permissions.can_send_media_messages,
-						canSendPolls: chat.permissions.can_send_polls,
-						canSendOtherMessages: chat.permissions.can_send_other_messages,
-						canAddWebPagePreviews: chat.permissions.can_add_web_page_previews,
-						canChangeInfo: chat.permissions.can_change_info,
-						canInviteUsers: chat.permissions.can_invite_users,
-						canPinMessages: chat.permissions.can_pin_messages,
-						canManageTopics: chat.permissions.can_manage_topics,
-					}
-				: undefined,
-			slowModeDelay: chat.slow_mode_delay,
-			stickerSetName: chat.sticker_set_name,
-			canSetStickerSet: chat.can_set_sticker_set,
-			memberCount: chat.members_count,
+			slowModeDelay: chat.slow_mode_delay as number | undefined,
+			stickerSetName: chat.sticker_set_name as string | undefined,
+			canSetStickerSet: chat.can_set_sticker_set as boolean | undefined,
+			memberCount: chat.members_count as number | undefined,
 		};
 	}
 
 	/** Get chat administrators */
-	async getChatAdministrators(chatId: number | string): Promise<any[]> {
+	async getChatAdministrators(
+		chatId: number | string,
+	): Promise<TelegramChatMember[]> {
 		const response = await this.api.apiCallRaw("getChatAdministrators", {
 			chat_id: chatId,
 		});
-		const data = (await response.json()) as { ok: boolean; result?: any[] };
+		const data = (await response.json()) as TelegramApiResponse<
+			TelegramChatMember[]
+		>;
 
 		if (!data.ok) return [];
 		return data.result ?? [];
@@ -969,7 +977,7 @@ export class TelegramChannel extends BaseChannel<
 		const response = await this.api.apiCallRaw("getChatMembersCount", {
 			chat_id: chatId,
 		});
-		const data = (await response.json()) as { ok: boolean; result?: number };
+		const data = (await response.json()) as TelegramApiResponse<number>;
 
 		if (!data.ok) return 0;
 		return data.result ?? 0;
@@ -979,15 +987,16 @@ export class TelegramChannel extends BaseChannel<
 	async getChatMember(
 		chatId: number | string,
 		userId: number,
-	): Promise<any | null> {
+	): Promise<TelegramChatMember | null> {
 		const response = await this.api.apiCallRaw("getChatMember", {
 			chat_id: chatId,
 			user_id: userId,
 		});
-		const data = (await response.json()) as { ok: boolean; result?: any };
+		const data =
+			(await response.json()) as TelegramApiResponse<TelegramChatMember>;
 
 		if (!data.ok) return null;
-		return data.result;
+		return data.result ?? null;
 	}
 
 	/** Leave a chat */
@@ -1094,10 +1103,10 @@ export class TelegramChannel extends BaseChannel<
 			offset: 0,
 			limit: 1,
 		});
-		const data = (await response.json()) as {
-			ok: boolean;
-			result?: { total_count: number; photos: any[][] };
-		};
+		const data = (await response.json()) as TelegramApiResponse<{
+			total_count: number;
+			photos: Array<Array<Record<string, unknown>>>;
+		}>;
 
 		if (!data.ok) return null;
 
@@ -1105,29 +1114,28 @@ export class TelegramChannel extends BaseChannel<
 		const chatResponse = await this.api.apiCallRaw("getChat", {
 			chat_id: userId,
 		});
-		const chatData = (await chatResponse.json()) as {
-			ok: boolean;
-			result?: any;
-		};
+		const chatData = (await chatResponse.json()) as TelegramApiResponse;
 
 		if (!chatData.ok) return null;
 
-		const chat = chatData.result;
+		const chat = chatData.result as Record<string, unknown>;
 		return {
-			id: chat.id,
-			username: chat.username,
-			firstName: chat.first_name,
-			lastName: chat.last_name,
+			id: chat.id as number,
+			username: chat.username as string | undefined,
+			firstName: chat.first_name as string | undefined,
+			lastName: chat.last_name as string | undefined,
 			photo: chat.photo
 				? {
-						smallFileId: chat.photo.small_file_id,
-						bigFileId: chat.photo.big_file_id,
+						smallFileId: (chat.photo as Record<string, string>).small_file_id,
+						bigFileId: (chat.photo as Record<string, string>).big_file_id,
 					}
 				: undefined,
-			bio: chat.bio,
-			languageCode: chat.language_code,
-			hasPrivateForwards: chat.has_private_forwards,
-			hasRestrictedVoiceAndVideo: chat.has_restricted_voice_and_video,
+			bio: chat.bio as string | undefined,
+			languageCode: chat.language_code as string | undefined,
+			hasPrivateForwards: chat.has_private_forwards as boolean | undefined,
+			hasRestrictedVoiceAndVideo: chat.has_restricted_voice_and_video as
+				| boolean
+				| undefined,
 			totalPhotos: data.result?.total_count ?? 0,
 		};
 	}
@@ -1169,16 +1177,19 @@ export class TelegramChannel extends BaseChannel<
 		errorMessage?: string;
 	} | null> {
 		const response = await this.api.apiCallRaw("getWebhookInfo");
-		const data = (await response.json()) as { ok: boolean; result?: any };
+		const data = (await response.json()) as TelegramApiResponse<
+			Record<string, unknown>
+		>;
 
 		if (!data.ok || !data.result) return null;
 
+		const r = data.result;
 		return {
-			url: data.result.url,
-			hasCustomCertificate: data.result.has_custom_certificate,
-			pendingUpdateCount: data.result.pending_update_count,
-			lastErrorDate: data.result.last_error_date,
-			errorMessage: data.result.last_error_message,
+			url: r.url as string,
+			hasCustomCertificate: r.has_custom_certificate as boolean,
+			pendingUpdateCount: r.pending_update_count as number,
+			lastErrorDate: r.last_error_date as number | undefined,
+			errorMessage: r.last_error_message as string | undefined,
 		};
 	}
 

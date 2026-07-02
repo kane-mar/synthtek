@@ -80,6 +80,12 @@ export interface ContextCompactionResult {
 
 // ─── Agent Loop ─────────────────────────────────────────────────────────────
 
+/**
+ * Agent Loop Config — the canonical runtime type.
+ *
+ * NOTE: A parallel serialization-friendly version exists in
+ * src/config/schema.ts for config file validation. Keep in sync.
+ */
 export interface AgentLoopConfig {
 	/** System prompt for the agent */
 	systemPrompt: string;
@@ -108,7 +114,7 @@ export interface AgentLoopConfig {
 	/** Response format type */
 	responseFormat?: "markdown" | "json" | "plain" | "structured";
 	/** Retry settings for LLM calls */
-	retry?: {
+	retry?: Partial<{
 		/** Maximum number of retries */
 		maxRetries: number;
 		/** Initial delay in milliseconds */
@@ -119,14 +125,14 @@ export interface AgentLoopConfig {
 		multiplier: number;
 		/** Error patterns that should trigger a retry */
 		retryableErrors?: RegExp[];
-	};
+	}>;
 	/** Circuit breaker settings */
-	circuitBreaker?: {
+	circuitBreaker?: Partial<{
 		/** Number of failures before opening the circuit */
 		failureThreshold: number;
 		/** Time in milliseconds to wait before half-opening */
 		recoveryTimeout: number;
-	};
+	}>;
 }
 
 export interface AgentLoopResult {
