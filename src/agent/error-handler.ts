@@ -3,8 +3,13 @@
  * Extracted from AgentLoop for single-responsibility.
  */
 
+import {
+	matchesPatterns,
+	NETWORK_PATTERNS,
+	RETRYABLE_ERROR_PATTERNS,
+	TIMEOUT_PATTERNS,
+} from "./retry.js";
 import type { AgentLoopConfig } from "./types.js";
-import { matchesPatterns, RETRYABLE_ERROR_PATTERNS, TIMEOUT_PATTERNS, NETWORK_PATTERNS } from "./retry.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -141,7 +146,10 @@ export class AgentErrorHandler {
 	recordFailure(): boolean {
 		this.circuitBreaker.failures += 1;
 		this.circuitBreaker.lastFailureAt = Date.now();
-		if (this.circuitBreaker.failures >= this.failureThreshold && this.circuitBreaker.state !== "open") {
+		if (
+			this.circuitBreaker.failures >= this.failureThreshold &&
+			this.circuitBreaker.state !== "open"
+		) {
 			this.circuitBreaker.state = "open";
 			return true; // state just transitioned to open
 		}

@@ -258,7 +258,10 @@ export class SubagentSpawner {
 		}
 
 		// If the subagent has already completed, just remove it
-		if (entry.result.status !== "completed" && entry.result.status !== "failed") {
+		if (
+			entry.result.status !== "completed" &&
+			entry.result.status !== "failed"
+		) {
 			entry.abort.abort();
 			entry.result.status = "cancelled";
 			entry.result.response = `Subagent cancelled.`;

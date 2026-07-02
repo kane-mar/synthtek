@@ -121,7 +121,7 @@ describe("Conversation sharing between TUI and WebUI", () => {
 		assert.ok(tuiSession, "TUI session found");
 
 		// getMessages should work
-		const messages = backend.getMessages(tuiSession.id);
+		const messages = backend.syncAndGetMessages(tuiSession.id);
 		assert.strictEqual(messages.length, 2);
 		assert.strictEqual(messages[0].role, "user");
 		assert.strictEqual(messages[0].content, "Hello from TUI");

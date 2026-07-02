@@ -76,14 +76,21 @@ export class WebUIServer {
 		try {
 			mkdirSync(configDir, { recursive: true });
 		} catch {
-			console.error(`[WebUIServer] Failed to create config directory: ${configDir}`);
+			console.error(
+				`[WebUIServer] Failed to create config directory: ${configDir}`,
+			);
 		}
 		this.providerManager = new ProviderManager(workspaceDir);
 		this.skillManager = new SkillManager(
 			join(workspaceDir, "skills"),
 			configDir,
 		);
-		this.backend = new WebUIBackend(config, workspaceDir, this.providerManager, this.skillManager);
+		this.backend = new WebUIBackend(
+			config,
+			workspaceDir,
+			this.providerManager,
+			this.skillManager,
+		);
 	}
 
 	async start(): Promise<void> {

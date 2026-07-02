@@ -12,8 +12,8 @@
  * - Deduplication of identical calls
  */
 
+import { classifyError, isRetryable } from "./retry.js";
 import type { ToolCall, ToolResult } from "./types.js";
-import { isRetryable, classifyError } from "./retry.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

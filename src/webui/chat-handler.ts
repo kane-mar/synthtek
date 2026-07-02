@@ -147,7 +147,11 @@ export async function handleChatCompletion(
 			role: string;
 			content: string;
 			toolCallId?: string;
-			toolCalls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
+			toolCalls?: Array<{
+				id: string;
+				name: string;
+				arguments: Record<string, unknown>;
+			}>;
 		}>;
 		const startTime = Date.now();
 		const result = await agent.processMessage(

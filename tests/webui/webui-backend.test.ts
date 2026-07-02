@@ -107,13 +107,13 @@ describe("WebUIBackend", () => {
 			const session = backend.createSession("user456");
 			backend.addMessage(session!.id, { role: "user", content: "Hi" });
 			backend.addMessage(session!.id, { role: "assistant", content: "Hello!" });
-			const messages = backend.getMessages(session!.id);
+			const messages = backend.syncAndGetMessages(session!.id);
 			strictEqual(messages.length, 2);
 		});
 
 		it("returns empty array for session with no messages", () => {
 			const session = backend.createSession("user789");
-			const messages = backend.getMessages(session!.id);
+			const messages = backend.syncAndGetMessages(session!.id);
 			strictEqual(messages.length, 0);
 		});
 	});
@@ -121,7 +121,10 @@ describe("WebUIBackend", () => {
 	describe("authentication (delegated to auth.ts)", () => {
 		it("auth is handled by server.ts via createAuthenticator, not backend", () => {
 			// Backend no longer has authenticate() — auth is centralized in auth.ts
-			strictEqual(typeof (backend as unknown as Record<string, unknown>).authenticate, "undefined");
+			strictEqual(
+				typeof (backend as unknown as Record<string, unknown>).authenticate,
+				"undefined",
+			);
 		});
 	});
 
@@ -140,7 +143,10 @@ describe("WebUIBackend", () => {
 		});
 
 		it("auth is centralized in auth.ts — backend no longer has authenticate()", () => {
-			strictEqual(typeof (openBackend as unknown as Record<string, unknown>).authenticate, "undefined");
+			strictEqual(
+				typeof (openBackend as unknown as Record<string, unknown>).authenticate,
+				"undefined",
+			);
 		});
 	});
 
@@ -184,8 +190,14 @@ describe("WebUIBackend", () => {
 
 	describe("WebSocket (removed — dead code)", () => {
 		it("WebSocket methods removed, handled via channels/websocket", () => {
-			strictEqual(typeof (backend as unknown as Record<string, unknown>).handleWebSocket, "undefined");
-			strictEqual(typeof (backend as unknown as Record<string, unknown>).broadcast, "undefined");
+			strictEqual(
+				typeof (backend as unknown as Record<string, unknown>).handleWebSocket,
+				"undefined",
+			);
+			strictEqual(
+				typeof (backend as unknown as Record<string, unknown>).broadcast,
+				"undefined",
+			);
 		});
 	});
 

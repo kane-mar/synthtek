@@ -287,10 +287,10 @@ Code quality backlog for synthtek architecture cleanup.
 ^- [x] **L2 — `edit_file` only replaces first occurrence** — When `replace_all=false` (default), only first match is replaced, but user expects all occurrences. Document or fix. (`src/agent/builtin-tools.ts`)
 ^- [x] **L3 — Dead wrapper methods in WebUI** — Methods that just call another method with no added value. (`src/webui/`)
 ^- [x] **L4 — Misleading method names** — Methods named `getX()` that do more than just get. (`src/`)
-- [ ] **L5 — Magic numbers throughout codebase** — Literal numbers without named constants (timeouts, limits, sizes). (`src/`)
-- [ ] **L6 — Unused state fields** — Fields in classes that are never read. (`src/`)
+^- [x] **L5 — Magic numbers throughout codebase** — Literal numbers without named constants (timeouts, limits, sizes). (`src/`)
+^- [x] **L6 — Unused state fields** — Fields in classes that are never read. (`src/`)
 ^- [x] **L7 — Resource leak in timeout promise** — Timeout promise in loop.ts never cleaned up on success. (`src/agent/loop.ts`)
-- [ ] **L8 — Off-by-one in some offset calculations** — Various minor off-by-ones. (`src/`)
+^- [x] **L8 — Off-by-one in some offset calculations** — Various minor off-by-ones. (`src/`)
 ^- [x] **L9 — `skill-manager.ts` clones full git repos with no depth limit** — Massive clones. **Fix**: Add `--depth 1`. (`src/webui/skill-manager.ts`)
 ^- [x] **L10 — Inconsistent error response formats across WebUI route handlers** — Some return `{error: ...}`, some `{message: ...}`, some raw strings. **Fix**: Standardize format. (`src/webui/`)
 ^- [x] **L11 — 75KB / 1547-line inline frontend has zero modularity** — All JS in one `<script>` tag. **Fix**: Split into separate JS modules. (`src/webui/frontend.html`)
@@ -301,8 +301,8 @@ Code quality backlog for synthtek architecture cleanup.
 
 | Severity | Phase 1 | Phase 2 | Phase 3 | Total | Fixed |
 |----------|---------|---------|---------|-------|-------|
-| CRITICAL | — | 4 | 6 | 10 | 0 |
-| HIGH | 6 | 3 | 7 | 16 | 8 |
-| MEDIUM | 9 | 5 | 10 | 24 | 14 |
-| LOW | 14 | 5 | 27 | 46 | 19 |
-| **Total** | **29** | **17** | **50** | **96** | **41** |
+| CRITICAL | — | 4 | 6 | 10 | 10 |
+| HIGH | 6 | 3 | 7 | 16 | 15 |
+| MEDIUM | 9 | 5 | 10 | 24 | 24 |
+| LOW | 14 | 5 | 27 | 46 | 24 |
+| **Total** | **29** | **17** | **50** | **96** | **73** |

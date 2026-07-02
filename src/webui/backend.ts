@@ -12,7 +12,9 @@ import {
 } from "../config/agent-config.js";
 import { ConversationStore } from "../messaging/conversation-store.js";
 import { AnalyticsTracker } from "./analytics.js";
+import type { ProviderManager } from "./provider-manager.js";
 import { handleProviderRoutes } from "./provider-routes.js";
+import type { SkillManager } from "./skill-manager.js";
 import { handleSkillRoutes } from "./skill-routes.js";
 import type {
 	AnalyticsSummary,
@@ -25,8 +27,6 @@ import type {
 	WebUIConfig,
 	WebUIStats,
 } from "./types.js";
-import type { ProviderManager } from "./provider-manager.js";
-import type { SkillManager } from "./skill-manager.js";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -409,7 +409,11 @@ export class WebUIBackend {
 			role: string;
 			content: string;
 			toolCallId?: string;
-			toolCalls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
+			toolCalls?: Array<{
+				id: string;
+				name: string;
+				arguments: Record<string, unknown>;
+			}>;
 		},
 	): Message | null {
 		// Load or create session from store (source of truth)
@@ -462,8 +466,6 @@ export class WebUIBackend {
 	}
 
 	// ── Authentication ─────────────────────────────────────────────────────────
-
-
 
 	// ── File Upload Handling ───────────────────────────────────────────────────
 
@@ -555,7 +557,6 @@ export class WebUIBackend {
 
 		return summary;
 	}
-
 
 	// ── Tools ──────────────────────────────────────────────────────────────────
 
