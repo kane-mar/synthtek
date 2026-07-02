@@ -93,9 +93,7 @@ export class AsyncFileService implements FileSystemService {
 
 			if (createDirectories) {
 				const dir = dirname(path);
-				if (!existsSync(dir)) {
-					mkdirSync(dir, { recursive: true });
-				}
+				mkdirSync(dir, { recursive: true });
 			}
 
 			writeFileSync(path, content, { encoding: "utf-8" });

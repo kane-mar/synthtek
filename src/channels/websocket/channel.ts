@@ -10,12 +10,15 @@ import type {
 	WebSocketSession,
 } from "./types.js";
 
+const HEARTBEAT_INTERVAL = 30_000;
+const MESSAGE_TIMEOUT = 30_000;
+
 const DEFAULT_CONFIG: WebSocketChannelConfig = {
 	port: 8080,
 	host: "0.0.0.0",
 	maxConnections: 100,
-	heartbeatIntervalMs: 30000,
-	messageTimeoutMs: 30000,
+	heartbeatIntervalMs: HEARTBEAT_INTERVAL,
+	messageTimeoutMs: MESSAGE_TIMEOUT,
 	authRequired: false,
 	authToken: undefined,
 	ssl: false,

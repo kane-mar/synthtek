@@ -2,11 +2,11 @@
  * Async executor service using Node.js child_process
  */
 
-import { execFile } from "node:child_process";
+import { execFile as _execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { ExecOptions, ExecResult, ExecutorService } from "./types.js";
 
-const execFileAsync = promisify(execFile);
+const execFileAsync = promisify(_execFile);
 
 export class AsyncExecutor implements ExecutorService {
 	async execute(options: ExecOptions): Promise<ExecResult> {

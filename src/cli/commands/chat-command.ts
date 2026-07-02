@@ -625,7 +625,7 @@ class ChatTUI {
 					const lines = convs.map((c) => {
 						const active =
 							c.id === this.conversationId ? color(" ← current", C.green) : "";
-						const title = c.title || c.id.substring(0, 12);
+						const title = c.title || c.id.slice(0, 12);
 						const msgs =
 							c.messages.length > 0
 								? ` (${Math.ceil(c.messages.length / 2)} msgs)`

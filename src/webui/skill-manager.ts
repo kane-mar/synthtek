@@ -199,8 +199,8 @@ export class SkillManager {
 
 			// Split owner/repo from optional @skill-path
 			const atIdx = parsed.indexOf("@");
-			const repoPath = atIdx >= 0 ? parsed.substring(0, atIdx) : parsed;
-			const skillPath = atIdx >= 0 ? parsed.substring(atIdx + 1) : "";
+			const repoPath = atIdx >= 0 ? parsed.slice(0, atIdx) : parsed;
+			const skillPath = atIdx >= 0 ? parsed.slice(atIdx + 1) : "";
 
 			// Also handle owner/repo/skill-name format (3+ segments without @)
 			const segments = repoPath.split("/");

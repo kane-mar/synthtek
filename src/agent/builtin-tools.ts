@@ -310,6 +310,7 @@ export function registerBuiltinTools(agent: AgentLoop): void {
 				try {
 					regex = new RegExp(pattern, ignoreCase ? "gi" : "g");
 				} catch {
+					// Silently ignore — invalid regex pattern
 					return {
 						callId: "",
 						name: "grep",

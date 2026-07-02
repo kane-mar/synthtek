@@ -11,6 +11,7 @@ import { sleep } from "./format.js";
 const API_BASE = "https://api.telegram.org/bot";
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_DELAY_MS = 500;
+const HTTP_TIMEOUT = 30_000;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -134,7 +135,7 @@ export class TelegramApiClient {
 		const isGetMethod = this.isGetMethod(method);
 
 		const controller = new AbortController();
-		const timeout = setTimeout(() => controller.abort(), 30_000);
+		const timeout = setTimeout(() => controller.abort(), HTTP_TIMEOUT);
 
 		try {
 			const finalUrl =

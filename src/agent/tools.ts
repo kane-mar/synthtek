@@ -73,6 +73,7 @@ function validateOutput(
 			actualType = typeof parsed;
 		}
 	} catch {
+		// Silently ignore — expected JSON parse failure
 		// Not valid JSON — check if schema expects string
 		if (expectedType === "string") return null;
 		actualType = "string"; // unparseable content is a string

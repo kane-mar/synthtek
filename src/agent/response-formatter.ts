@@ -83,6 +83,7 @@ export class ResponseFormatter {
 			const parsed = JSON.parse(content);
 			return JSON.stringify(parsed, null, 2);
 		} catch {
+			// Silently ignore — expected JSON parse failure
 			// Not valid JSON — wrap in envelope
 			return JSON.stringify(
 				{
@@ -122,6 +123,7 @@ export class ResponseFormatter {
 				data = parsed;
 			}
 		} catch {
+			// Silently ignore — expected JSON parse failure
 			// Not JSON — check for markdown
 			isMarkdown = /[#*`>-]/.test(content);
 			wordCount = content.split(/\s+/).filter((w) => w.length > 0).length;

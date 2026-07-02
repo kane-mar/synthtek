@@ -247,7 +247,9 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 			// React with configured emoji
 			if (this.config.reactions) {
 				try {
-					msg.react(this.config.reactEmoji).catch(() => {});
+					msg.react(this.config.reactEmoji).catch((err: Error) => {
+						this.emitError(err);
+					});
 				} catch {
 					// Ignore reaction errors
 				}
@@ -689,9 +691,9 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		};
 	}
 
-	/** Get the bot's user info */
-	getBotUser(): any {
-		return this.botUser;
+	/** Get the bot's user info (may be null if not yet connected) */
+	getBotUser(): import("discord.js").ClientUser | null {
+		return this.botUser ?? null;
 	}
 
 	/** Send a text message */

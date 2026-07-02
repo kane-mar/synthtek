@@ -105,6 +105,7 @@ function parseToolCalls(content: string): ToolCall[] {
 				if (json !== content) break;
 			}
 		} catch {
+			// Silently ignore — expected JSON parse failure
 			// Not valid JSON, try next candidate
 		}
 	}
