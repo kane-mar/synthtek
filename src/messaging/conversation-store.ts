@@ -49,9 +49,7 @@ export class ConversationStore {
 			try {
 				mkdirSync(dir, { recursive: true });
 			} catch {
-				console.error(
-					`[ConversationStore] Failed to create directory: ${dir}`,
-				);
+				console.error(`[ConversationStore] Failed to create directory: ${dir}`);
 			}
 		}
 		this.filePath = join(dir, "conversations.json");
