@@ -534,6 +534,14 @@ function drawTokenChart(canvas, data) {
   const h = rect.height;
   const pad = { top: 16, right: 12, bottom: 24, left: 48 };
 
+  // Read theme-aware colors from CSS custom properties
+  const style = getComputedStyle(document.documentElement);
+  const borderColor = style.getPropertyValue('--border').trim() || '#30363d';
+  const textDimColor = style.getPropertyValue('--text-dim').trim() || '#8b949e';
+  const accentColor = style.getPropertyValue('--accent').trim() || '#58a6ff';
+  const greenColor = style.getPropertyValue('--green').trim() || '#3fb950';
+  const bgColor = style.getPropertyValue('--bg').trim() || '#0d1117';
+
   // Find max value
   let maxVal = 0;
   for (const d of data) {
@@ -547,26 +555,31 @@ function drawTokenChart(canvas, data) {
   const barW = Math.max(4, Math.min(14, chartW / data.length - 2));
   const gap = Math.max(1, (chartW - barW * data.length) / (data.length + 1));
 
-  // Clear
-  ctx.clearRect(0, 0, w, h);
+  // Clear with theme background
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, w, h);
 
-  // Grid lines
-  ctx.strokeStyle = 'rgba(255,255,255,.06)';
+  // Grid lines (theme-aware)
+  ctx.strokeStyle = borderColor;
   ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.3;
   for (let i = 0; i <= 4; i++) {
     const y = pad.top + (chartH / 4) * i;
     ctx.beginPath();
     ctx.moveTo(pad.left, y);
     ctx.lineTo(w - pad.right, y);
     ctx.stroke();
-    // Y-axis labels
+    // Y-axis labels (theme-aware)
     const val = Math.round(maxVal - (maxVal / 4) * i);
-    ctx.fillStyle = 'rgba(255,255,255,.4)';
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = textDimColor;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     ctx.fillText(formatTokens(val), pad.left - 6, y);
+    ctx.globalAlpha = 0.3;
   }
+  ctx.globalAlpha = 1;
 
   // Bars
   for (let i = 0; i < data.length; i++) {
@@ -578,33 +591,37 @@ function drawTokenChart(canvas, data) {
 
     // Completion tokens (top, accent color)
     if (d.completion > 0) {
-      ctx.fillStyle = 'rgba(99,102,241,.8)';
+      ctx.fillStyle = accentColor;
+      ctx.globalAlpha = 0.8;
       ctx.fillRect(x, pad.top + chartH - totalH, barW, completionH);
     }
 
     // Prompt tokens (bottom, green tint)
     if (d.prompt > 0) {
-      ctx.fillStyle = 'rgba(34,197,94,.6)';
+      ctx.fillStyle = greenColor;
+      ctx.globalAlpha = 0.6;
       ctx.fillRect(x, pad.top + chartH - totalH + completionH, barW, promptH);
     }
 
-    // Hour labels (every 3 hours)
+    // Hour labels (every 3 hours, theme-aware)
     if (i % 3 === 0 || i === data.length - 1) {
       const label = d.hour.slice(11, 16); // "HH:00"
-      ctx.fillStyle = 'rgba(255,255,255,.35)';
+      ctx.fillStyle = textDimColor;
+      ctx.globalAlpha = 0.7;
       ctx.font = '9px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       ctx.fillText(label, x + barW / 2, h - pad.bottom + 4);
     }
   }
+  ctx.globalAlpha = 1;
 
-  // Legend
+  // Legend (theme-aware)
   const legend = document.getElementById('chart-legend');
   if (legend) {
     legend.innerHTML =
-      '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(99,102,241,.8);margin-right:4px;vertical-align:middle"></span>Completion</span>' +
-      '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(34,197,94,.6);margin-right:4px;vertical-align:middle"></span>Prompt</span>';
+      `<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${accentColor};opacity:0.8;margin-right:4px;vertical-align:middle"></span>Completion</span>` +
+      `<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${greenColor};opacity:0.6;margin-right:4px;vertical-align:middle"></span>Prompt</span>`;
   }
 }
 
