@@ -11,6 +11,7 @@ import type {
 	ProviderMessage,
 	StreamChunk,
 } from "../types.js";
+import { getMetadataString } from "../types.js";
 
 const DEFAULT_CONFIG: Partial<ProviderConfig> = {
 	baseUrl: "https://api.openai.com/v1",
@@ -74,14 +75,14 @@ function toOpenAIMessages(messages: ProviderMessage[]): Array<{
 				role: m.role,
 				content: parts,
 				tool_call_id: m.toolCallId,
-				name: m.metadata?.name as string | undefined,
+				name: getMetadataString(m, "name"),
 			};
 		}
 		return {
 			role: m.role,
 			content: m.content,
 			tool_call_id: m.toolCallId,
-			name: m.metadata?.name as string | undefined,
+			name: getMetadataString(m, "name"),
 		};
 	});
 }

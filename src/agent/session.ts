@@ -117,7 +117,10 @@ export class AgentSession {
 			this.config.responseFormat = update.responseFormat;
 		}
 		if (update.loopConfig !== undefined) {
-			this.config.loopConfig = { ...this.config.loopConfig, ...update.loopConfig };
+			this.config.loopConfig = {
+				...this.config.loopConfig,
+				...update.loopConfig,
+			};
 		}
 
 		// Propagate to the internal AgentLoop
@@ -128,6 +131,14 @@ export class AgentSession {
 			responseFormat: this.config.responseFormat,
 			...this.config.loopConfig,
 		});
+	}
+
+	/**
+	 * Get the underlying ToolRegistry for external tool registration
+	 * (e.g., via SkillInjector).
+	 */
+	getToolRegistry(): import("./tools.js").ToolRegistry {
+		return this.loop.getTools();
 	}
 
 	/**

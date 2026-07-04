@@ -147,10 +147,10 @@ describe("WebUIServer", () => {
 				"should use proper ellipsis character",
 			);
 
-			// I6: color-scheme: dark
+			// I6: color-scheme: light (default theme)
 			assert.ok(
-				html.includes("color-scheme: dark"),
-				"should set color-scheme: dark",
+				html.includes("color-scheme: light"),
+				"should set color-scheme: light",
 			);
 
 			// I7: theme-color meta tag

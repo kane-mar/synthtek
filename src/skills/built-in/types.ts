@@ -7,7 +7,7 @@ export interface BuiltInSkill {
 	description: string;
 	category: string;
 	version: string;
-	execute(context: SkillContext): SkillResult;
+	execute(context: SkillContext): SkillResult | Promise<SkillResult>;
 	parseCronExpression?(expr: string): CronParsed | null;
 }
 

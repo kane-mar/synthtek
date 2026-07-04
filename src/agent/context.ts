@@ -1,8 +1,13 @@
 /**
  * Context Window Manager
  * Manages token counting, compaction, and message history for the agent loop.
+ *
+ * Uses a pluggable tokenizer for token estimation. Defaults to
+ * CharacterCountTokenizer (~4 chars/token) but can be overridden
+ * with more accurate implementations (e.g. GptBpeTokenizer).
  */
 
+import { getDefaultTokenizer, type Tokenizer } from "./tokenizer.js";
 import type {
 	AgentMessage,
 	ContextCompactionResult,
@@ -17,32 +22,42 @@ const DEFAULT_CONFIG: ContextWindowConfig = {
 	summarizeOldMessages: true,
 };
 
-/**
- * Rough token estimator: ~4 chars per token for English text.
- * This is a heuristic — real token counts depend on the model's tokenizer.
- */
-function estimateTokens(text: string): number {
-	if (text.length === 0) return 0;
-	// More accurate: count newlines (each is ~1 token), then chars/4
-	const newlineCount = (text.match(/\n/g) || []).length;
-	const charTokens = Math.ceil(text.length / 4);
-	return charTokens + newlineCount;
-}
-
 export class ContextWindowManager {
 	private config: ContextWindowConfig;
 	private messages: AgentMessage[];
 	private tokenCount: number;
+	private tokenizer: Tokenizer;
 
-	constructor(config?: Partial<ContextWindowConfig>) {
+	constructor(config?: Partial<ContextWindowConfig>, tokenizer?: Tokenizer) {
 		this.config = { ...DEFAULT_CONFIG, ...config };
 		this.messages = [];
 		this.tokenCount = 0;
+		this.tokenizer = tokenizer ?? getDefaultTokenizer();
+	}
+
+	/** Get the tokenizer used by this manager */
+	getTokenizer(): Tokenizer {
+		return this.tokenizer;
+	}
+
+	/** Set a custom tokenizer (e.g., swap from character-count to gpt-bpe) */
+	setTokenizer(tokenizer: Tokenizer): void {
+		this.tokenizer = tokenizer;
+		// Recalculate token count with new tokenizer
+		this.recalculateTokenCount();
+	}
+
+	/** Recalculate the total token count from scratch */
+	private recalculateTokenCount(): void {
+		this.tokenCount = this.messages.reduce(
+			(sum, m) => sum + this.tokenizer.estimateTokens(m.content),
+			0,
+		);
 	}
 
 	/** Add a message to the context window */
 	addMessage(message: AgentMessage): void {
-		const tokens = estimateTokens(message.content);
+		const tokens = this.tokenizer.estimateTokens(message.content);
 		this.messages.push(message);
 		this.tokenCount += tokens;
 	}
@@ -50,10 +65,7 @@ export class ContextWindowManager {
 	/** Replace the entire message history */
 	setMessages(messages: AgentMessage[]): void {
 		this.messages = [...messages];
-		this.tokenCount = messages.reduce(
-			(sum, m) => sum + estimateTokens(m.content),
-			0,
-		);
+		this.recalculateTokenCount();
 	}
 
 	/** Get all messages in the context window */
@@ -108,7 +120,7 @@ export class ContextWindowManager {
 		];
 
 		const newTokenCount = compacted.reduce(
-			(sum, m) => sum + estimateTokens(m.content),
+			(sum, m) => sum + this.tokenizer.estimateTokens(m.content),
 			0,
 		);
 
@@ -119,7 +131,7 @@ export class ContextWindowManager {
 			messages: [...compacted],
 			tokenCount: newTokenCount,
 			needed: true,
-			summary: `Summarized ${oldMessages.length} messages into ${recentCount} recent messages. Reduced from ~${this.tokenCount + estimateTokens(summary)} to ~${newTokenCount} tokens.`,
+			summary: `Summarized ${oldMessages.length} messages into ${recentCount} recent messages. Reduced from ~${this.tokenCount} to ~${newTokenCount} tokens.`,
 		};
 	}
 
@@ -148,7 +160,7 @@ export class ContextWindowManager {
 
 		// Keep system messages, trim from the oldest non-system messages
 		let trimmedTokens = systemMessages.reduce(
-			(sum, m) => sum + estimateTokens(m.content),
+			(sum, m) => sum + this.tokenizer.estimateTokens(m.content),
 			0,
 		);
 
@@ -156,7 +168,7 @@ export class ContextWindowManager {
 		let keptMessages: AgentMessage[] = [];
 		for (let i = nonSystemMessages.length - 1; i >= 0; i--) {
 			const msg = nonSystemMessages[i];
-			const msgTokens = estimateTokens(msg.content);
+			const msgTokens = this.tokenizer.estimateTokens(msg.content);
 			if (trimmedTokens + msgTokens <= this.config.maxTokens) {
 				keptMessages.unshift(msg);
 				trimmedTokens += msgTokens;
@@ -167,7 +179,7 @@ export class ContextWindowManager {
 		if (keptMessages.length === 0 && nonSystemMessages.length > 0) {
 			const lastMsg = nonSystemMessages[nonSystemMessages.length - 1];
 			keptMessages = [lastMsg];
-			trimmedTokens = estimateTokens(lastMsg.content);
+			trimmedTokens = this.tokenizer.estimateTokens(lastMsg.content);
 		}
 
 		const finalMessages = [...systemMessages, ...keptMessages];

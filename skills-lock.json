@@ -1,11 +1,41 @@
 {
   "version": 1,
   "skills": {
+    "agent-collaboration": {
+      "source": "kane-mar/skills",
+      "sourceType": "github",
+      "skillPath": "agent-collaboration/SKILL.md",
+      "computedHash": "9943fdad95beb7325faf9f61b344d36991b230b3feb895fd52bab611e9078879"
+    },
+    "backlog-management": {
+      "source": "kane-mar/skills",
+      "sourceType": "github",
+      "skillPath": "backlog-management/SKILL.md",
+      "computedHash": "56e2c036d3d9df487641bf2ae77dae71163accaa8b93b354154894ed04711127"
+    },
+    "clean-code": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/clean-code/SKILL.md",
+      "computedHash": "74bf6ded4f61ddcb593e7a29beb96c284f888cbe0639ad6e23710447c36ff19a"
+    },
+    "definition-of-done": {
+      "source": "kane-mar/skills",
+      "sourceType": "github",
+      "skillPath": "definition-of-done/SKILL.md",
+      "computedHash": "cbaf4ef1f48dfa1a7c9383bfac93df6628f291162ec6cd67c4a797d76a88440b"
+    },
     "duckducksearch": {
       "source": "xsailor511/duckduck-web-search",
       "sourceType": "github",
       "skillPath": "SKILL.md",
       "computedHash": "fd82d7962c2eee16292a772782e3537fd0aeb8ddee7371b419a3e057322508d6"
+    },
+    "kanban-board": {
+      "source": "kane-mar/skills",
+      "sourceType": "github",
+      "skillPath": "kanban-board/SKILL.md",
+      "computedHash": "7ac30093feb1cb4ff4e61a298bc8e10a911e15a4c03de7a81eb1fecd91b1c0a1"
     }
   }
 }

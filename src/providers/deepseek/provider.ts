@@ -11,6 +11,7 @@ import type {
 	ProviderMessage,
 	StreamChunk,
 } from "../types.js";
+import { getMetadataString } from "../types.js";
 
 const DEFAULT_CONFIG: Partial<ProviderConfig> = {
 	baseUrl: "https://api.deepseek.com/v1",
@@ -36,7 +37,7 @@ function toDeepSeekMessages(messages: ProviderMessage[]): Array<{
 		role: m.role,
 		content: m.content,
 		tool_call_id: m.toolCallId,
-		name: m.metadata?.name as string | undefined,
+		name: getMetadataString(m, "name"),
 		...(m.toolCalls && m.toolCalls.length > 0
 			? {
 					tool_calls: m.toolCalls.map((tc) => ({

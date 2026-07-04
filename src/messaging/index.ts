@@ -1,8 +1,10 @@
 /**
  * Messaging — Unified chat pipeline
  *
- * Provides a ChatService that all interfaces (WebUI, CLI, channels)
- * route through for a consistent message-processing experience.
+ * Provides a ChatService (used by CLI/TUI) and shared type definitions
+ * used by WebUI, channels, and CLI.
+ *
+ * Note: WebUI routes directly through WebUIBackend, not ChatService.
  */
 
 export { ChatService } from "./chat-service.js";

@@ -11,6 +11,7 @@ import type {
 	ProviderMessage,
 	StreamChunk,
 } from "../types.js";
+import { getMetadataString } from "../types.js";
 
 const DEFAULT_CONFIG: Partial<ProviderConfig> = {
 	baseUrl: "https://api.mistral.ai/v1",
@@ -31,7 +32,7 @@ function toMistralMessages(messages: ProviderMessage[]): Array<{
 		role: m.role,
 		content: m.content,
 		tool_call_id: m.toolCallId,
-		name: m.metadata?.name as string | undefined,
+		name: getMetadataString(m, "name"),
 	}));
 }
 

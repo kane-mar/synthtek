@@ -18,12 +18,12 @@ export function registerWebuiCommand(program: Command): void {
 		.option(
 			"--port <port>",
 			"Port to listen on",
-			process.env.WEBUI_PORT || "8080",
+			process.env.WEBUI_PORT || "3000",
 		)
 		.action(async (opts: { host?: string; port?: string }) => {
 			const webuiConfig = {
 				host: opts.host || "0.0.0.0",
-				port: parseInt(opts.port || "8080", 10),
+				port: parseInt(opts.port || "3000", 10),
 				apiKey: process.env.WEBUI_API_KEY || "",
 				maxSessions: parseInt(process.env.WEBUI_MAX_SESSIONS || "100", 10),
 				sessionTimeout: parseInt(

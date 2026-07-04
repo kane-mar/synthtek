@@ -191,3 +191,20 @@ export type ProviderType =
 	| "azure"
 	| "vllm"
 	| "qwen";
+
+// ── Utility ───────────────────────────────────────────────────────────────────
+
+/**
+ * Safely extract a string value from a message's metadata map.
+ *
+ * `metadata` is typed as `Record<string, unknown>`, so indexed access
+ * yields `unknown`. This helper narrows to `string | undefined` without
+ * an unsafe `as` cast — the runtime `typeof` check satisfies the compiler.
+ */
+export function getMetadataString(
+	msg: { metadata?: Record<string, unknown> },
+	key: string,
+): string | undefined {
+	const val = msg.metadata?.[key];
+	return typeof val === "string" ? val : undefined;
+}

@@ -2,7 +2,7 @@
  * Telegram Channel — Bot API integration for synthtek
  */
 
-import type { StreamBuffer } from "../../performance/types.js";
+import type { StreamBuffer } from "../types.js";
 
 export type TelegramGroupPolicy = "open" | "mention";
 

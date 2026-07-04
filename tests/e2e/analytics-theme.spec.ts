@@ -25,9 +25,7 @@ test.describe("WebUI - Analytics Chart Themes", () => {
 		expect(dims.h).toBeGreaterThan(0);
 	});
 
-	test("analytics chart canvas is visible in light theme", async ({
-		page,
-	}) => {
+	test("analytics chart canvas is visible in light theme", async ({ page }) => {
 		await page.goto(BASE_URL);
 		await page.waitForLoadState("networkidle");
 
@@ -86,7 +84,8 @@ test.describe("WebUI - Analytics Chart Themes", () => {
 		expect(legendColors!.length).toBeGreaterThanOrEqual(2);
 		// Colors can be hex (#0969da) or rgba() — just verify they're valid
 		for (const color of legendColors!) {
-			const isValid = /^#[\da-fA-F]{3,8}$/.test(color) || /^rgba?\(/.test(color);
+			const isValid =
+				/^#[\da-fA-F]{3,8}$/.test(color) || /^rgba?\(/.test(color);
 			expect(isValid).toBeTruthy();
 		}
 	});

@@ -454,6 +454,79 @@ export class AgentLoop {
 	}
 
 	/**
+	 * Execute a single LLM turn: call the LLM, extract response and tool calls.
+	 * Returns null on error (error details are pushed to the errors array).
+	 * Shared between streaming and non-streaming paths.
+	 */
+	private async callLlm(
+		currentMessages: Array<{ role: string; content: string }>,
+		llmStrategy: LlmCallStrategy,
+		errors: string[],
+	): Promise<{
+		response: string;
+		tokens: number;
+		toolCalls:
+			| Array<{ id: string; name: string; arguments: Record<string, unknown> }>
+			| undefined;
+	} | null> {
+		try {
+			const llmResult = await llmStrategy(currentMessages);
+			return {
+				response: llmResult.content,
+				tokens: llmResult.tokens,
+				toolCalls: llmResult.toolCalls,
+			};
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			errors.push(`LLM call failed after retries: ${errorMsg}`);
+			return null;
+		}
+	}
+
+	/**
+	 * Execute tool calls from an LLM response and update loop state.
+	 * Returns whether the loop should continue (tool calls were made) or
+	 * break (no tool calls — plain text response).
+	 */
+	private async executeLlmTurn(
+		llmResponse: string,
+		llmTokens: number,
+		nativeToolCalls:
+			| Array<{ id: string; name: string; arguments: Record<string, unknown> }>
+			| undefined,
+		state: {
+			toolCallsMade: number;
+			currentMessages: Array<{ role: string; content: string }>;
+			responseContent: string;
+		},
+		errors: string[],
+	): Promise<{ shouldContinue: boolean; responseContent: string }> {
+		// Call after-LLM hook
+		if (this.hooks.onAfterLLMCall) {
+			await this.hooks.onAfterLLMCall(llmResponse, llmTokens);
+		}
+
+		this.stats.tokensUsed += llmTokens;
+
+		// Execute tool calls from the response
+		const toolCallsMadeRef = { value: state.toolCallsMade };
+		const currentMessagesRef = { value: state.currentMessages };
+		const toolResult = await this.executeToolCalls(
+			llmResponse,
+			nativeToolCalls,
+			toolCallsMadeRef,
+			currentMessagesRef,
+			errors,
+		);
+		state.toolCallsMade = toolCallsMadeRef.value;
+		state.currentMessages = currentMessagesRef.value;
+		return {
+			shouldContinue: toolResult.shouldContinue,
+			responseContent: toolResult.responseContent,
+		};
+	}
+
+	/**
 	 * Shared tool-call loop — the core "LLM decides → tools execute → repeat"
 	 * cycle used by both streaming and non-streaming paths.
 	 *
@@ -475,9 +548,6 @@ export class AgentLoop {
 	}> {
 		const errors: string[] = [];
 		let toolCallsMade = 0;
-
-		// Update state
-		this.state = "processing";
 		this.stats.status = "running";
 		this.stats.lastActivityAt = new Date();
 
@@ -775,65 +845,49 @@ export class AgentLoop {
 		this.context.addMessage(message);
 
 		// Main loop: iterate until LLM returns plain text (no tool calls)
-		let currentMessages = this.context.getFormattedMessages();
+		const currentMessages = this.context.getFormattedMessages();
 		let responseContent = "";
 
+		// Create streaming strategy that buffers chunks via a side channel
+		// (async generators can't yield from callbacks, so we collect and yield)
+		const pendingChunks: StreamChunk[] = [];
 		const strategy = this.createStreamingStrategy(llmProvider, (chunk) => {
-			// Yield chunks as they arrive from the streaming strategy
-			// Using a side channel since async generators can't yield from callbacks
 			pendingChunks.push(chunk);
 		});
 
-		const pendingChunks: StreamChunk[] = [];
+		const state = { toolCallsMade, currentMessages, responseContent };
 
-		while (toolCallsMade < this.config.maxToolCalls) {
+		while (state.toolCallsMade < this.config.maxToolCalls) {
 			// Context management (compaction + trimming)
 			await this.ensureContextHealthy(errors);
-			currentMessages = this.context.getFormattedMessages();
+			state.currentMessages = this.context.getFormattedMessages();
 
 			// Call before-LLM hook
 			if (this.hooks.onBeforeLLMCall) {
-				await this.hooks.onBeforeLLMCall(currentMessages as AgentMessage[]);
+				await this.hooks.onBeforeLLMCall(
+					state.currentMessages as AgentMessage[],
+				);
 			}
 
-			// Call LLM via streaming strategy
-			let llmResponse: string;
-			let llmTokens: number;
-			let nativeToolCalls:
-				| Array<{
-						id: string;
-						name: string;
-						arguments: Record<string, unknown>;
-				  }>
-				| undefined;
+			// Clear pending chunks before each LLM call
+			pendingChunks.length = 0;
 
-			try {
-				// Clear pending chunks before each LLM call
-				pendingChunks.length = 0;
-
-				const llmResult = await strategy(currentMessages);
-
-				// Yield all chunks that were collected during this LLM call
-				for (const chunk of pendingChunks.splice(0)) {
-					if (!chunk.done && chunk.delta) {
-						yield chunk;
-					}
-				}
-
-				llmResponse = llmResult.content;
-				llmTokens = llmResult.tokens;
-				nativeToolCalls = llmResult.toolCalls;
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				errors.push(`LLM call failed after retries: ${errorMsg}`);
+			// Call LLM via shared callLlm method
+			const llmResult = await this.callLlm(
+				state.currentMessages,
+				strategy,
+				errors,
+			);
+			if (!llmResult) {
 				this.state = "error";
+				const errorMsg = errors[errors.length - 1] || "Unknown error";
 
 				yield { delta: `\n\n[Error: ${errorMsg}]`, done: true };
 
 				const result: AgentLoopResult = {
 					response: `Error processing your message: ${errorMsg}`,
 					tokensUsed: this.stats.tokensUsed,
-					toolCallsMade,
+					toolCallsMade: state.toolCallsMade,
 					duration: Date.now() - startTime,
 					errors,
 				};
@@ -847,32 +901,33 @@ export class AgentLoop {
 				return result;
 			}
 
-			// Call after-LLM hook
-			if (this.hooks.onAfterLLMCall) {
-				await this.hooks.onAfterLLMCall(llmResponse, llmTokens);
+			// Yield all chunks collected during this LLM call
+			for (const chunk of pendingChunks.splice(0)) {
+				if (!chunk.done && chunk.delta) {
+					yield chunk;
+				}
 			}
 
-			totalTokens += llmTokens;
-			this.stats.tokensUsed += llmTokens;
+			totalTokens += llmResult.tokens;
 
-			// Check if the response contains tool calls
-			const toolCallsMadeRef = { value: toolCallsMade };
-			const currentMessagesRef = { value: currentMessages };
-			const toolResult = await this.executeToolCalls(
-				llmResponse,
-				nativeToolCalls,
-				toolCallsMadeRef,
-				currentMessagesRef,
+			// Execute tools from LLM response via shared executeLlmTurn
+			const turnResult = await this.executeLlmTurn(
+				llmResult.response,
+				llmResult.tokens,
+				llmResult.toolCalls,
+				state,
 				errors,
 			);
-			toolCallsMade = toolCallsMadeRef.value;
-			currentMessages = currentMessagesRef.value;
-			responseContent = toolResult.responseContent;
-			if (toolResult.shouldContinue) {
+			state.responseContent = turnResult.responseContent;
+			responseContent = state.responseContent;
+			if (turnResult.shouldContinue) {
 				continue;
 			}
 			break;
 		}
+
+		// Update outer vars from state object
+		toolCallsMade = state.toolCallsMade;
 
 		// If we hit max tool calls, return what we have
 		if (toolCallsMade >= this.config.maxToolCalls) {
@@ -889,7 +944,7 @@ export class AgentLoop {
 			usage: {
 				promptTokens: 0,
 				completionTokens: totalTokens,
-				totalTokens: totalTokens,
+				totalTokens,
 			},
 		};
 

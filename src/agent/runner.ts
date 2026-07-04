@@ -9,6 +9,8 @@
  * tool availability and seamless cross-interface conversations.
  */
 
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { getAgentConfig, getSystemPrompt } from "../config/agent-config.js";
 import { SimpleLogger } from "../core/logger.js";
 import type { ChannelConfigs } from "../messaging/channel-configs.js";
@@ -22,8 +24,33 @@ import {
 	registerDefaultProviders,
 } from "../providers/index.js";
 import type { LLMProvider } from "../providers/types.js";
+import { SkillInjector } from "../skills/injector.js";
 import { AgentSession } from "./session.js";
 import type { AgentLoopConfig } from "./types.js";
+
+// ── External Skill Config Types ─────────────────────────────────────────────
+
+/** Shape of an external skill config file (JSON) */
+interface ExternalSkillConfig {
+	name: string;
+	type: "exec" | "http";
+	description: string;
+	/** For exec type: shell command to run */
+	command?: string;
+	/** For http type: URL and method */
+	url?: string;
+	method?: "GET" | "POST" | "PUT" | "DELETE";
+	/** JSON schema for input parameters */
+	parameters?: Record<string, unknown>;
+	/** Timeout in ms */
+	timeout?: number;
+	/** Working directory for exec type */
+	cwd?: string;
+	/** Input mode for exec type */
+	inputMode?: "env" | "args" | "stdin";
+	/** HTTP headers for http type */
+	headers?: Record<string, string>;
+}
 
 export interface AgentRunnerConfig {
 	provider: string;
@@ -44,6 +71,9 @@ export interface AgentRunnerConfig {
 
 type SessionMap = Map<string, AgentSession>;
 
+/** Default directory for external skill configs (JSON) */
+const DEFAULT_SKILLS_DIR = "skills/tools";
+
 export class AgentRunner {
 	private logger: SimpleLogger;
 	private config: AgentRunnerConfig;
@@ -52,6 +82,7 @@ export class AgentRunner {
 	private sessions: SessionMap;
 	private systemPrompt: string;
 	private activeChannels = new Set<{ disconnect: () => Promise<void> }>();
+	private externalSkills: ExternalSkillConfig[] = [];
 
 	constructor(config: AgentRunnerConfig) {
 		registerDefaultProviders();
@@ -130,6 +161,96 @@ export class AgentRunner {
 		this.logger.debug("Cleared all sessions");
 	}
 
+	// ── External Skills ─────────────────────────────────────────────────────
+
+	/**
+	 * Load external skill configurations from a directory.
+	 * Scans for .json files and registers them as agent tools.
+	 * Call this before start() or between start/stop cycles.
+	 */
+	loadExternalSkills(skillsDir?: string): void {
+		const dir = skillsDir ?? DEFAULT_SKILLS_DIR;
+		if (!existsSync(dir)) {
+			this.logger.debug(`No external skills directory: ${dir}`);
+			return;
+		}
+
+		const entries = readdirSync(dir);
+		const loaded: ExternalSkillConfig[] = [];
+
+		for (const entry of entries) {
+			if (!entry.endsWith(".json")) continue;
+			const filePath = join(dir, entry);
+			try {
+				const stat = statSync(filePath);
+				if (!stat.isFile()) continue;
+				const content = readFileSync(filePath, "utf-8");
+				const config = JSON.parse(content) as ExternalSkillConfig;
+				if (!config.name || !config.type) {
+					this.logger.warn(`Invalid skill config: ${entry}`);
+					continue;
+				}
+				loaded.push(config);
+				this.logger.debug(
+					`Loaded external skill: ${config.name} (${config.type})`,
+				);
+			} catch (err) {
+				this.logger.warn(`Failed to load skill config: ${entry}`, {
+					error: err instanceof Error ? err.message : String(err),
+				});
+			}
+		}
+
+		this.externalSkills = loaded;
+		if (loaded.length > 0) {
+			this.logger.info(`Loaded ${loaded.length} external skill(s)`);
+		}
+	}
+
+	/**
+	 * Register external skills on a session using SkillInjector.
+	 */
+	private registerExternalSkills(session: AgentSession): void {
+		if (this.externalSkills.length === 0) return;
+
+		const registry = session.getToolRegistry();
+		const injector = new SkillInjector(registry);
+
+		for (const skill of this.externalSkills) {
+			try {
+				switch (skill.type) {
+					case "exec": {
+						injector.injectExecutor(skill.name, {
+							command: skill.command ?? "",
+							cwd: skill.cwd,
+							timeout: skill.timeout,
+							description: skill.description,
+							inputSchema: skill.parameters ?? {},
+							inputMode: skill.inputMode,
+						});
+						this.logger.debug(`Registered exec skill: ${skill.name}`);
+						break;
+					}
+					case "http": {
+						injector.injectHttp(skill.name, {
+							url: skill.url ?? "",
+							method: skill.method,
+							headers: skill.headers,
+							description: skill.description,
+							inputSchema: skill.parameters ?? {},
+						});
+						this.logger.debug(`Registered http skill: ${skill.name}`);
+						break;
+					}
+				}
+			} catch (err) {
+				this.logger.warn(`Failed to register skill: ${skill.name}`, {
+					error: err instanceof Error ? err.message : String(err),
+				});
+			}
+		}
+	}
+
 	// ── Session Management ──────────────────────────────────────────────────
 
 	private getOrCreateSession(conversationId: string): AgentSession | null {
@@ -160,6 +281,7 @@ export class AgentRunner {
 					process.cwd(),
 			});
 			this.sessions.set(conversationId, session);
+			this.registerExternalSkills(session);
 			this.logger.debug(
 				`Created session for ${conversationId} (maxToolCalls=${agentCfg.maxToolCalls}, temp=${agentCfg.temperature})`,
 			);
@@ -208,7 +330,7 @@ export class AgentRunner {
 
 		// Wrap legacy telegramToken config into channelConfigs for unified handling
 		if (!channelConfigs.telegram && this.config.telegramToken) {
-			(channelConfigs as Record<string, unknown>).telegram = {
+			channelConfigs.telegram = {
 				token: this.config.telegramToken,
 				webhookUrl: this.config.telegramWebhookUrl,
 			};

@@ -137,6 +137,24 @@ const DISCORD_MAX_MESSAGE_LEN = 2000;
 const STREAM_EDIT_INTERVAL_MS = 600;
 const TYPING_INTERVAL_MS = 8000;
 
+/** Operations available on text-capable Discord channels */
+interface TextDiscordChannel {
+	send: (options: unknown) => Promise<{ id: string }>;
+	sendTyping: () => Promise<void>;
+	messages: {
+		fetch: (id: string) => Promise<{
+			id: string;
+			edit: (options: Record<string, unknown>) => Promise<unknown>;
+			delete: () => Promise<void>;
+			react: (emoji: string) => Promise<unknown>;
+			reactions: {
+				cache: Map<string, { remove: () => Promise<void> }>;
+				fetch: () => Promise<Map<string, unknown>>;
+			};
+		}>;
+	};
+}
+
 export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 	private client: Client;
 	protected config: Required<DiscordConfig>;
@@ -499,9 +517,9 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		// Only edit if enough time has passed since last edit
 		if (now - buf.lastEdit >= STREAM_EDIT_INTERVAL_MS) {
 			try {
-				const ch = await this.getChannel(channelId);
+				const ch = await this.getTextChannel(channelId);
 				if (ch) {
-					const msg = await (ch as any).messages.fetch(buf.messageId);
+					const msg = await ch.messages.fetch(buf.messageId);
 					await msg.edit({ content: buf.text });
 					buf.lastEdit = now;
 				}
@@ -518,9 +536,9 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 
 		// Final edit to ensure complete text is shown
 		try {
-			const ch = await this.getChannel(channelId);
+			const ch = await this.getTextChannel(channelId);
 			if (ch) {
-				const msg = await (ch as any).messages.fetch(buf.messageId);
+				const msg = await ch.messages.fetch(buf.messageId);
 				await msg.edit({ content: buf.text });
 			}
 		} catch {
@@ -587,7 +605,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 			this.stopTyping(msg.channelId);
 		}
 
-		const ch = await this.getChannel(msg.channelId);
+		const ch = await this.getTextChannel(msg.channelId);
 		if (!ch) {
 			console.error(`[Discord] Channel ${msg.channelId} not found`);
 			return;
@@ -602,12 +620,12 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 				}
 
 				const attachment = new AttachmentBuilder(mediaPath);
-				await (ch as any).send({ files: [attachment] });
+				await ch.send({ files: [attachment] });
 				this.runtime.mediaSent++;
 			} catch (error) {
 				const filename = mediaPath.split("/").pop() ?? mediaPath;
 				console.error(`[Discord] Failed to send media ${mediaPath}:`, error);
-				await (ch as any).send({ content: `[Failed to send: ${filename}]` });
+				await ch.send({ content: `[Failed to send: ${filename}]` });
 			}
 		}
 
@@ -615,7 +633,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		if (msg.content && msg.content !== "[empty message]") {
 			for (const chunk of this.splitMessage(msg.content)) {
 				try {
-					await (ch as any).send({ content: chunk });
+					await ch.send({ content: chunk });
 					this.recordSent();
 				} catch (error) {
 					console.error("[Discord] Failed to send message:", error);
@@ -742,7 +760,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 					}
 				: (options ?? {});
 
-		const ch = await this.getChannel(channelId);
+		const ch = await this.getTextChannel(channelId);
 		if (!ch) throw new Error(`Channel ${channelId} not found`);
 
 		const sendOptions: Record<string, unknown> = {};
@@ -756,7 +774,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 
 		if (mergedOptions?.embed) {
 			const embed = buildEmbed(mergedOptions.embed);
-			return (ch as any).send({
+			const sent = await ch.send({
 				content: messageText,
 				...sendOptions,
 				embeds: [embed],
@@ -767,9 +785,10 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 				flags: options?.inThread ? [MessageFlags.HasThread] : undefined,
 				threadId: options?.threadId,
 			});
+			return { messageId: sent.id };
 		}
 
-		const result = await (ch as any).send({
+		const result = await ch.send({
 			content: text,
 			...sendOptions,
 			components: options?.components ?? [],
@@ -790,11 +809,11 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		channelId: string,
 		embed: DiscordEmbed,
 	): Promise<{ messageId: string }> {
-		const ch = await this.getChannel(channelId);
+		const ch = await this.getTextChannel(channelId);
 		if (!ch) throw new Error(`Channel ${channelId} not found`);
 
 		const builder = buildEmbed(embed);
-		const result = await (ch as any).send({ embeds: [builder] });
+		const result = await ch.send({ embeds: [builder] });
 		return { messageId: result.id };
 	}
 
@@ -805,7 +824,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		buttons: Array<{ label: string; style: ButtonStyle; customId: string }>,
 		options?: DiscordSendOptions,
 	): Promise<{ messageId: string }> {
-		const ch = await this.getChannel(channelId);
+		const ch = await this.getTextChannel(channelId);
 		if (!ch) throw new Error(`Channel ${channelId} not found`);
 
 		const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -817,7 +836,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 			),
 		);
 
-		const result = await (ch as any).send({
+		const result = await ch.send({
 			content,
 			components: [row],
 			...options,
@@ -839,7 +858,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		}>,
 		customId: string,
 	): Promise<{ messageId: string }> {
-		const ch = await this.getChannel(channelId);
+		const ch = await this.getTextChannel(channelId);
 		if (!ch) throw new Error(`Channel ${channelId} not found`);
 
 		const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
@@ -856,7 +875,7 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 				),
 		);
 
-		const result = await (ch as any).send({ content, components: [row] });
+		const result = await ch.send({ content, components: [row] });
 		return { messageId: result.id };
 	}
 
@@ -867,10 +886,10 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		content: string,
 		options?: DiscordSendOptions,
 	): Promise<void> {
-		const ch = await this.getChannel(channelId);
+		const ch = await this.getTextChannel(channelId);
 		if (!ch) throw new Error(`Channel ${channelId} not found`);
 
-		const msg = await (ch as any).messages.fetch(messageId);
+		const msg = await ch.messages.fetch(messageId);
 		if (options?.embed) {
 			await msg.edit({ content, embeds: [buildEmbed(options.embed)] });
 		} else {
@@ -880,19 +899,19 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 
 	/** Delete a message */
 	async deleteMessage(channelId: string, messageId: string): Promise<void> {
-		const ch = await this.getChannel(channelId);
+		const ch = await this.getTextChannel(channelId);
 		if (!ch) throw new Error(`Channel ${channelId} not found`);
 
-		const msg = await (ch as any).messages.fetch(messageId);
+		const msg = await ch.messages.fetch(messageId);
 		await msg.delete();
 	}
 
 	/** Send a typing indicator */
 	async sendTyping(channelId: string): Promise<void> {
-		const ch = await this.getChannel(channelId);
+		const ch = await this.getTextChannel(channelId);
 		if (!ch) throw new Error(`Channel ${channelId} not found`);
 
-		await (ch as any).sendTyping();
+		await ch.sendTyping();
 	}
 
 	/** React to a message with an emoji */
@@ -901,10 +920,10 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		messageId: string,
 		emoji: string,
 	): Promise<void> {
-		const ch = await this.getChannel(channelId);
+		const ch = await this.getTextChannel(channelId);
 		if (!ch) throw new Error(`Channel ${channelId} not found`);
 
-		const msg = await (ch as any).messages.fetch(messageId);
+		const msg = await ch.messages.fetch(messageId);
 		await msg.react(emoji);
 	}
 
@@ -914,10 +933,10 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		messageId: string,
 		emoji: string,
 	): Promise<void> {
-		const ch = await this.getChannel(channelId);
+		const ch = await this.getTextChannel(channelId);
 		if (!ch) throw new Error(`Channel ${channelId} not found`);
 
-		const msg = await (ch as any).messages.fetch(messageId);
+		const msg = await ch.messages.fetch(messageId);
 		await msg.reactions.cache.get(emoji)?.remove();
 	}
 
@@ -926,10 +945,10 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		channelId: string,
 		messageId: string,
 	): Promise<DiscordReaction[]> {
-		const ch = await this.getChannel(channelId);
+		const ch = await this.getTextChannel(channelId);
 		if (!ch) throw new Error(`Channel ${channelId} not found`);
 
-		const msg = await (ch as any).messages.fetch(messageId);
+		const msg = await ch.messages.fetch(messageId);
 		const reactions = await msg.reactions.fetch();
 		return Array.from(reactions.values()).map((r: any) => ({
 			emoji: { id: r.emoji.id, name: r.emoji.name },
@@ -939,6 +958,16 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 	}
 
 	/** Fetch a channel by ID */
+	private isTextChannel(ch: unknown): ch is TextDiscordChannel {
+		return (
+			ch !== null &&
+			typeof ch === "object" &&
+			"send" in ch &&
+			"messages" in ch &&
+			"sendTyping" in ch
+		);
+	}
+
 	async getChannel(
 		channelId: string,
 	): Promise<
@@ -980,6 +1009,18 @@ export class DiscordChannel extends BaseChannel<DiscordConfig, DiscordMessage> {
 		} catch {
 			return null;
 		}
+	}
+
+	/**
+	 * Fetch a channel and narrow to text-capable operations.
+	 * Returns null if the channel doesn't support text operations.
+	 */
+	private async getTextChannel(
+		channelId: string,
+	): Promise<TextDiscordChannel | null> {
+		const ch = await this.getChannel(channelId);
+		if (ch && this.isTextChannel(ch)) return ch;
+		return null;
 	}
 
 	/** Get channel info */

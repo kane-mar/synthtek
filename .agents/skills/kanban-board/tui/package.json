@@ -1,0 +1,18 @@
+{
+  "name": "kanban-board-tui",
+  "version": "1.0.0",
+  "description": "Standalone real-time Kanban board TUI — watch cards move across columns live",
+  "main": "index.js",
+  "type": "module",
+  "bin": {
+    "kanban-tui": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "kanban-tui": "node index.js"
+  },
+  "dependencies": {
+    "blessed": "^0.1.81",
+    "chokidar": "^4.0.3"
+  }
+}

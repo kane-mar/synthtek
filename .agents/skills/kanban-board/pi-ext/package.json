@@ -1,0 +1,8 @@
+{
+  "name": "kanban-board",
+  "private": true,
+  "description": "TUI Kanban board for pi — interactive board with /kanban command",
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

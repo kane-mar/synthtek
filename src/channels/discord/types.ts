@@ -2,7 +2,7 @@
  * Discord Channel — Discord.js integration for synthtek
  */
 
-import type { StreamBuffer } from "../../performance/types.js";
+import type { StreamBuffer } from "../types.js";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 

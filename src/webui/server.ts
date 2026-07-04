@@ -36,6 +36,7 @@ import { WebUIBackend } from "./backend.js";
 import { handleChatCompletion } from "./chat-handler.js";
 import { FRONTEND_HTML } from "./frontend.js";
 import { parseBody, sendFile, sendJson } from "./helpers.js";
+import { MetricsCollector } from "./metrics.js";
 import { ProviderManager } from "./provider-manager.js";
 import { SkillManager } from "./skill-manager.js";
 import type { WebUIConfig } from "./types.js";
@@ -45,7 +46,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // ── CSP Header ──────────────────────────────────────────────────────────────
 
 /** Content-Security-Policy for frontend and API responses */
-const CSP_HEADER =
+export const CSP_HEADER =
 	"default-src 'self'; " +
 	"script-src 'self' 'unsafe-inline'; " +
 	"style-src 'self' 'unsafe-inline'; " +
@@ -63,6 +64,7 @@ export class WebUIServer {
 	private backend: WebUIBackend;
 	private providerManager: ProviderManager;
 	private skillManager: SkillManager;
+	private metrics: MetricsCollector;
 	private server: ReturnType<typeof createServer> | null = null;
 
 	constructor(config: WebUIConfig, workspaceDirOverride?: string) {
@@ -85,11 +87,13 @@ export class WebUIServer {
 			join(workspaceDir, "skills"),
 			configDir,
 		);
+		this.metrics = new MetricsCollector();
 		this.backend = new WebUIBackend(
 			config,
 			workspaceDir,
 			this.providerManager,
 			this.skillManager,
+			this.metrics,
 		);
 	}
 
@@ -100,6 +104,8 @@ export class WebUIServer {
 		const auth = createAuthenticator({ apiKey: this.config.apiKey ?? "" });
 
 		const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
+			const startTime = performance.now();
+
 			// CORS preflight
 			if (req.method === "OPTIONS") {
 				res.writeHead(204, {
@@ -117,7 +123,15 @@ export class WebUIServer {
 			// API routes
 			if (path.startsWith("/api/")) {
 				// Require authentication for non-public endpoints
-				if (!auth.requireAuth(req, res)) return;
+				if (!auth.requireAuth(req, res)) {
+					this.metrics.recordRequest(
+						req.method ?? "GET",
+						path,
+						401,
+						performance.now() - startTime,
+					);
+					return;
+				}
 
 				// Parse body for POST/PUT
 				let body: unknown = {};
@@ -131,6 +145,7 @@ export class WebUIServer {
 
 				// Chat completion (streaming — needs ServerResponse)
 				if (req.method === "POST" && path === "/api/chat/completions") {
+					// Streaming responses tracked separately
 					return handleChatCompletion(
 						req,
 						res,
@@ -146,6 +161,12 @@ export class WebUIServer {
 					path,
 					body,
 					queryString,
+				);
+				this.metrics.recordRequest(
+					req.method ?? "GET",
+					path,
+					response.status,
+					performance.now() - startTime,
 				);
 				return sendJson(res, response.status, response.body);
 			}
@@ -170,6 +191,15 @@ export class WebUIServer {
 		};
 
 		this.server = createServer(handleRequest);
+		this.server.on("error", (err: NodeJS.ErrnoException) => {
+			if (err.code === "EADDRINUSE") {
+				console.error(
+					`Port ${this.config.port} is already in use. Please choose another port or free it up.`,
+				);
+				process.exit(1);
+			}
+			throw err;
+		});
 		this.server.listen(this.config.port, this.config.host, () => {
 			console.log(
 				`[webui] Server running at http://${this.config.host}:${this.config.port}`,

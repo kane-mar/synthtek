@@ -217,7 +217,8 @@ export function getAgentConfig(): AgentSettings {
 			// Stale detection: if the system prompt hash doesn't match, use defaults.
 			// Accept both old `defaultPromptHash` and new `_defaultPromptHash` keys.
 			const savedHash =
-				parsed._defaultPromptHash ?? (parsed as any).defaultPromptHash;
+				parsed._defaultPromptHash ??
+				(parsed as { defaultPromptHash?: string }).defaultPromptHash;
 			if (savedHash !== undefined && savedHash !== DEFAULT_PROMPT_HASH) {
 				cachedConfig = { ...DEFAULT_SETTINGS };
 				return { ...cachedConfig };

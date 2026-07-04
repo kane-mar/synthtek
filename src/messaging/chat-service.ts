@@ -1,9 +1,9 @@
 /**
- * ChatService — Unified messaging service for all interfaces.
+ * ChatService — Unified messaging service for CLI and TUI.
  *
- * Provides a consistent message-processing pipeline that WebUI, CLI/TUI,
- * and channels all route through. Handles provider selection, state
- * management (loading/streaming/error), and system prompt injection.
+ * Provides a consistent message-processing pipeline. WebUI routes through
+ * WebUIBackend directly (not through ChatService), but CLI/TUI uses this
+ * for its interactive chat mode.
  *
  * Usage:
  *   const chat = new ChatService(providerManager);
@@ -143,10 +143,6 @@ export class ChatService {
 			);
 
 			// ── Send to provider ──────────────────────────────────────────
-			// Concrete implementations (WebUI server, CLI runner) override
-			// this method or inject a completion handler. By default, we
-			// return a structured error indicating the caller must provide
-			// the actual LLM integration.
 			const response = await this.executeCompletion(provider, messages);
 			return response;
 		} catch (err: unknown) {

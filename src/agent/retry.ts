@@ -25,7 +25,11 @@ export const RETRYABLE_ERROR_PATTERNS: RegExp[] = [
 ];
 
 /** Patterns indicating a timeout */
-export const TIMEOUT_PATTERNS: RegExp[] = [/timeout/i, /etimedout/i];
+export const TIMEOUT_PATTERNS: RegExp[] = [
+	/timeout/i,
+	/timed out/i,
+	/etimedout/i,
+];
 
 /** Patterns indicating a network error */
 export const NETWORK_PATTERNS: RegExp[] = [

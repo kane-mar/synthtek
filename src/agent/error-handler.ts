@@ -51,13 +51,14 @@ const RATE_LIMIT_PATTERNS: RegExp[] = [
 // ─── AgentErrorHandler Class ─────────────────────────────────────────────────
 
 export class AgentErrorHandler {
-	private readonly maxRetries: number;
-	private readonly initialDelay: number;
-	private readonly maxDelay: number;
-	private readonly multiplier: number;
-	private readonly retryablePatterns: RegExp[];
-	private readonly failureThreshold: number;
-	private readonly recoveryTimeout: number;
+	// Configuration values — publicly accessible for testing and introspection
+	maxRetries: number;
+	initialDelay: number;
+	maxDelay: number;
+	readonly multiplier: number;
+	readonly retryablePatterns: RegExp[];
+	failureThreshold: number;
+	recoveryTimeout: number;
 
 	private circuitBreaker: CircuitBreakerState = {
 		failures: 0,

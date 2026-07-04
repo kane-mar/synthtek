@@ -12,11 +12,14 @@ import {
 } from "../config/agent-config.js";
 import { ConversationStore } from "../messaging/conversation-store.js";
 import { AnalyticsTracker } from "./analytics.js";
+import type { MetricsCollector } from "./metrics.js";
+import { getOpenApiSpec } from "./openapi.js";
 import type { ProviderManager } from "./provider-manager.js";
 import { handleProviderRoutes } from "./provider-routes.js";
 import type { SkillManager } from "./skill-manager.js";
 import { handleSkillRoutes } from "./skill-routes.js";
 import type {
+	AgentConfig,
 	AnalyticsSummary,
 	APIResponse,
 	CronJob,
@@ -70,7 +73,7 @@ export class WebUIBackend {
 	private readonly sessions: Map<string, Session> = new Map();
 	private readonly cronJobs: Map<string, CronJob> = new Map();
 	private readonly routes: RouteEntry[] = [];
-	private agentConfig: import("./types.js").AgentConfig = {
+	private agentConfig: AgentConfig = {
 		systemPrompt: getSharedAgentConfig().systemPrompt,
 		language: getSharedAgentConfig().language,
 		maxToolCalls: getSharedAgentConfig().maxToolCalls,
@@ -85,6 +88,7 @@ export class WebUIBackend {
 		workspaceDir?: string,
 		private providerManager?: ProviderManager,
 		private skillManager?: SkillManager,
+		private metricsCollector?: MetricsCollector,
 	) {
 		this.config = config;
 		this.analytics = new AnalyticsTracker();
@@ -228,9 +232,7 @@ export class WebUIBackend {
 			}
 			return {
 				status: 200,
-				body: this.updateAgentConfig(
-					req as Partial<import("./types.js").AgentConfig>,
-				),
+				body: this.updateAgentConfig(req as Partial<AgentConfig>),
 			};
 		});
 
@@ -242,6 +244,13 @@ export class WebUIBackend {
 		this.get("/api/health", (_body, _params) => ({
 			status: 200,
 			body: this.healthCheck(),
+		}));
+
+		this.get("/api/metrics", (_body, _params) => ({
+			status: 200,
+			body: this.metricsCollector?.getSnapshot() ?? {
+				error: "metrics not available",
+			},
 		}));
 
 		this.get("/api/stats", (_body, _params) => ({
@@ -267,6 +276,11 @@ export class WebUIBackend {
 		this.get("/api/themes", (_body, _params) => ({
 			status: 200,
 			body: this.listThemes(),
+		}));
+
+		this.get("/api/openapi.json", (_body, _params) => ({
+			status: 200,
+			body: getOpenApiSpec(),
 		}));
 
 		this.get("/api/config", (_body, _params) => ({
@@ -648,7 +662,7 @@ export class WebUIBackend {
 
 	// ── Agent Config ───────────────────────────────────────────────────────────
 
-	getAgentConfig(): import("./types.js").AgentConfig {
+	getAgentConfig(): AgentConfig {
 		const shared = getSharedAgentConfig();
 		this.agentConfig.systemPrompt = shared.systemPrompt;
 		this.agentConfig.language = shared.language;
@@ -698,9 +712,7 @@ export class WebUIBackend {
 		return { valid: true };
 	}
 
-	updateAgentConfig(
-		update: Partial<import("./types.js").AgentConfig>,
-	): import("./types.js").AgentConfig {
+	updateAgentConfig(update: Partial<AgentConfig>): AgentConfig {
 		const validation = this.validateAgentConfig(
 			update as Record<string, unknown>,
 		);
@@ -738,7 +750,7 @@ export class WebUIBackend {
 		return this.getAgentConfig();
 	}
 
-	resetAgentConfig(): import("./types.js").AgentConfig {
+	resetAgentConfig(): AgentConfig {
 		const defaults = resetSharedAgentConfig();
 		this.agentConfig.systemPrompt = defaults.systemPrompt;
 		this.agentConfig.language = defaults.language;

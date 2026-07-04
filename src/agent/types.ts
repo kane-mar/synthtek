@@ -83,8 +83,7 @@ export interface ContextCompactionResult {
 /**
  * Agent Loop Config — the canonical runtime type.
  *
- * NOTE: A parallel serialization-friendly version exists in
- * src/config/schema.ts for config file validation. Keep in sync.
+ * Imported by src/config/schema.ts for config file validation.
  */
 export interface AgentLoopConfig {
 	/** System prompt for the agent */

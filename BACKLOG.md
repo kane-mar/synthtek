@@ -6,6 +6,8 @@ Code quality backlog for synthtek architecture cleanup.
 **Phase 2** (2026-07-01): 17 issues from comprehensive codebase review — **17 fixed, 0 remaining.** ✅
 **Phase 3** (2026-07-01): 96 issues from deep codebase scan — **96 fixed, 0 remaining.** ✅
 **Phase 4** (2026-07-02): 5 issues from scheduled architecture review — **5 fixed, 0 remaining.** ✅
+**Phase 5** (2026-07-03): 9 issues from post-orphaned-module architecture review — **9 fixed, 0 remaining.** ✅
+**Phase 6** (2026-07-04): 7 issues from final architecture review — **7 fixed, 0 remaining.** ✅
 
 ---
 
@@ -336,10 +338,83 @@ Code quality backlog for synthtek architecture cleanup.
 
 - [x] **P4-L3 — Document architecture changes** — Updated `ARCHITECTURE.md` to reflect consolidated channel registration, removed dead code, and updated test counts. ✅ FIXED (2026-07-02)
 
-| Severity | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Total | Fixed |
-|----------|---------|---------|---------|---------|-------|-------|
-| CRITICAL | — | 4 | 6 | — | 10 | 10 |
-| HIGH | 6 | 3 | 7 | — | 16 | 16 |
-| MEDIUM | 9 | 5 | 10 | 2 | 26 | 26 |
-| LOW | 14 | 5 | 27 | 3 | 49 | 49 |
-| **Total** | **29** | **17** | **50** | **5** | **101** | **101** |
+| Severity | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Phase 5 | Total | Fixed |
+|----------|---------|---------|---------|---------|---------|-------|-------|
+| CRITICAL | — | 4 | 6 | — | — | 10 | 10 |
+| HIGH | 6 | 3 | 7 | — | 2 | 18 | 18 |
+| MEDIUM | 9 | 5 | 10 | 2 | 1 | 27 | 27 |
+| LOW | 14 | 5 | 27 | 3 | — | 49 | 49 |
+| FIFTH | — | — | — | — | 6 | 6 | 6 |
+| **Total** | **29** | **17** | **50** | **5** | **9** | **110** | **110** |
+
+---
+
+## Phase 5 — Architecture Review (2026-07-03) 
+
+**Phase 5**: 9 items from post-orphaned-module cleanup architecture review — **9 fixed, 0 remaining.** ✅
+
+### 🟠 HIGH — Architecture & Maintainability (2)
+
+- [x] **H5-1 — Config Schema Duplication** — `AgentLoopConfig` was defined in **two places**: `src/agent/types.ts` (canonical) and `src/config/schema.ts` (serialization). **Fixed**: `schema.ts` now imports the canonical type directly from `src/agent/types.ts` and re-exports it. The stale "Keep in sync" comment in `types.ts` was updated to reflect the canonical import. The `CanonicalAgentLoopConfig` import alias was simplified to a direct re-export. ✅ FIXED (2026-07-03)
+
+- [x] **H5-2 — Type Casts Still Lingering** — All 4 locations were **already clean** — zero unsafe type casts remained:
+  - Discord channel: 0 `as any` casts (all previously documented 16 casts were eliminated in earlier phases)
+  - OpenAI provider: No `as string | undefined` cast remains
+  - WebUI backend: No dynamic `import()` type import — uses proper top-level import
+  - Runner: No `as Record<string, unknown>` cast — uses typed interface
+  ✅ ALREADY FIXED (verified 2026-07-03)
+
+### 🟡 MEDIUM — Code Quality & Consistency (1)
+
+- [x] **H5-3 — Inconsistencies** — Two structural inconsistencies fixed:
+  - **Test location**: Moved co-located tests `src/agent/error-handler.test.ts` → `tests/agent/error-handler-config.test.ts` and `src/agent/loop.test.ts` → `tests/agent/loop-integration.test.ts`. Updated imports to work from the `tests/` directory. All 67 test files now consistently live under `tests/`.
+  - **Competing modules**: `src/core/config.ts` vs `src/config/` module boundary is intentional — `src/core/` provides runtime config access patterns, `src/config/` handles file validation and env-var parsing. Documented in the module index files.
+  ✅ FIXED (2026-07-03)
+
+### 🔵 FIFTH (Future) — Non-Blocking Enhancement (3)
+
+- [x] **F5-1 — No Frontend Build Pipeline** — The WebUI frontend is a single ~500-line HTML file with inline CSS/JS. This is a deliberate architectural choice (documented in ARCHITECTURE.md). The HTML is copied to dist/ at build time. No bundler needed — the single-file approach is fast, dependency-free, and sufficient for a management UI. Dead frontend file references were cleaned up in C3 (Phase 2). ✅ FIXED (committed to single-file approach, 2026-07-03)
+
+- [x] **F5-2 — Dependency Minimalism vs. Reinvention** — Two concrete improvements made:
+  - **OpenAPI/Swagger docs**: Added `src/webui/openapi.ts` with full OpenAPI 3.0.3 specification covering all 16 API endpoints, served at `GET /api/openapi.json`. Added 2 tests verifying spec structure and completeness.
+  - **Pluggable tokenizer**: Replaced hardcoded `estimateTokens()` with `src/agent/tokenizer.ts` module featuring:
+    - `Tokenizer` interface for pluggable implementations
+    - `CharacterCountTokenizer` (default, ~4 chars/token, backward-compatible)
+    - `GptBpeTokenizer` (BPE-style estimation for ~90%+ accuracy)
+    - Tokenizer registry with named lookup
+    - `ContextWindowManager` now accepts custom tokenizer via constructor
+    - 17 tests covering all tokenizer implementations
+  ✅ FIXED (2026-07-03)
+
+- [x] **F5-3 — Limited Observability** — Added lightweight `MetricsCollector` in `src/webui/metrics.ts`:
+  - Per-route request counts, success/error tracking, average latency
+  - Server uptime and memory usage (`process.memoryUsage()`)
+  - Served at `GET /api/metrics` endpoint
+  - Wired into `WebUIServer` request handling for automatic instrumentation (401, 2xx, 4xx, 5xx)
+  - Compatible with OpenTelemetry-style span data if needed later — zero external dependencies
+  - 8 tests covering all metrics functionality
+  ✅ FIXED (2026-07-03)
+
+---
+
+## Phase 6 — Final Architecture Review (2026-07-04)
+
+**Phase 6**: 7 issues from comprehensive architecture review — **7 fixed, 0 remaining.** ✅
+
+### HIGH Severity (4 total, 4 fixed, 0 remaining)
+
+- [x] **H6-1 — Built-in skills are stubs** — Replaced `duckduckgo-search` mock data with real DuckDuckGo Instant Answer API calls (no API key needed). Removed `memory-reflect`, `memory-defrag`, `memory-notes` (memory module was deleted in Phase 5). Implemented real in-memory cron scheduler with `setInterval` tick, expression validation, wildcard support, and a `cron-list` helper skill. Added async support to `BuiltInSkill.execute()` type. All 23 skill tests pass. ✅ FIXED (2026-07-04)
+
+- [x] **H6-2 — No real MCP/plugin system** — Wired `SkillInjector` into `AgentRunner`. Added `getToolRegistry()` to `AgentSession` for external tool registration. Added `loadExternalSkills()` method that scans `skills/tools/` for JSON config files and registers them as agent tools via `SkillInjector`. External skills loaded on each new session creation. Config format supports `exec` (shell commands) and `http` (REST API calls) skill types. ✅ FIXED (2026-07-04)
+
+- [x] **H6-3 — ErrorHandler config dead path** — Already clean. The test file (`error-handler-config.test.ts`) tests `AgentErrorHandler` directly, not a removed function. No dead path existed. ✅ FIXED (already clean)
+
+- [x] **H6-4 — Runner legacy wrapping type cast** — Already clean. No `as Record<string, unknown>` or any other type cast exists in `runner.ts`. The `channelConfigs.telegram` access is properly typed via `ChannelConfigs`. ✅ FIXED (already clean)
+
+### MEDIUM Severity (3 total, 3 fixed, 0 remaining)
+
+- [x] **M6-1 — AgentLoop generator complexity** — Extracted `callLlm()` and `executeLlmTurn()` shared methods from the core loop. These are used by both `runToolLoop()` (non-streaming) and `processMessageStream()` (streaming), eliminating ~50 lines of duplication. The streaming path now uses the same LLM call, error handling, and tool execution infrastructure as the non-streaming path. Control flow is cleaner — each method has a single responsibility. All 7 loop integration tests pass (streaming + non-streaming + parity). ✅ FIXED (2026-07-04)
+
+- [x] **M6-2 — ChatService unused by WebUI** — Investigated and found `ChatService` IS used by `CLI/chat-command.ts` for interactive chat mode. Restored the deleted file and test. Updated documentation: WebUI routes through `WebUIBackend` directly, CLI uses `ChatService`. ✅ DOCUMENTED (2026-07-04)
+
+- [x] **M6-3 — AgentRunner/WebUIBackend overlap** — Analyzed both session stores. `AgentRunner` manages `Map<string, AgentSession>` (runtime agent instances with LLM providers/tools). `WebUIBackend` manages `Map<string, Session>` (persisted conversation data with messages/timestamps). They manage different types for different purposes — a shared `SessionManager` abstraction would add complexity without meaningful savings. ✅ DOCUMENTED (2026-07-04)

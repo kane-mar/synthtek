@@ -51,7 +51,10 @@ export async function handleChatCompletion(
 	providerManager: ProviderManager,
 	backend: WebUIBackend,
 ): Promise<void> {
-	const chatReq = body as ChatCompletionRequest & { providerId?: string };
+	const chatReq = body as ChatCompletionRequest & {
+		providerId?: string;
+		sessionId?: string;
+	};
 
 	try {
 		// Resolve provider
@@ -100,9 +103,7 @@ export async function handleChatCompletion(
 		}
 
 		const systemContent = chatReq.system || "You are a helpful AI assistant.";
-		const sessionId = (chatReq as Record<string, unknown>).sessionId as
-			| string
-			| undefined;
+		const sessionId = chatReq.sessionId;
 
 		// Read agent parameters from shared config
 		const agentCfg = getAgentConfig();
@@ -190,7 +191,7 @@ export async function handleChatCompletion(
 		const message = err instanceof Error ? err.message : "Unknown error";
 		let providerLabel = "unknown";
 		try {
-			const p = providerManager.getActiveProvider((body as any)?.providerId);
+			const p = providerManager.getActiveProvider(chatReq.providerId);
 			if (p) providerLabel = p.name || p.type || "unknown";
 		} catch {
 			/* ignore */

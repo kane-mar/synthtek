@@ -231,6 +231,54 @@ describe("WebUIBackend", () => {
 		});
 	});
 
+	describe("OpenAPI specification", () => {
+		it("serves OpenAPI spec at /api/openapi.json", () => {
+			const handler = backend.handleRequest("GET", "/api/openapi.json", {});
+			strictEqual(handler.status, 200);
+			const spec = handler.body as Record<string, unknown>;
+			ok(spec.openapi, "should have openapi version");
+			strictEqual(spec.openapi, "3.0.3");
+			ok(spec.info, "should have info section");
+			ok(spec.paths, "should have paths section");
+			ok(
+				(spec.paths as Record<string, unknown>)["/api/sessions"],
+				"should document /api/sessions",
+			);
+			ok(
+				(spec.paths as Record<string, unknown>)["/api/health"],
+				"should document /api/health",
+			);
+			ok(
+				(spec.paths as Record<string, unknown>)["/api/openapi.json"],
+				"should self-document",
+			);
+			ok(spec.components, "should have components section");
+			ok(
+				(spec.components as Record<string, unknown>).schemas,
+				"should have schemas",
+			);
+		});
+
+		it("validates OpenAPI spec structure", async () => {
+			const { getOpenApiSpec } = await import("../../src/webui/openapi.js");
+			const spec = getOpenApiSpec();
+			// Standard OpenAPI 3.0 fields
+			strictEqual(spec.openapi, "3.0.3");
+			const info = spec.info as Record<string, unknown> | undefined;
+			ok(info?.title, "should have title");
+			ok(typeof info?.version === "string", "should have version");
+
+			// All paths should have at least one operation
+			const paths = spec.paths as Record<string, Record<string, unknown>>;
+			for (const [path, operations] of Object.entries(paths)) {
+				ok(
+					Object.keys(operations).length > 0,
+					`${path} should have at least one operation`,
+				);
+			}
+		});
+	});
+
 	describe("analytics summary", () => {
 		it("returns analytics summary via API", () => {
 			const handler = backend.handleRequest(
