@@ -127,10 +127,10 @@ jobs:
           docker run -d \
             --name synthtek \
             --restart unless-stopped \
-            -p ${{ secrets.PRODUCTION_PORT_MAPPING || '3456:3456' }} \
+            -p 3456:3456 \
             -v /volume1/docker/synthtek/config:/root/.synthtek/config \
             -v /volume1/docker/synthtek/data:/data \
-            -e SYNTHTEK_PORT=3456 \
+            -e WEBUI_PORT=3456 \
             -e SYNTHTEK_WORKSPACE=/data \
             -e HOME=/data \
             -e npm_config_cache=/data/.npm \

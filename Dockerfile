@@ -65,12 +65,12 @@ ENV HOME=/data
 # Speed up npx by caching to persistent volume
 ENV npm_config_cache=/data/.npm
 
-# WebUI port (override via --port or SYNTHTEK_PORT env var)
+# WebUI port (override via --port or WEBUI_PORT env var)
 EXPOSE 3456
 
-# Health check — probes the WebUI health endpoint
+# Health check — probes the WebUI health endpoint using port specified by WEBUI_PORT
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "import('http').then(h => h.get('http://127.0.0.1:3456/api/health', r => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1)))" || exit 1
+  CMD node -e "const p=process.env.WEBUI_PORT||3456;import('http').then(h=>h.get('http://127.0.0.1:'+p+'/api/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1)))" || exit 1
 
 # Default: start WebUI server on port 3456
 ENTRYPOINT ["docker-entrypoint.sh", "node", "dist/src/cli.js"]
