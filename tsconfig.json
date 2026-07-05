@@ -26,6 +26,7 @@
     "src/agents",
     "src/commands",
     "tests/e2e/*.spec.ts",
-    "tests/e2e/puppeteer.test.ts"
+    "tests/e2e/*.e2e.ts",
+    "tests/webui/*.e2e.ts"
   ]
 }

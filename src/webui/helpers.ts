@@ -35,6 +35,9 @@ export function sendJson(
 		"Content-Type": "application/json",
 		"Access-Control-Allow-Origin": "*",
 		"Content-Length": Buffer.byteLength(json),
+		"Cache-Control": "no-cache, no-store, must-revalidate",
+		Pragma: "no-cache",
+		Expires: "0",
 	});
 	res.end(json);
 }

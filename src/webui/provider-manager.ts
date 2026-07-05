@@ -174,11 +174,20 @@ export class ProviderManager {
 	private persist(): void {
 		const data: LLMProviderConfig[] = Array.from(this.providers.values());
 		try {
-			mkdirSync(dirname(this.dataPath), { recursive: true });
-			writeFileSync(this.dataPath, JSON.stringify(data, null, 2), "utf-8");
+			const dir = dirname(this.dataPath);
+			mkdirSync(dir, { recursive: true });
+			const json = JSON.stringify(data, null, 2);
+			writeFileSync(this.dataPath, json, "utf-8");
+			// Verify the file was written correctly by reading it back
+			const written = readFileSync(this.dataPath, "utf-8");
+			if (written !== json) {
+				console.error(
+					`[ProviderManager] Data verification failed for ${this.dataPath}`,
+				);
+			}
 		} catch (error) {
 			console.error(
-				`[ProviderManager] Failed to persist providers: ${(error as Error).message}`,
+				`[ProviderManager] Failed to persist providers to ${this.dataPath}: ${(error as Error).message}`,
 			);
 		}
 	}
