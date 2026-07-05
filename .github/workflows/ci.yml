@@ -181,7 +181,7 @@ jobs:
 
       - name: Run full browser e2e tests against production
         run: |
-          SYNTHTEK_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' synthtek.prod)
+          SYNTHTEK_IP="localhost"
           E2E_BASE_URL="http://${SYNTHTEK_IP}:3456" BASE_URL="http://${SYNTHTEK_IP}:3456" \
             npx playwright test tests/e2e/*.spec.ts
 
