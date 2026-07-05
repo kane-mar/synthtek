@@ -2,8 +2,8 @@
 
 A modular, plugin-based AI agent framework built with Node.js and TypeScript.
 
-[![Tests](https://img.shields.io/badge/tests-1320%20passing-brightgreen)](https://github.com/synthtek/synthtek)
-[![E2E](https://img.shields.io/badge/e2e-6%2F6%20passing-brightgreen)](https://github.com/synthtek/synthtek)
+[![Tests](https://img.shields.io/badge/tests-1012%20passing-brightgreen)](https://github.com/synthtek/synthtek)
+[![E2E](https://img.shields.io/badge/e2e-61%20suites%20passing-brightgreen)](https://github.com/synthtek/synthtek)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node](https://img.shields.io/badge/Node-%3E%3D20.0.0-brightgreen)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
@@ -93,7 +93,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed architecture docs.
 
 ```bash
 npm run build      # Compile TypeScript
-npm test           # Run all tests (1,320+ passing)
+npm test           # Run all tests (1,012 passing, 0 failing, 3 skipped)
 npm run dev        # Development mode with source maps
 npm run lint       # Lint source code
 npm run clean      # Remove dist/
@@ -107,11 +107,11 @@ npm run clean      # Remove dist/
 
 ## Project Stats
 
-- **~33,700 lines** of source code
-- **~23,000 lines** of tests
-- **165 source files**, **88 test files**
-- **1,320 tests passing** (100% green, 1 skipped)
-- **6 Playwright e2e tests** passing against production Docker build
+- **~28,000 lines** of source code
+- **~19,200 lines** of tests
+- **125 source files**, **75 test files**
+- **1,012 tests passing** (100% green, 3 skipped)
+- **61 internal API e2e test suites** passing (Playwright WebUI tests require Chromium)
 
 ## License
 

@@ -12,6 +12,8 @@ import { after, describe, it } from "node:test";
 import { ProviderManager } from "../../src/webui/provider-manager.js";
 import { handleProviderRoutes } from "../../src/webui/provider-routes.js";
 
+const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+
 describe("ProviderRoutes", () => {
 	const baseDir = mkdtempSync(join(tmpdir(), "synthtek-pr-"));
 
@@ -37,8 +39,9 @@ describe("ProviderRoutes", () => {
 		assert.equal(result.handled, true);
 		assert.ok(result.response);
 		assert.equal(result.response.status, 201);
-		assert.ok(result.response.body.id);
-		assert.equal(result.response.body.name, "Test");
+		const apiBody = result.response.body as { id: string; name: string };
+		assert.ok(apiBody.id);
+		assert.equal(apiBody.name, "Test");
 	});
 
 	it("returns 400 on POST /api/providers with missing name", () => {
@@ -86,8 +89,12 @@ describe("ProviderRoutes", () => {
 		assert.equal(result.handled, true);
 		assert.ok(result.response);
 		assert.equal(result.response.status, 200);
-		assert.ok(result.response.body.dataPath);
-		assert.equal(result.response.body.providerCount, 0);
+		const diagBody = result.response.body as {
+			dataPath: string;
+			providerCount: number;
+		};
+		assert.ok(diagBody.dataPath);
+		assert.equal(diagBody.providerCount, 0);
 	});
 
 	it("returns 200 on PUT /api/providers/:id", () => {
@@ -160,7 +167,7 @@ describe("ProviderRoutes", () => {
 		assert.equal(result.response.status, 404);
 	});
 
-	it("returns 500 on POST when persistence fails", () => {
+	it("returns 500 on POST when persistence fails", { skip: isRoot }, () => {
 		const ws = freshWorkspace();
 		// Make the config directory read-only
 		const configDir = join(ws, "config");

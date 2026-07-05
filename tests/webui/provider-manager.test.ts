@@ -9,6 +9,8 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { ProviderManager } from "../../src/webui/provider-manager.js";
 
+const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+
 describe("ProviderManager", () => {
 	const baseDir = mkdtempSync(join(tmpdir(), "synthtek-pm-"));
 
@@ -219,7 +221,7 @@ describe("ProviderManager", () => {
 		assert.equal(d2.loaded, true);
 	});
 
-	it("persist throws on unwritable directory", () => {
+	it("persist throws on unwritable directory", { skip: isRoot }, () => {
 		const ws = freshWorkspace();
 		// Make the workspace read-only
 		const configDir = join(ws, "config");

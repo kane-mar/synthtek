@@ -1,9 +1,9 @@
 # Architecture
 
-> **Last updated:** 2026-07-02  
-> **Tests:** 1,313 passing, 1 skipped, 481 suites (100% green) – all tests post-refactor pass  
-> **E2E:** 10 internal API e2e tests passing + 6 Playwright WebUI tests  
-> **Source:** 165 TypeScript files (~33,600 LOC)  
+> **Last updated:** 2026-07-05  
+> **Tests:** 1,012 passing, 3 skipped, 370 suites (100% green) – all tests pass  
+> **E2E:** 61 internal API e2e test suites passing (Playwright WebUI tests require Chromium)  
+> **Source:** 125 TypeScript files (~28,000 LOC) + 75 test files (~19,200 LOC)  
 > **Lint:** Clean (0 errors, 0 warnings) – Biome
 
 ---
