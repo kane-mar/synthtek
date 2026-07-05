@@ -123,17 +123,20 @@ jobs:
           echo 'Stopping and removing existing container...'
           docker rm -f synthtek.prod 2>/dev/null || true
 
+          echo 'Creating persistent volumes if they do not exist...'
+          docker volume create synthtek_data 2>/dev/null || true
+
           echo 'Starting new container...'
           docker run -d \
             --name synthtek.prod \
             --restart unless-stopped \
             -p 3456:3456 \
-            -v /volume1/docker/synthtek.prod/config:/root/.synthtek/config \
-            -v /volume1/docker/synthtek.prod/workspace:/workspace \
+            -v synthtek_data:/data \
             -e WEBUI_PORT=3456 \
-            -e SYNTHTEK_WORKSPACE=/workspace \
-            -e HOME=/workspace \
-            -e npm_config_cache=/workspace/.npm \
+            -e WEBUI_HOST=0.0.0.0 \
+            -e SYNTHTEK_WORKSPACE=/data \
+            -e HOME=/data \
+            -e npm_config_cache=/data/.npm \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
           echo 'Cleaning up old images...'

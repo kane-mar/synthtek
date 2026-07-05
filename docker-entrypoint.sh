@@ -4,7 +4,11 @@ set -e
 # Ensure the workspace directory exists with proper permissions
 if [ -n "$SYNTHTEK_WORKSPACE" ]; then
   mkdir -p "$SYNTHTEK_WORKSPACE" 2>/dev/null || true
-  chown -R synthtek:synthtek "$SYNTHTEK_WORKSPACE" 2>/dev/null || true
+  if ! chown -R synthtek:synthtek "$SYNTHTEK_WORKSPACE" 2>/dev/null; then
+    echo "[entrypoint] WARNING: Could not chown $SYNTHTEK_WORKSPACE to synthtek user." >&2
+    echo "[entrypoint] The synthtek user may not be able to write to the workspace." >&2
+    echo "[entrypoint] If using a host bind mount, ensure the directory is writable by UID $(id -u synthtek)." >&2
+  fi
 fi
 
 # Set HOME to workspace so ~/.agents/skills/ and npm cache persist
