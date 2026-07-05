@@ -20,7 +20,6 @@ const MAX_CONFIG_VALUE_LENGTH = 65536;
 const CONFIG_KEY_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
 /** Maximum number of CLI operations per minute */
-const DEFAULT_MAX_OPS_PER_MINUTE = 60;
 
 // ─── Path Validation ─────────────────────────────────────────────────────────
 
@@ -156,106 +155,12 @@ export function validateCommand(command: string): void {
 	}
 }
 
-// ─── Rate Limiter ────────────────────────────────────────────────────────────
-
+// ─── Rate Limiter (re-exported from security module) ─────────────────────────
 /**
- * Simple in-memory rate limiter that tracks operations per time window.
- * Automatically cleans up expired entries.
+ * Rate limiter for CLI operations.
+ * Delegates to the security module's implementation.
  */
-export class RateLimiter {
-	private operations: Map<string, number[]> = new Map();
-	private maxOpsPerMinute: number;
-	private cleanupInterval: ReturnType<typeof setInterval> | null = null;
-
-	/**
-	 * Create a new rate limiter.
-	 *
-	 * @param maxOpsPerMinute - Maximum operations allowed per minute
-	 * @param cleanupIntervalMs - How often to clean up expired entries (default 60s)
-	 */
-	constructor(
-		maxOpsPerMinute: number = DEFAULT_MAX_OPS_PER_MINUTE,
-		cleanupIntervalMs: number = 60_000,
-	) {
-		this.maxOpsPerMinute = maxOpsPerMinute;
-		this.startCleanup(cleanupIntervalMs);
-	}
-
-	/**
-	 * Check if an operation is allowed under the rate limit.
-	 *
-	 * @param key - Unique identifier for the operation type
-	 * @returns true if allowed, false if rate limited
-	 */
-	check(key: string = "default"): boolean {
-		const now = Date.now();
-		const windowStart = now - 60_000;
-
-		let ops = this.operations.get(key) ?? [];
-		// Remove expired entries
-		ops = ops.filter((t) => t > windowStart);
-
-		if (ops.length >= this.maxOpsPerMinute) {
-			this.operations.set(key, ops);
-			return false;
-		}
-
-		ops.push(now);
-		this.operations.set(key, ops);
-		return true;
-	}
-
-	/**
-	 * Get current operation count for a key.
-	 */
-	getCurrentCount(key: string = "default"): number {
-		const now = Date.now();
-		const windowStart = now - 60_000;
-		const ops = this.operations.get(key) ?? [];
-		return ops.filter((t) => t > windowStart).length;
-	}
-
-	/**
-	 * Start periodic cleanup of expired entries.
-	 */
-	private startCleanup(intervalMs: number): void {
-		this.cleanupInterval = setInterval(() => {
-			this.cleanup();
-		}, intervalMs);
-		// Don't keep process alive for cleanup
-		if (this.cleanupInterval.unref) {
-			this.cleanupInterval.unref();
-		}
-	}
-
-	/**
-	 * Remove all expired entries from the rate limiter.
-	 */
-	cleanup(): void {
-		const now = Date.now();
-		const windowStart = now - 60_000;
-
-		for (const [key, ops] of this.operations.entries()) {
-			const filtered = ops.filter((t) => t > windowStart);
-			if (filtered.length === 0) {
-				this.operations.delete(key);
-			} else {
-				this.operations.set(key, filtered);
-			}
-		}
-	}
-
-	/**
-	 * Stop the rate limiter and clean up resources.
-	 */
-	stop(): void {
-		if (this.cleanupInterval !== null) {
-			clearInterval(this.cleanupInterval);
-			this.cleanupInterval = null;
-		}
-		this.operations.clear();
-	}
-}
+export { RateLimiter } from "../security/rate-limiter.js";
 
 // ─── Validation Error ────────────────────────────────────────────────────────
 

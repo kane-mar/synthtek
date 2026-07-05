@@ -27,7 +27,7 @@ export function getConfig(): ConfigServiceImpl {
 
 export function getRateLimiter(): RateLimiter {
 	if (!_configRateLimiter) {
-		_configRateLimiter = new RateLimiter(30);
+		_configRateLimiter = new RateLimiter({ maxRequests: 30, windowMs: 60000 });
 	}
 	return _configRateLimiter;
 }

@@ -365,20 +365,23 @@ export class AgentRunner {
 	 *   disconnect on stop
 	 *
 	 * Each channel has unique message/send option types, so the interface
-	 * pragmatically uses `any` for message and options.
+	 * is generic over message and send-options types.
 	 */
-	private async wireChannel(
+	private async wireChannel<
+		MsgT extends { text?: string; content?: string },
+		SendOptsT extends { text?: string },
+	>(
 		channel: {
-			onMessage: (handler: (msg: any) => Promise<void>) => void;
+			onMessage: (handler: (msg: MsgT) => Promise<void>) => void;
 			connect: () => Promise<void>;
 			disconnect: () => Promise<void>;
-			sendMessage: (options: any) => Promise<unknown>;
+			sendMessage: (options: SendOptsT) => Promise<unknown>;
 		},
 		channelName: string,
-		getChatId: (msg: any) => string,
+		getChatId: (msg: MsgT) => string,
 	): Promise<void> {
-		this.activeChannels.add(channel as { disconnect: () => Promise<void> });
-		channel.onMessage(async (msg: any) => {
+		this.activeChannels.add(channel);
+		channel.onMessage(async (msg) => {
 			const content = String(msg.text ?? msg.content ?? "");
 			if (!content) return;
 			const chatId = getChatId(msg);
@@ -387,7 +390,7 @@ export class AgentRunner {
 				`${channelName}:${chatId}`,
 				async (text) => {
 					try {
-						await channel.sendMessage({ text, content: text });
+						await channel.sendMessage({ text } as SendOptsT);
 					} catch (err: unknown) {
 						this.logger.error(`${channelName} send error`, {
 							error: err instanceof Error ? err.message : "send failed",
@@ -401,6 +404,7 @@ export class AgentRunner {
 	}
 
 	/** Channel descriptor for consolidated dynamic import + wiring */
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each channel has unique message shapes; any is pragmatically correct for message field extraction
 	private static readonly CHANNEL_REGISTRY: Array<{
 		key: keyof ChannelConfigs;
 		name: string;
@@ -441,7 +445,10 @@ export class AgentRunner {
 			name: "feishu",
 			path: "../channels/feishu/channel.js",
 			className: "FeishuChannel",
-			getChatId: (m) => String(m.chatId ?? m.sender?.id ?? "unknown"),
+			getChatId: (m: Record<string, unknown>) => {
+				const sender = m.sender as Record<string, unknown> | undefined;
+				return String(m.chatId ?? sender?.id ?? "unknown");
+			},
 		},
 		{
 			key: "wecom",
@@ -512,15 +519,17 @@ export class AgentRunner {
 	): Promise<void> {
 		const mod = await import(descriptor.path);
 		const ChannelClass = mod[descriptor.className] as new (
-			config: any,
+			config: Record<string, unknown>,
 		) => {
-			onMessage: (handler: (msg: any) => Promise<void>) => void;
+			onMessage: (
+				handler: (msg: Record<string, unknown>) => Promise<void>,
+			) => void;
 			connect: () => Promise<void>;
 			disconnect: () => Promise<void>;
-			sendMessage: (options: any) => Promise<unknown>;
+			sendMessage: (options: Record<string, unknown>) => Promise<unknown>;
 		};
 		await this.wireChannel(
-			new ChannelClass(channelConfig),
+			new ChannelClass(channelConfig as Record<string, unknown>),
 			descriptor.name,
 			descriptor.getChatId,
 		);

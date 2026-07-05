@@ -7,6 +7,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { classifyError } from "../agent/retry.js";
 import { AgentSession } from "../agent/session.js";
 import { getAgentConfig } from "../config/agent-config.js";
 import { getRegistry } from "../providers/index.js";
@@ -25,21 +26,10 @@ import type { ProviderManager } from "./provider-manager.js";
 function classifyProviderError(
 	message: string,
 ): "rate_limit" | "timeout" | "network" | "error" {
-	const lowered = message.toLowerCase();
-	if (
-		/rate.?limit/i.test(lowered) ||
-		/too many requests/i.test(lowered) ||
-		/429/i.test(lowered)
-	)
-		return "rate_limit";
-	if (/timeout/i.test(lowered) || /etimedout/i.test(lowered)) return "timeout";
-	if (
-		/network/i.test(lowered) ||
-		/connection refuse/i.test(lowered) ||
-		/econnreset/i.test(lowered) ||
-		/eai_again/i.test(lowered) ||
-		/enotfound/i.test(lowered)
-	)
+	const category = classifyError(message);
+	if (category === "rate_limit") return "rate_limit";
+	if (category === "timeout") return "timeout";
+	if (category === "network" || category === "service_unavailable")
 		return "network";
 	return "error";
 }

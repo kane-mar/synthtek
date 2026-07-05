@@ -24,6 +24,13 @@ export const RETRYABLE_ERROR_PATTERNS: RegExp[] = [
 	/\bconnection\b.*\b(refused|reset|closed|timeout)\b/i,
 ];
 
+/** Patterns indicating a rate limit */
+export const RATE_LIMIT_PATTERNS: RegExp[] = [
+	/rate.?limit/i,
+	/too many requests/i,
+	/429/i,
+];
+
 /** Patterns indicating a timeout */
 export const TIMEOUT_PATTERNS: RegExp[] = [
 	/timeout/i,
@@ -57,12 +64,11 @@ export function isRetryable(errorMessage: string): boolean {
 /** Map an error message to a machine-readable code */
 export function classifyError(message: string): string {
 	const lower = message.toLowerCase();
-	if (/rate\s*limit|too\s*many|429/.test(lower)) return "rate_limit";
-	if (/timeout|timed?\s*out|deadline/.test(lower)) return "timeout";
+	if (matchesPatterns(lower, RATE_LIMIT_PATTERNS)) return "rate_limit";
+	if (matchesPatterns(lower, TIMEOUT_PATTERNS)) return "timeout";
 	if (/unavailable|overloaded|503|502/.test(lower))
 		return "service_unavailable";
-	if (/network|connection|econnreset|eai_again|enotfound/.test(lower))
-		return "network";
+	if (matchesPatterns(lower, NETWORK_PATTERNS)) return "network";
 	if (/not found|404/.test(lower)) return "not_found";
 	if (/auth|unauthorized|403|401/.test(lower)) return "auth";
 	return "unknown";

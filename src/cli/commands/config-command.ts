@@ -27,7 +27,7 @@ export function registerConfigCommand(program: Command): void {
 				.argument("<key>", "configuration key")
 				.argument("<value>", "value to set")
 				.action((key, value) => {
-					if (!configRateLimiter.check("config-set")) {
+					if (!configRateLimiter.check("config-set").allowed) {
 						logger.error(
 							"Rate limit exceeded for config operations. Please wait.",
 						);

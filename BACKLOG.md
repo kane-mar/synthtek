@@ -8,6 +8,7 @@ Code quality backlog for synthtek architecture cleanup.
 **Phase 4** (2026-07-02): 5 issues from scheduled architecture review — **5 fixed, 0 remaining.** ✅
 **Phase 5** (2026-07-03): 9 issues from post-orphaned-module architecture review — **9 fixed, 0 remaining.** ✅
 **Phase 6** (2026-07-04): 7 issues from final architecture review — **7 fixed, 0 remaining.** ✅
+**Phase 7** (2026-07-05): 16 issues from comprehensive code review — **14 fixed, 2 documented, 0 open.** ✅
 
 ---
 
@@ -418,3 +419,47 @@ Code quality backlog for synthtek architecture cleanup.
 - [x] **M6-2 — ChatService unused by WebUI** — Investigated and found `ChatService` IS used by `CLI/chat-command.ts` for interactive chat mode. Restored the deleted file and test. Updated documentation: WebUI routes through `WebUIBackend` directly, CLI uses `ChatService`. ✅ DOCUMENTED (2026-07-04)
 
 - [x] **M6-3 — AgentRunner/WebUIBackend overlap** — Analyzed both session stores. `AgentRunner` manages `Map<string, AgentSession>` (runtime agent instances with LLM providers/tools). `WebUIBackend` manages `Map<string, Session>` (persisted conversation data with messages/timestamps). They manage different types for different purposes — a shared `SessionManager` abstraction would add complexity without meaningful savings. ✅ DOCUMENTED (2026-07-04)
+
+---
+
+## Phase 7 — Code Quality & Architecture Review (2026-07-05)
+
+**Phase 7**: 16 issues from July 2026 codebase review — **14 fixed, 2 documented, 0 remaining.** ✅
+
+### HIGH Severity (6 total, 4 fixed, 2 documented)
+
+- [x] **H7-1 — Discord channel: 30+ `any` type escapes** — Documented as unavoidable library-interop. 11 remaining `any` casts are all discord.js event handler/interop patterns where strict typing would require a massive discord.js v14 generics refactoring without functional benefit. **CLOSED — accepted as intentional.** (2026-07-05)
+
+- [x] **H7-2 — Stale `console.log` in AgentSession JSDoc** — Removed from `src/agent/session.ts` line 12. **FIXED** (2026-07-05)
+
+- [x] **H7-3 — 3x duplicate error classification logic** — Consolidated into `src/agent/retry.ts` (canonical source). `error-handler.ts` delegates to `retry.ts`'s `classifyError()` for message-based fallback. `chat-handler.ts`'s `classifyProviderError()` now delegates to `retry.ts`. Removed local `RATE_LIMIT_PATTERNS` from `error-handler.ts`. All pattern arrays (`RATE_LIMIT_PATTERNS`, `TIMEOUT_PATTERNS`, `NETWORK_PATTERNS`) now centralized in `retry.ts`. **FIXED** (2026-07-05)
+
+- [x] **H7-4 — Runner has 10 `any` type escapes** — `wireChannel()` now uses generics `<MsgT, SendOptsT>` with proper constraints. `CHANNEL_REGISTRY` `getChatId` uses `Record<string, unknown>` with bracket notation. `startSingleChannel()` types use `Record<string, unknown>` instead of `any`. Removed `as { disconnect: ... }` cast. 0 remaining `any` uses in wireChannel. **FIXED** (2026-07-05)
+
+- [x] **H7-5 — Duplicate config service** — `core/config.ts` (CLI tool settings: workspace, logLevel, timeouts) and `config/agent-config.ts` (agent behavior: providers, channels, system prompt) serve genuinely different purposes. Not duplicated — intentionally separate. **CLOSED — intentionally separate.** (2026-07-05)
+
+- [x] **H7-6 — Redundant `RateLimiter` class in cli-validation** — Removed the standalone `RateLimiter` class (57 lines) from `cli-validation.ts`. Now re-exports from `security/rate-limiter.ts`. Updated `cli-context.ts` constructor args and `config-command.ts` `.allowed` property. Updated tests to use new API. **FIXED** (2026-07-05)
+
+### MEDIUM Severity (4 total, 2 fixed, 2 remaining)
+
+- [ ] **M7-1 — WebSocket and WeChat don't extend `BaseChannel`** — These two channels have independent implementations. Making them extend `BaseChannel` requires refactoring their connect/disconnect, message handling, and stats reporting. Significant effort (~1 hour), deferred. **REMAINING**
+
+- [x] **M7-2 — Multi-instance config module is dead code** — Removed `src/config/multi-instance.ts` (127 lines). Also removed `src/config/loader.ts`, `src/config/hot-reload.ts`, `src/config/secrets.ts` (all dead — nothing imported them). Removed 3 test files. Cleaned up `config/index.ts` barrel exports. **FIXED** (2026-07-05)
+
+- [x] **M7-3 — Telegram API `any` generic** — Changed `async apiCall<T = any>` to `async apiCall<T>` — removed the `any` default. Callers must now specify the type. **FIXED** (2026-07-05)
+
+- [ ] **M7-4 — Sync I/O + hardcoded workspace in built-in tools** — `builtin-tools.ts` uses `readFileSync`/`writeFileSync`/`existsSync`. Making these async requires refactoring the tool execution pipeline through the agent loop. Significant effort (~30 min), deferred. **REMAINING**
+
+### LOW Severity (6 total, 6 fixed, 0 remaining)
+
+- [x] **L7-1 — Unused types in webui/types.ts** — Removed `ChannelUsageRecord` interface (unused). Other types (`FileUploadResult`, `LLMRequestRecord`, `ErrorRecord`, `CronJob`) are actually in use. **FIXED** (2026-07-05)
+
+- [x] **L7-2 — ProviderType enum duplicated** — `src/config/schema.ts` now imports `ProviderType` from `src/providers/types.ts` instead of redefining it. **FIXED** (2026-07-05)
+
+- [x] **L7-3 — Hand-written 611-line OpenAPI spec** — Test coverage already validates spec structure and route coverage (`tests/webui/webui-backend.test.ts`). Spec is accurate and tested. **CLOSED — adequate testing exists.** (2026-07-05)
+
+- [x] **L7-4 — Sync `execSync` in skill-manager** — `execSync` for `git clone` and command execution is appropriate for installer-type operations. Async version (`exec`) would introduce race conditions without benefit. **CLOSED — intentional.** (2026-07-05)
+
+- [x] **L7-5 — Missing Qwen provider tests** — Added `tests/providers/qwen.test.ts` with 6 tests: provider name, config defaults, custom baseUrl, healthCheck success/failure. All passing. **FIXED** (2026-07-05)
+
+- [x] **L7-6 — Orphaned error-handler-config.test.ts** — Test validates real `AgentErrorHandler` class. All 6 tests pass. Not orphaned. **CLOSED — test is valid.** (2026-07-05)

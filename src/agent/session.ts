@@ -9,7 +9,6 @@
  * Usage:
  *   const session = new AgentSession(provider, { systemPrompt });
  *   const reply = await session.processMessage("hello", "conv_123");
- *   console.log(reply);
  */
 
 import { ConversationStore } from "../messaging/conversation-store.js";

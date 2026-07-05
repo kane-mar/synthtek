@@ -3,21 +3,10 @@
  *
  * Types for config file serialization and env-var parsing.
  * Runtime agent types are imported from the canonical source in agent/types.ts.
+ * Provider types are imported from the canonical source in providers/types.ts.
  */
 
-export type ProviderType =
-	| "openai"
-	| "anthropic"
-	| "openrouter"
-	| "ollama"
-	| "lmstudio"
-	| "llamacpp"
-	| "deepseek"
-	| "gemini"
-	| "mistral"
-	| "azure"
-	| "vllm"
-	| "qwen";
+import type { ProviderType } from "../providers/types.js";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 

@@ -76,10 +76,7 @@ export class TelegramApiClient {
 	/**
 	 * Make an API call with retry logic, returning parsed JSON.
 	 */
-	async apiCall<T = any>(
-		method: string,
-		body?: Record<string, unknown>,
-	): Promise<T> {
+	async apiCall<T>(method: string, body?: Record<string, unknown>): Promise<T> {
 		return this.apiCallWithRetry<T>(method, body);
 	}
 

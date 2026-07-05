@@ -77,14 +77,6 @@ export interface ErrorRecord {
 	timestamp: number;
 }
 
-/** Channel message count snapshot */
-export interface ChannelUsageRecord {
-	channel: string;
-	messagesSent: number;
-	messagesReceived: number;
-	timestamp: number;
-}
-
 /** Aggregated analytics summary for a time range */
 export interface AnalyticsSummary {
 	requestVolume: {

@@ -203,38 +203,35 @@ describe("CLI Validation Module", () => {
 		let limiter: RateLimiter;
 
 		before(() => {
-			limiter = new RateLimiter(5, 60_000);
+			limiter = new RateLimiter({ maxRequests: 5, windowMs: 60_000 });
 		});
 
 		it("should allow operations within limit", () => {
 			for (let i = 0; i < 5; i++) {
-				assert.strictEqual(limiter.check("test"), true);
+				assert.strictEqual(limiter.check("test").allowed, true);
 			}
 		});
 
 		it("should block operations exceeding limit", () => {
-			assert.strictEqual(limiter.check("test"), false);
+			assert.strictEqual(limiter.check("test").allowed, false);
 		});
 
-		it("should track operation counts", () => {
-			assert.ok(limiter.getCurrentCount("test") >= 5);
+		it("should report remaining requests", () => {
+			const result = limiter.check("remaining-key");
+			assert.strictEqual(result.allowed, true);
+			assert.strictEqual(typeof result.remaining, "number");
+			assert.strictEqual(typeof result.resetMs, "number");
 		});
 
 		it("should allow independent keys", () => {
-			assert.strictEqual(limiter.check("other-key"), true);
+			assert.strictEqual(limiter.check("other-key").allowed, true);
 		});
 
-		it("should cleanup expired entries", () => {
-			limiter.cleanup();
-			// After cleanup, the map should still have entries (they're not expired yet)
-			// We can't check internal state, but cleanup should not throw
-		});
-
-		it("should stop and clear resources", () => {
-			const stopLimiter = new RateLimiter(10);
-			stopLimiter.stop();
-			// After stop, getCurrentCount should return 0
-			assert.strictEqual(stopLimiter.getCurrentCount("any-key"), 0);
+		it("should provide stats for a key", () => {
+			const stats = limiter.stats("test");
+			assert.ok(stats !== null);
+			assert.strictEqual(typeof stats!.totalRequests, "number");
+			assert.strictEqual(typeof stats!.windowRequests, "number");
 		});
 	});
 

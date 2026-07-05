@@ -4,10 +4,9 @@
  */
 
 import {
+	classifyError as classifyErrorMessage,
 	matchesPatterns,
-	NETWORK_PATTERNS,
 	RETRYABLE_ERROR_PATTERNS,
-	TIMEOUT_PATTERNS,
 } from "./retry.js";
 import type { AgentLoopConfig } from "./types.js";
 
@@ -38,15 +37,9 @@ export interface CircuitBreakerState {
 
 // ─── Error Category Detection ────────────────────────────────────────────────
 
-const RATE_LIMIT_PATTERNS: RegExp[] = [
-	/rate.?limit/i,
-	/too many requests/i,
-	/429/i,
-];
-
-// Note: RETRYABLE_ERROR_PATTERNS, TIMEOUT_PATTERNS, NETWORK_PATTERNS,
-// and matchesPatterns() imported from retry.ts — consolidated to eliminate
-// duplicated pattern lists that drift apart.
+// Note: All pattern definitions (RATE_LIMIT_PATTERNS, TIMEOUT_PATTERNS,
+// NETWORK_PATTERNS, RETRYABLE_ERROR_PATTERNS) and classifyError() are
+// consolidated in retry.ts to eliminate duplicated pattern lists.
 
 // ─── AgentErrorHandler Class ─────────────────────────────────────────────────
 
@@ -97,13 +90,16 @@ export class AgentErrorHandler {
 				return "network";
 		}
 
-		// Fallback to message-based classification
+		// Fallback to message-based classification (delegated to retry.ts)
 		const message = error.message.toLowerCase();
+		const msgCategory = classifyErrorMessage(error.message);
+
 		if (message.includes("context") || message.includes("token limit"))
 			return "context";
-		if (matchesPatterns(message, RATE_LIMIT_PATTERNS)) return "rate_limit";
-		if (matchesPatterns(message, TIMEOUT_PATTERNS)) return "timeout";
-		if (matchesPatterns(message, NETWORK_PATTERNS)) return "network";
+		if (msgCategory === "rate_limit") return "rate_limit";
+		if (msgCategory === "timeout") return "timeout";
+		if (msgCategory === "network") return "network";
+		if (msgCategory === "auth") return "provider";
 		if (
 			message.includes("provider") ||
 			message.includes("llm") ||
