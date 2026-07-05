@@ -121,7 +121,7 @@ jobs:
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
           echo 'Stopping and removing existing container...'
-          docker rm -f synthtek 2>/dev/null || true
+          docker rm -f synthtek.prod 2>/dev/null || true
 
           echo 'Starting new container...'
           docker run -d \
@@ -145,7 +145,7 @@ jobs:
         run: |
           echo "Waiting for container to become healthy..."
           for i in $(seq 1 30); do
-            STATUS=$(docker inspect --format='{{.State.Health.Status}}' synthtek 2>/dev/null || echo "starting")
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' synthtek.prod 2>/dev/null || echo "starting")
             if [ "$STATUS" = "healthy" ]; then
               echo "✅ Container is healthy"
               break
@@ -181,7 +181,7 @@ jobs:
 
       - name: Run full browser e2e tests against production
         run: |
-          SYNTHTEK_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' synthtek)
+          SYNTHTEK_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' synthtek.prod)
           E2E_BASE_URL="http://${SYNTHTEK_IP}:3456" BASE_URL="http://${SYNTHTEK_IP}:3456" \
             npx playwright test tests/e2e/*.spec.ts
 
