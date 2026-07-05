@@ -34,6 +34,14 @@ export function handleProviderRoutes(
 		};
 	}
 
+	// GET /api/providers/diagnostics (must be BEFORE /:id wildcard)
+	if (method === "GET" && path === "/api/providers/diagnostics") {
+		return {
+			handled: true,
+			response: { status: 200, body: providerManager.getDiagnostics() },
+		};
+	}
+
 	// POST /api/providers
 	if (method === "POST" && path === "/api/providers") {
 		const reqData = body as CreateProviderRequest;
@@ -46,8 +54,20 @@ export function handleProviderRoutes(
 				},
 			};
 		}
-		const provider = providerManager.create(reqData);
-		return { handled: true, response: { status: 201, body: provider } };
+		try {
+			const provider = providerManager.create(reqData);
+			return { handled: true, response: { status: 201, body: provider } };
+		} catch (error) {
+			return {
+				handled: true,
+				response: {
+					status: 500,
+					body: {
+						error: `Failed to persist provider: ${(error as Error).message}`,
+					},
+				},
+			};
+		}
 	}
 
 	// GET /api/providers/:id
@@ -75,14 +95,26 @@ export function handleProviderRoutes(
 	) {
 		const id = path.split("/")[3];
 		const reqData = body as UpdateProviderRequest;
-		const provider = providerManager.update(id, reqData);
-		if (provider) {
-			return { handled: true, response: { status: 200, body: provider } };
+		try {
+			const provider = providerManager.update(id, reqData);
+			if (provider) {
+				return { handled: true, response: { status: 200, body: provider } };
+			}
+			return {
+				handled: true,
+				response: { status: 404, body: { error: "Provider not found" } },
+			};
+		} catch (error) {
+			return {
+				handled: true,
+				response: {
+					status: 500,
+					body: {
+						error: `Failed to persist provider update: ${(error as Error).message}`,
+					},
+				},
+			};
 		}
-		return {
-			handled: true,
-			response: { status: 404, body: { error: "Provider not found" } },
-		};
 	}
 
 	// DELETE /api/providers/:id
@@ -92,11 +124,23 @@ export function handleProviderRoutes(
 		path.split("/").length === 4
 	) {
 		const id = path.split("/")[3];
-		const deleted = providerManager.delete(id);
-		return {
-			handled: true,
-			response: { status: deleted ? 200 : 404, body: {} },
-		};
+		try {
+			const deleted = providerManager.delete(id);
+			return {
+				handled: true,
+				response: { status: deleted ? 200 : 404, body: {} },
+			};
+		} catch (error) {
+			return {
+				handled: true,
+				response: {
+					status: 500,
+					body: {
+						error: `Failed to persist provider deletion: ${(error as Error).message}`,
+					},
+				},
+			};
+		}
 	}
 
 	return { handled: false }; // Not a provider route

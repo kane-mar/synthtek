@@ -312,7 +312,10 @@ function setApiKey(key) { _apiKey = key; }
 
 async function fetchJSONGet(url) {
   const headers = _apiKey ? { Authorization: `Bearer ${_apiKey}` } : {};
-  return fetchJSON(url, { headers });
+  // Add cache-busting query param to prevent stale responses
+  const separator = url.includes('?') ? '&' : '?';
+  const cacheBustUrl = `${url}${separator}_t=${Date.now()}`;
+  return fetchJSON(cacheBustUrl, { headers });
 }
 
 async function fetchJSONPost(url, body) {

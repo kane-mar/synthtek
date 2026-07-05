@@ -3,7 +3,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -193,6 +193,56 @@ describe("ProviderManager", () => {
 		const p = mgr.update(created.id, { status: "inactive" });
 		assert.ok(p);
 		assert.equal(p.status, "inactive");
+	});
+
+	it("getDiagnostics returns correct info", () => {
+		const ws = freshWorkspace();
+		const mgr = new ProviderManager(ws);
+		const d1 = mgr.getDiagnostics();
+		assert.equal(d1.dataPath, join(ws, "config", "providers.json"));
+		assert.equal(d1.fileExists, false);
+		assert.equal(d1.providerCount, 0);
+		assert.equal(d1.loaded, false);
+
+		mgr.create({
+			name: "Diag Test",
+			type: "anthropic",
+			baseUrl: "",
+			apiKey: "",
+			models: [],
+			defaultModel: "",
+		});
+		const d2 = mgr.getDiagnostics();
+		assert.equal(d2.fileExists, true);
+		assert.ok(d2.fileSize > 0);
+		assert.equal(d2.providerCount, 1);
+		assert.equal(d2.loaded, true);
+	});
+
+	it("persist throws on unwritable directory", () => {
+		const ws = freshWorkspace();
+		// Make the workspace read-only
+		const configDir = join(ws, "config");
+		mkdirSync(configDir, { recursive: true });
+		chmodSync(ws, 0o444);
+		try {
+			const mgr = new ProviderManager(ws);
+			assert.throws(
+				() => {
+					mgr.create({
+						name: "Should Fail",
+						type: "openai",
+						baseUrl: "",
+						apiKey: "",
+						models: [],
+						defaultModel: "",
+					});
+				},
+				{ name: "Error" },
+			);
+		} finally {
+			chmodSync(ws, 0o755);
+		}
 	});
 
 	after(() => rmSync(baseDir, { recursive: true, force: true }));

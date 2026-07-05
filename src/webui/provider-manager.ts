@@ -4,7 +4,13 @@
  * CRUD for LLM provider configurations persisted to a JSON file.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 
 export type ProviderType =
@@ -159,35 +165,36 @@ export class ProviderManager {
 
 	private ensureLoaded(): void {
 		if (this.loaded) return;
+
 		try {
 			if (existsSync(this.dataPath)) {
 				const raw = readFileSync(this.dataPath, "utf-8");
 				const data: LLMProviderConfig[] = JSON.parse(raw);
 				for (const p of data) this.providers.set(p.id, p);
 			}
-		} catch {
-			this.providers.clear();
+		} catch (error) {
+			console.error(
+				`[ProviderManager] Failed to load providers from ${this.dataPath}: ${(error as Error).message}`,
+			);
+			// Only clear if file exists but is corrupt — not if it just doesn't exist yet
+			if (existsSync(this.dataPath)) {
+				this.providers.clear();
+			}
 		}
 		this.loaded = true;
 	}
 
 	private persist(): void {
 		const data: LLMProviderConfig[] = Array.from(this.providers.values());
-		try {
-			const dir = dirname(this.dataPath);
-			mkdirSync(dir, { recursive: true });
-			const json = JSON.stringify(data, null, 2);
-			writeFileSync(this.dataPath, json, "utf-8");
-			// Verify the file was written correctly by reading it back
-			const written = readFileSync(this.dataPath, "utf-8");
-			if (written !== json) {
-				console.error(
-					`[ProviderManager] Data verification failed for ${this.dataPath}`,
-				);
-			}
-		} catch (error) {
-			console.error(
-				`[ProviderManager] Failed to persist providers to ${this.dataPath}: ${(error as Error).message}`,
+		const dir = dirname(this.dataPath);
+		mkdirSync(dir, { recursive: true });
+		const json = JSON.stringify(data, null, 2);
+		writeFileSync(this.dataPath, json, "utf-8");
+		// Verify the file was written correctly by reading it back
+		const written = readFileSync(this.dataPath, "utf-8");
+		if (written !== json) {
+			throw new Error(
+				`Data verification failed for ${this.dataPath}: written content does not match`,
 			);
 		}
 	}
@@ -232,6 +239,36 @@ export class ProviderManager {
 		const removed = this.providers.delete(id);
 		if (removed) this.persist();
 		return removed;
+	}
+
+	/**
+	 * Returns diagnostic info about the provider storage.
+	 * Useful for debugging persistence issues.
+	 */
+	getDiagnostics(): {
+		dataPath: string;
+		fileExists: boolean;
+		fileSize: number;
+		providerCount: number;
+		loaded: boolean;
+	} {
+		let fileExists = false;
+		let fileSize = 0;
+		try {
+			if (existsSync(this.dataPath)) {
+				fileExists = true;
+				fileSize = statSync(this.dataPath).size;
+			}
+		} catch {
+			// ignore
+		}
+		return {
+			dataPath: this.dataPath,
+			fileExists,
+			fileSize,
+			providerCount: this.providers.size,
+			loaded: this.loaded,
+		};
 	}
 
 	// ── Presets ────────────────────────────────────────────────────────────
