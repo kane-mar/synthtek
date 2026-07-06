@@ -3,20 +3,18 @@ set -e
 
 # Ensure the workspace directory exists with proper permissions
 if [ -n "$SYNTHTEK_WORKSPACE" ]; then
-  mkdir -p "$SYNTHTEK_WORKSPACE" 2>/dev/null || true
-  if ! chown -R synthtek:synthtek "$SYNTHTEK_WORKSPACE" 2>/dev/null; then
-    echo "[entrypoint] WARNING: Could not chown $SYNTHTEK_WORKSPACE to synthtek user." >&2
-    echo "[entrypoint] The synthtek user may not be able to write to the workspace." >&2
-    echo "[entrypoint] If using a host bind mount, ensure the directory is writable by UID $(id -u synthtek)." >&2
-  fi
+  # Create the workspace and subdirectories the app needs to write to
+  for subdir in "" ".npm" "config" "skills" ".agents/skills"; do
+    mkdir -p "$SYNTHTEK_WORKSPACE/$subdir" 2>/dev/null || true
+  done
+  # Try chown first (works for Docker volumes), fall back to chmod (works for host bind mounts)
+  chown -R synthtek:synthtek "$SYNTHTEK_WORKSPACE" 2>/dev/null || chmod -R a+w "$SYNTHTEK_WORKSPACE" 2>/dev/null || true
 fi
 
 # Set HOME to workspace so ~/.agents/skills/ and npm cache persist
 if [ -n "$SYNTHTEK_WORKSPACE" ]; then
   HOME="$SYNTHTEK_WORKSPACE"
   export HOME
-  mkdir -p "$HOME/.npm" 2>/dev/null || true
-  chown -R synthtek:synthtek "$HOME/.npm" 2>/dev/null || true
 fi
 
 # Bridge skills from skills.sh install path (~/.agents/skills/) to
