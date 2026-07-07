@@ -5,7 +5,7 @@
 import { expect, test } from "@playwright/test";
 
 const BASE_URL =
-	process.env.E2E_BASE_URL || process.env.BASE_URL || "http://localhost:8080";
+	process.env.E2E_BASE_URL || process.env.BASE_URL || "http://localhost:3456";
 
 test.describe("SynthTek WebUI", () => {
 	// ── API Health (lightweight, no browser needed) ──────────────────────
