@@ -179,14 +179,14 @@ jobs:
         shell: bash
         run: |
           export DEBIAN_FRONTEND=noninteractive
-          # Fix any broken dpkg state from previous interrupted installs
-          (which sudo && sudo dpkg --configure -a) || dpkg --configure -a 2>/dev/null || true
-          # Ensure apt is ready
-          (which sudo && sudo apt-get update -qq) || apt-get update -qq 2>/dev/null || true
-          # Install Playwright deps with noninteractive frontend (fallback to direct install)
-          (which sudo && sudo env DEBIAN_FRONTEND=noninteractive npx playwright install-deps chromium) || \
-            (which sudo && sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libdbus-1-3 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2) || \
-            env DEBIAN_FRONTEND=noninteractive npx playwright install-deps chromium 2>&1 || true
+          # Fix dpkg if interrupted, then install only the missing lib
+          if which sudo >/dev/null 2>&1; then
+            sudo dpkg --configure -a --frontend=noninteractive 2>/dev/null || true
+            sudo apt-get install -y -qq libnspr4 2>/dev/null || true
+          else
+            dpkg --configure -a --frontend=noninteractive 2>/dev/null || true
+            apt-get install -y -qq libnspr4 2>/dev/null || true
+          fi
           npx playwright install chromium 2>&1
 
       - name: Run full browser e2e tests against production
