@@ -179,14 +179,19 @@ jobs:
         shell: bash
         run: |
           export DEBIAN_FRONTEND=noninteractive
-          # Fix dpkg if interrupted, then install only the missing lib
+          echo "=== Fixing dpkg state ==="
+          # Fix broken dpkg from previous interrupted installs
           if which sudo >/dev/null 2>&1; then
-            sudo dpkg --configure -a --frontend=noninteractive 2>/dev/null || true
-            sudo apt-get install -y -qq libnspr4 2>/dev/null || true
+            sudo rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock
+            sudo dpkg --configure -a || true
+            echo "=== Installing system deps ==="
+            sudo apt-get update -qq && sudo npx playwright install-deps chromium
           else
-            dpkg --configure -a --frontend=noninteractive 2>/dev/null || true
-            apt-get install -y -qq libnspr4 2>/dev/null || true
+            rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock
+            dpkg --configure -a || true
+            apt-get update -qq && npx playwright install-deps chromium
           fi
+          echo "=== Installing Chromium ==="
           npx playwright install chromium 2>&1
 
       - name: Run full browser e2e tests against production
