@@ -213,12 +213,23 @@ jobs:
           if [ -z "$SYNTHTEK_IP" ] || [ "$SYNTHTEK_IP" = "" ]; then
             SYNTHTEK_IP="localhost"
           fi
-          echo "Target: http://${SYNTHTEK_IP}:3456"
-          # Verify connectivity first
-          curl -sf "http://${SYNTHTEK_IP}:3456/api/health" && echo "Production reachable" || echo "Warning: health check failed, tests may fail"
+          TARGET="http://${SYNTHTEK_IP}:3456"
+          echo "Target: $TARGET"
+          # Wait for production to be reachable (handles brief container restarts)
+          for i in $(seq 1 12); do
+            if curl -sf "$TARGET/api/health" >/dev/null 2>&1; then
+              echo "Production reachable after ${i}s"
+              break
+            fi
+            if [ "$i" = "12" ]; then
+              echo "Warning: health check failed after 12s, tests may fail"
+            fi
+            sleep 5
+          done
           # Run only the current e2e test suite (matches current frontend HTML)
-          E2E_BASE_URL="http://${SYNTHTEK_IP}:3456" BASE_URL="http://${SYNTHTEK_IP}:3456" \
-            npx playwright test tests/e2e/synthtek-e2e.spec.ts --timeout=30000
+          # Use 3 retries to handle brief container restarts during tests
+          E2E_BASE_URL="$TARGET" BASE_URL="$TARGET" \
+            npx playwright test tests/e2e/synthtek-e2e.spec.ts --timeout=30000 --retries=3
 
       - name: Upload test artifacts
         if: failure()
