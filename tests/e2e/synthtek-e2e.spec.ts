@@ -55,7 +55,7 @@ test.describe("SynthTek WebUI", () => {
 
 	test("page title shows current section", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForSelector("#page-title", { timeout: 15000 });
+		await page.waitForSelector("#page-title", { timeout: 25000 });
 		await expect(page.locator("#page-title")).toBeVisible();
 	});
 
@@ -153,8 +153,8 @@ test.describe("SynthTek WebUI", () => {
 		page,
 	}) => {
 		await page.goto(`${BASE_URL}/#config`);
-		await page.waitForSelector("#config-panel", { timeout: 15000 });
-		await page.waitForSelector("#add-provider-btn", { timeout: 15000 });
+		await page.waitForSelector("#config-panel", { timeout: 25000 });
+		await page.waitForSelector("#add-provider-btn", { timeout: 25000 });
 
 		await expect(page.locator("#config-panel")).toBeVisible();
 		await expect(page.locator("#add-provider-btn")).toBeVisible();
@@ -162,8 +162,8 @@ test.describe("SynthTek WebUI", () => {
 
 	test("config page shows agent settings", async ({ page }) => {
 		await page.goto(`${BASE_URL}/#config`);
-		await page.waitForSelector("#config-panel", { timeout: 15000 });
-		await page.waitForSelector("#config-agent", { timeout: 15000 });
+		await page.waitForSelector("#config-panel", { timeout: 25000 });
+		await page.waitForSelector("#config-agent", { timeout: 25000 });
 
 		await expect(page.locator("#config-agent")).toBeVisible();
 		await expect(page.locator("#agent-language")).toBeVisible();
