@@ -8,7 +8,7 @@ test.describe("WebUI - Analytics Chart Themes", () => {
 		page,
 	}) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		await page.click('#sidebar nav a[data-page="analytics"]');
 		await page.waitForTimeout(1000);
@@ -27,13 +27,13 @@ test.describe("WebUI - Analytics Chart Themes", () => {
 
 	test("analytics chart canvas is visible in light theme", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		await page.evaluate(() => {
 			localStorage.setItem("theme", "Light");
 		});
 		await page.reload();
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		await page.click('#sidebar nav a[data-page="analytics"]');
 		await page.waitForTimeout(1000);
@@ -54,13 +54,13 @@ test.describe("WebUI - Analytics Chart Themes", () => {
 		page,
 	}) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		await page.evaluate(() => {
 			localStorage.setItem("theme", "Light");
 		});
 		await page.reload();
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		await page.click('#sidebar nav a[data-page="analytics"]');
 		await page.waitForTimeout(1000);
@@ -95,13 +95,13 @@ test.describe("WebUI - Analytics Chart Themes", () => {
 		page.on("pageerror", (error) => errors.push(error.message));
 
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		await page.evaluate(() => {
 			localStorage.setItem("theme", "Dark (GitHub)");
 		});
 		await page.reload();
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await page.click('#sidebar nav a[data-page="analytics"]');
 		await page.waitForTimeout(1000);
 
@@ -109,7 +109,7 @@ test.describe("WebUI - Analytics Chart Themes", () => {
 			localStorage.setItem("theme", "Light");
 		});
 		await page.reload();
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await page.click('#sidebar nav a[data-page="analytics"]');
 		await page.waitForTimeout(1000);
 
@@ -126,13 +126,13 @@ test.describe("WebUI - Analytics Chart Themes", () => {
 		page,
 	}) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		await page.evaluate(() => {
 			localStorage.setItem("theme", "Dark (GitHub)");
 		});
 		await page.reload();
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		await page.click('#sidebar nav a[data-page="analytics"]');
 		await page.waitForTimeout(500);

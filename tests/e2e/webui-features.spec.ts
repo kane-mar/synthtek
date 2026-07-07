@@ -15,7 +15,7 @@ async function navigateTo(page: any, pageName: string) {
 test.describe("WebUI - Skills (Tools) Page", () => {
 	test("loads the Skills page and shows skills list", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await navigateTo(page, "tools");
 		await page.waitForTimeout(500);
 
@@ -27,7 +27,7 @@ test.describe("WebUI - Skills (Tools) Page", () => {
 
 	test("skills page has an install input and button", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await navigateTo(page, "tools");
 		await page.waitForTimeout(500);
 
@@ -43,7 +43,7 @@ test.describe("WebUI - Skills (Tools) Page", () => {
 
 	test("skills page can toggle a skill on/off", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await navigateTo(page, "tools");
 		await page.waitForTimeout(500);
 
@@ -62,7 +62,7 @@ test.describe("WebUI - Skills (Tools) Page", () => {
 
 	test("skills page can delete a skill", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await navigateTo(page, "tools");
 		await page.waitForTimeout(500);
 
@@ -85,7 +85,7 @@ test.describe("WebUI - Skills (Tools) Page", () => {
 test.describe("WebUI - Cron Jobs Page", () => {
 	test("loads the Cron page and shows cron jobs list", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await navigateTo(page, "cron");
 		await page.waitForTimeout(500);
 
@@ -98,7 +98,7 @@ test.describe("WebUI - Cron Jobs Page", () => {
 		page.on("pageerror", (error) => errors.push(error.message));
 
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await navigateTo(page, "cron");
 		await page.waitForTimeout(1000);
 
@@ -117,7 +117,7 @@ test.describe("WebUI - Cron Jobs Page", () => {
 test.describe("WebUI - Agent Config Page", () => {
 	test("loads the Config page and shows agent settings", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await navigateTo(page, "config");
 		await page.waitForTimeout(500);
 
@@ -127,7 +127,7 @@ test.describe("WebUI - Agent Config Page", () => {
 
 	test("config page shows system prompt field", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await navigateTo(page, "config");
 		await page.waitForTimeout(500);
 
@@ -143,7 +143,7 @@ test.describe("WebUI - Agent Config Page", () => {
 
 	test("config page can update and reset settings", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await navigateTo(page, "config");
 		await page.waitForTimeout(500);
 
@@ -175,7 +175,7 @@ test.describe("WebUI - Agent Config Page", () => {
 test.describe("WebUI - Analytics Page", () => {
 	test("loads the Analytics page", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await navigateTo(page, "analytics");
 		await page.waitForTimeout(500);
 
@@ -187,7 +187,7 @@ test.describe("WebUI - Analytics Page", () => {
 		page.on("pageerror", (error) => errors.push(error.message));
 
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await navigateTo(page, "analytics");
 		await page.waitForTimeout(1000);
 
@@ -202,7 +202,7 @@ test.describe("WebUI - Analytics Page", () => {
 
 	test("analytics shows stats cards", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await navigateTo(page, "analytics");
 		await page.waitForTimeout(1000);
 
@@ -321,7 +321,7 @@ test.describe("WebUI - API Backend", () => {
 test.describe("WebUI - Sidebar Navigation", () => {
 	test("all nav links are visible", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		const navLinks = page.locator("#sidebar nav a");
 		const count = await navLinks.count();
@@ -336,7 +336,7 @@ test.describe("WebUI - Sidebar Navigation", () => {
 
 	test("navigation preserves page state", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		// Navigate to each page and back
 		const pages = ["analytics", "tools", "cron", "config", "chat"];
@@ -349,7 +349,7 @@ test.describe("WebUI - Sidebar Navigation", () => {
 
 	test("active nav link updates on navigation", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		// Check chat is active by default
 		let activeLink = page.locator("#sidebar nav a.active");
@@ -389,7 +389,7 @@ test.describe("WebUI - Error Handling", () => {
 test.describe("WebUI - Chat Interface", () => {
 	test("chat page loads with message input", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		// Look for the chat input
 		const chatInput = page.locator(
@@ -406,7 +406,7 @@ test.describe("WebUI - Chat Interface", () => {
 		page.on("pageerror", (error) => errors.push(error.message));
 
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await page.waitForTimeout(1000);
 
 		const criticalErrors = errors.filter(

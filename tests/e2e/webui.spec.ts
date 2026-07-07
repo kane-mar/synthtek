@@ -6,7 +6,7 @@ const BASE_URL =
 test.describe("WebUI - Navigation & Default Page", () => {
 	test("loads the Chat page by default", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		// The default page should be Chat
 		const activeLink = page.locator("#sidebar nav a.active");
@@ -16,7 +16,7 @@ test.describe("WebUI - Navigation & Default Page", () => {
 
 	test("has Analytics tab (not old Dashboard)", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		// Should have Analytics link
 		await expect(
@@ -30,10 +30,10 @@ test.describe("WebUI - Navigation & Default Page", () => {
 
 	test("navigates to System Config page", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		await page.click('#sidebar nav a[data-page="config"]');
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await expect(page.locator("body")).toBeVisible();
 		await expect(page.locator("#page-title")).toContainText("System Config");
 	});
@@ -42,7 +42,7 @@ test.describe("WebUI - Navigation & Default Page", () => {
 test.describe("WebUI - System Config Tabs", () => {
 	test("config tabs are functional", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 		await page.click('#sidebar nav a[data-page="config"]');
 		await page.waitForTimeout(500);
 
@@ -66,7 +66,7 @@ test.describe("WebUI - General Health", () => {
 		page.on("pageerror", (error) => errors.push(error.message));
 
 		await page.goto(BASE_URL);
-		await page.waitForLoadState("networkidle");
+		await page.waitForLoadState("load");
 
 		// Filter out expected/cosmetic errors
 		const criticalErrors = errors.filter(
