@@ -127,6 +127,7 @@ jobs:
           docker run -d \
             --name synthtek.prod \
             --restart unless-stopped \
+            --memory="512m" --memory-reservation="256m" \
             -p 3456:3456 \
             -v /volume1/docker/synthtek.prod/config:/root/.synthtek/config \
             -v /volume1/docker/synthtek.prod/workspace:/workspace \
