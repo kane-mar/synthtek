@@ -220,17 +220,20 @@ jobs:
           # Outer retry loop — retry the entire test suite if container restarts mid-run
           for attempt in 1 2 3; do
             echo "=== E2E test attempt $attempt/3 ==="
-            # Wait for production to be reachable
+            # Wait for production to be reachable (up to 60s)
             for i in $(seq 1 12); do
               if curl -sf "$TARGET/api/health" >/dev/null 2>&1; then
                 echo "Production reachable after ${i}s"
                 break
               fi
               if [ "$i" = "12" ]; then
-                echo "Warning: health check failed after 12s"
+                echo "Warning: health check failed after 60s"
               fi
               sleep 5
             done
+
+            # Small extra delay to let the container fully stabilize
+            sleep 5
 
             # Run the current e2e test suite
             set +e
@@ -246,8 +249,8 @@ jobs:
 
             echo "⚠️  Tests failed (exit $EXIT_CODE), attempt $attempt/3"
             if [ $attempt -lt 3 ]; then
-              echo "Waiting for container to stabilize..."
-              sleep 15
+              echo "Waiting for container to stabilize (30s)..."
+              sleep 30
             fi
           done
 
