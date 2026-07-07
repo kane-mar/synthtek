@@ -215,21 +215,43 @@ jobs:
           fi
           TARGET="http://${SYNTHTEK_IP}:3456"
           echo "Target: $TARGET"
-          # Wait for production to be reachable (handles brief container restarts)
-          for i in $(seq 1 12); do
-            if curl -sf "$TARGET/api/health" >/dev/null 2>&1; then
-              echo "Production reachable after ${i}s"
-              break
+
+          # Outer retry loop — retry the entire test suite if container restarts mid-run
+          for attempt in 1 2 3; do
+            echo "=== E2E test attempt $attempt/3 ==="
+            # Wait for production to be reachable
+            for i in $(seq 1 12); do
+              if curl -sf "$TARGET/api/health" >/dev/null 2>&1; then
+                echo "Production reachable after ${i}s"
+                break
+              fi
+              if [ "$i" = "12" ]; then
+                echo "Warning: health check failed after 12s"
+              fi
+              sleep 5
+            done
+
+            # Run the current e2e test suite
+            set +e
+            E2E_BASE_URL="$TARGET" BASE_URL="$TARGET" \
+              npx playwright test tests/e2e/synthtek-e2e.spec.ts --timeout=30000 --retries=2
+            EXIT_CODE=$?
+            set -e
+
+            if [ $EXIT_CODE -eq 0 ]; then
+              echo "✅ All tests passed!"
+              exit 0
             fi
-            if [ "$i" = "12" ]; then
-              echo "Warning: health check failed after 12s, tests may fail"
+
+            echo "⚠️  Tests failed (exit $EXIT_CODE), attempt $attempt/3"
+            if [ $attempt -lt 3 ]; then
+              echo "Waiting for container to stabilize..."
+              sleep 15
             fi
-            sleep 5
           done
-          # Run only the current e2e test suite (matches current frontend HTML)
-          # Use 3 retries to handle brief container restarts during tests
-          E2E_BASE_URL="$TARGET" BASE_URL="$TARGET" \
-            npx playwright test tests/e2e/synthtek-e2e.spec.ts --timeout=30000 --retries=3
+
+          echo "❌ Tests failed after 3 attempts"
+          exit 1
 
       - name: Upload test artifacts
         if: failure()
