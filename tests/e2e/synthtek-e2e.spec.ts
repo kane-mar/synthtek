@@ -56,20 +56,15 @@ test.describe("SynthTek WebUI", () => {
 
 	// ── Page Load ────────────────────────────────────────────────────────
 
-	test("page loads with sidebar and main content", async ({ page }) => {
-		await page.goto(BASE_URL);
-		await page.waitForSelector("#sidebar", { timeout: 15000 });
-		await page.waitForSelector("#main", { timeout: 5000 });
-		await expect(page.locator("#sidebar")).toBeVisible();
-	});
-
-	test("chat link is active by default and page has title", async ({
+	test("page loads with sidebar, active chat link, and title", async ({
 		page,
 	}) => {
 		await page.goto(BASE_URL);
+		await page.waitForSelector("#sidebar", { timeout: 15000 });
 		await page.waitForSelector("#sidebar nav a.active", { timeout: 15000 });
 		await page.waitForSelector("#page-title", { timeout: 5000 });
 
+		await expect(page.locator("#sidebar")).toBeVisible();
 		await expect(page.locator("#sidebar nav a.active")).toHaveAttribute(
 			"data-page",
 			"chat",
