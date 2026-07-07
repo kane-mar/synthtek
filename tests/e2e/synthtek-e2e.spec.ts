@@ -149,11 +149,29 @@ test.describe("SynthTek WebUI", () => {
 
 	// ── Config Page ──────────────────────────────────────────────────────
 
+	async function navigateToConfig(page: any, url: string) {
+		for (let attempt = 1; attempt <= 3; attempt++) {
+			try {
+				await page.goto(url, { timeout: 30000 });
+				await page.waitForSelector("#config-panel", { timeout: 25000 });
+				return;
+			} catch (e: any) {
+				if (attempt < 3 && e.message?.includes("ERR_CONNECTION")) {
+					console.log(
+						`Config navigation attempt ${attempt} failed, retrying...`,
+					);
+					await new Promise((r) => setTimeout(r, 5000));
+					continue;
+				}
+				throw e;
+			}
+		}
+	}
+
 	test("config page shows provider section with add button", async ({
 		page,
 	}) => {
-		await page.goto(`${BASE_URL}/#config`);
-		await page.waitForSelector("#config-panel", { timeout: 25000 });
+		await navigateToConfig(page, `${BASE_URL}/#config`);
 		await page.waitForSelector("#add-provider-btn", { timeout: 25000 });
 
 		await expect(page.locator("#config-panel")).toBeVisible();
@@ -161,8 +179,7 @@ test.describe("SynthTek WebUI", () => {
 	});
 
 	test("config page shows agent settings", async ({ page }) => {
-		await page.goto(`${BASE_URL}/#config`);
-		await page.waitForSelector("#config-panel", { timeout: 25000 });
+		await navigateToConfig(page, `${BASE_URL}/#config`);
 		await page.waitForSelector("#config-agent", { timeout: 25000 });
 
 		await expect(page.locator("#config-agent")).toBeVisible();
