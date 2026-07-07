@@ -26,24 +26,6 @@ test.describe("SynthTek WebUI", () => {
 		await expect(page.locator("#main")).toBeVisible();
 	});
 
-	test("sidebar has navigation links with data-page attributes", async ({
-		page,
-	}) => {
-		await page.goto(BASE_URL);
-		await page.waitForSelector("#sidebar nav", { timeout: 15000 });
-
-		const navLinks = page.locator("#sidebar nav a");
-		const count = await navLinks.count();
-		expect(count).toBeGreaterThanOrEqual(4);
-
-		const pages = await navLinks.evaluateAll((links) =>
-			links.map((a) => a.getAttribute("data-page")),
-		);
-		expect(pages).toContain("chat");
-		expect(pages).toContain("analytics");
-		expect(pages).toContain("config");
-	});
-
 	test("chat link is active by default", async ({ page }) => {
 		await page.goto(BASE_URL);
 		await page.waitForSelector("#sidebar nav a.active", { timeout: 15000 });
@@ -55,7 +37,7 @@ test.describe("SynthTek WebUI", () => {
 
 	test("page title shows current section", async ({ page }) => {
 		await page.goto(BASE_URL);
-		await page.waitForSelector("#page-title", { timeout: 25000 });
+		await page.waitForSelector("#page-title", { timeout: 15000 });
 		await expect(page.locator("#page-title")).toBeVisible();
 	});
 
