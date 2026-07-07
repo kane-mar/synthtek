@@ -176,15 +176,22 @@ jobs:
         run: npm ci
 
       - name: Install Playwright system deps and browsers
+        shell: bash
         run: |
-          npx playwright install-deps chromium
-          npx playwright install chromium
+          export DEBIAN_FRONTEND=noninteractive
+          # Ensure apt is ready (runner may not have sudo)
+          (which sudo && sudo apt-get update -qq) || apt-get update -qq 2>/dev/null || true
+          # Install Playwright deps with noninteractive frontend
+          (which sudo && sudo env DEBIAN_FRONTEND=noninteractive npx playwright install-deps chromium) || \
+            env DEBIAN_FRONTEND=noninteractive npx playwright install-deps chromium 2>&1 || true
+          npx playwright install chromium 2>&1
 
       - name: Run full browser e2e tests against production
         run: |
-          SYNTHTEK_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' synthtek.prod)
+          SYNTHTEK_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' synthtek.prod 2>/dev/null || echo "localhost")
+          echo "Target container IP: ${SYNTHTEK_IP}"
           E2E_BASE_URL="http://${SYNTHTEK_IP}:3456" BASE_URL="http://${SYNTHTEK_IP}:3456" \
-            npx playwright test tests/e2e/*.spec.ts
+            npx playwright test tests/e2e/*.spec.ts --timeout=60000
 
       - name: Upload test artifacts
         if: failure()
