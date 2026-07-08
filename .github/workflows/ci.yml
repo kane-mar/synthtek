@@ -126,10 +126,10 @@ jobs:
           echo 'Fixing permissions on workspace volume...'
           docker run --rm \
             -v /volume1/docker/synthtek.prod/workspace:/workspace \
-            alpine chmod -R a+w /workspace 2>/dev/null || \
+            alpine chmod -R a+rwX /workspace 2>/dev/null || \
           docker run --rm \
             -v /volume1/docker/synthtek.prod/workspace:/workspace \
-            busybox chmod -R a+w /workspace 2>/dev/null || \
+            busybox chmod -R a+rwX /workspace 2>/dev/null || \
           echo '⚠️  Could not fix permissions (trying to continue anyway)'
 
           echo 'Starting new container...'

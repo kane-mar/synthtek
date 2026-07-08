@@ -8,7 +8,7 @@ if [ -n "$SYNTHTEK_WORKSPACE" ]; then
     mkdir -p "$SYNTHTEK_WORKSPACE/$subdir" 2>/dev/null || true
   done
   # Try chown first (works for Docker volumes), fall back to chmod (works for host bind mounts)
-  chown -R synthtek:synthtek "$SYNTHTEK_WORKSPACE" 2>/dev/null && echo "Permissions set via chown" || { chmod -R a+w "$SYNTHTEK_WORKSPACE" 2>/dev/null && echo "Permissions set via chmod" || echo "⚠️  Could not set permissions on $SYNTHTEK_WORKSPACE (non-fatal)"; }
+  chown -R synthtek:synthtek "$SYNTHTEK_WORKSPACE" 2>/dev/null && echo "Permissions set via chown" || { chmod -R a+rwX "$SYNTHTEK_WORKSPACE" 2>/dev/null && echo "Permissions set via chmod" || echo "⚠️  Could not set permissions on $SYNTHTEK_WORKSPACE (non-fatal)"; }
 fi
 
 # Set HOME to workspace so ~/.agents/skills/ and npm cache persist
