@@ -123,6 +123,15 @@ jobs:
           echo 'Stopping and removing existing container...'
           docker rm -f synthtek.prod 2>/dev/null || true
 
+          echo 'Fixing permissions on workspace volume...'
+          docker run --rm \
+            -v /volume1/docker/synthtek.prod/workspace:/workspace \
+            alpine chmod -R a+w /workspace 2>/dev/null || \
+          docker run --rm \
+            -v /volume1/docker/synthtek.prod/workspace:/workspace \
+            busybox chmod -R a+w /workspace 2>/dev/null || \
+          echo '⚠️  Could not fix permissions (trying to continue anyway)'
+
           echo 'Starting new container...'
           docker run -d \
             --name synthtek.prod \
