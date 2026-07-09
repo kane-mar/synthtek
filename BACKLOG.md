@@ -463,3 +463,54 @@ Code quality backlog for synthtek architecture cleanup.
 - [x] **L7-5 — Missing Qwen provider tests** — Added `tests/providers/qwen.test.ts` with 6 tests: provider name, config defaults, custom baseUrl, healthCheck success/failure. All passing. **FIXED** (2026-07-05)
 
 - [x] **L7-6 — Orphaned error-handler-config.test.ts** — Test validates real `AgentErrorHandler` class. All 6 tests pass. Not orphaned. **CLOSED — test is valid.** (2026-07-05)
+
+---
+
+## Phase 8 — Large Files Audit (2026-07-08)
+
+**Phase 8**: 19 source files > 500 lines identified. **0 fixed, 19 remaining.** ❌
+
+All files > 500 lines represent disproportionate complexity concentration. These are potential refactoring targets to split into smaller, more maintainable modules.
+
+### Files > 500 lines (19 total)
+
+| # | File | Lines | Module | Priority |
+|---|------|-------|--------|----------|
+| 1 | `src/webui/frontend.html` | **1,573** | WebUI — single-page frontend | 🔴 HIGH |
+| 2 | `src/channels/telegram/channel.ts` | **1,502** | Telegram channel | 🔴 HIGH |
+| 3 | `src/channels/discord/channel.ts` | **1,284** | Discord channel | 🔴 HIGH |
+| 4 | `src/agent/loop.ts` | **1,092** | Agent core loop | 🟡 MEDIUM |
+| 5 | `src/cli/commands/chat-command.ts` | **933** | CLI interactive chat | 🟡 MEDIUM |
+| 6 | `tests/e2e/page-functionality.spec.ts` | **898** | E2E browser tests | 🟢 LOW |
+| 7 | `tests/agent.test.ts` | **870** | Agent loop tests | 🟢 LOW |
+| 8 | `tests/webui/webui-e2e-playwright.e2e.ts` | **863** | Playwright E2E tests | 🟢 LOW |
+| 9 | `src/webui/backend.ts` | **839** | WebUI REST API router | 🟡 MEDIUM |
+| 10 | `tests/webui/webui-e2e.test.ts` | **654** | WebUI E2E tests | 🟢 LOW |
+| 11 | `.agents/skills/kanban-board/pi-ext/index.ts` | **622** | Kanban TUI skill | 🟢 LOW |
+| 12 | `tests/webui/server.test.ts` | **620** | WebUI server tests | 🟢 LOW |
+| 13 | `src/webui/openapi.ts` | **611** | OpenAPI 3.0.3 spec | 🟢 LOW |
+| 14 | `src/channels/slack/channel.ts` | **594** | Slack channel | 🟡 MEDIUM |
+| 15 | `src/agent/runner.ts` | **591** | Agent runner | 🟡 MEDIUM |
+| 16 | `tests/providers/reasoning.test.ts` | **549** | Reasoning provider tests | 🟢 LOW |
+| 17 | `tests/channels/slack.test.ts` | **541** | Slack channel tests | 🟢 LOW |
+| 18 | `src/webui/skill-manager.ts` | **514** | Skill management | 🟡 MEDIUM |
+| 19 | `.agents/skills/kanban-board/tui/src/renderers.js` | **507** | Kanban TUI renderer | 🟢 LOW |
+
+### Priority Breakdown
+
+| Priority | Count | Files |
+|----------|-------|-------|
+| 🔴 **HIGH** | 3 | `frontend.html` (1,573), `telegram/channel.ts` (1,502), `discord/channel.ts` (1,284) |
+| 🟡 **MEDIUM** | 6 | `loop.ts` (1,092), `chat-command.ts` (933), `backend.ts` (839), `slack/channel.ts` (594), `runner.ts` (591), `skill-manager.ts` (514) |
+| 🟢 **LOW** | 10 | Test files, skill files, `openapi.ts` |
+
+### Top 3 Refactoring Candidates
+
+**1. `src/webui/frontend.html` (1,573 lines)** 🔴
+Single-file SPA with inline CSS/JS. No component model, no build pipeline. Adding features means growing a monolithic file. Candidate for extraction into separate JS/CSS files or a proper frontend framework.
+
+**2. `src/channels/telegram/channel.ts` (1,502 lines)** 🔴
+The largest channel — Telegram's API surface demands it. However, the bot command handling, inline query processing, and callback query handling could be extracted into submodules as `discord/channel.ts` already does with `api.ts`, `format.ts`.
+
+**3. `src/channels/discord/channel.ts` (1,284 lines)** 🔴
+Also large, but already has partial extraction into `api.ts`. Further candidates: embed formatting, slash command registration, reaction handling.

@@ -2,6 +2,7 @@
  * Telegram Channel — Bot API integration for synthtek
  */
 
+import { Telegraf } from "telegraf";
 import { BaseChannel } from "../base-channel.js";
 import { TelegramApiClient } from "./api.js";
 import {
@@ -68,6 +69,7 @@ export class TelegramChannel extends BaseChannel<
 > {
 	protected config: Required<TelegramConfig>;
 	private api: TelegramApiClient;
+	private bot: Telegraf;
 	private botInfo: { username?: string; id?: number } = {};
 	private pollingState: {
 		lastUpdateId: number;
@@ -97,6 +99,7 @@ export class TelegramChannel extends BaseChannel<
 	constructor(config: TelegramConfig) {
 		super(config);
 		this.api = new TelegramApiClient(config);
+		this.bot = new Telegraf(config.token);
 		this.config = {
 			token: config.token,
 			webhookUrl: config.webhookUrl ?? "",
@@ -219,19 +222,10 @@ export class TelegramChannel extends BaseChannel<
 
 	/** Get the bot's info */
 	async getBotInfo(): Promise<{ username: string; id: number }> {
-		const response = await this.api.apiCallRaw("getMe");
-		const data = (await response.json()) as {
-			ok: boolean;
-			result: { username: string; id: number };
-		};
-
-		if (!data.ok) {
-			throw new Error(`Failed to get bot info: ${JSON.stringify(data)}`);
-		}
-
-		this.botInfo.username = data.result.username;
-		this.botInfo.id = data.result.id;
-		return data.result;
+		const me = await this.bot.telegram.getMe();
+		this.botInfo.username = me.username;
+		this.botInfo.id = me.id;
+		return { username: me.username ?? "", id: me.id };
 	}
 
 	/** Get the bot's username */
@@ -296,31 +290,31 @@ export class TelegramChannel extends BaseChannel<
 		const results: Array<{ messageId: number }> = [];
 
 		for (let i = 0; i < chunks.length; i++) {
-			const response = await this.api.apiCallRaw("sendMessage", {
-				chat_id: chatId,
-				text: chunks[i],
-				parse_mode: mergedOptions?.parseMode,
-				disable_web_page_preview: mergedOptions?.disablePreviewLinks,
-				protect_content: mergedOptions?.protectContent,
-				disable_notification: mergedOptions?.disableNotification,
-				allow_sending_without_reply: mergedOptions?.allowSendingWithoutReply,
-				...(mergedOptions?.replyToMessageId !== undefined && i === 0
-					? { reply_to_message_id: mergedOptions.replyToMessageId }
-					: {}),
-				...(mergedOptions?.messageThreadId !== undefined && i === 0
-					? { message_thread_id: mergedOptions.messageThreadId }
-					: {}),
-			});
+			const msg = await this.bot.telegram.sendMessage(
+				String(chatId),
+				chunks[i],
+				{
+					parse_mode: mergedOptions?.parseMode as
+						| "HTML"
+						| "Markdown"
+						| "MarkdownV2"
+						| undefined,
+					link_preview_options: mergedOptions?.disablePreviewLinks
+						? { is_disabled: true }
+						: undefined,
+					protect_content: mergedOptions?.protectContent,
+					disable_notification: mergedOptions?.disableNotification,
+					allow_sending_without_reply: mergedOptions?.allowSendingWithoutReply,
+					...(mergedOptions?.replyToMessageId !== undefined && i === 0
+						? { reply_to_message_id: mergedOptions.replyToMessageId }
+						: {}),
+					...(mergedOptions?.messageThreadId !== undefined && i === 0
+						? { message_thread_id: mergedOptions.messageThreadId }
+						: {}),
+				} as never,
+			);
 
-			const data = (await response.json()) as {
-				ok: boolean;
-				result: { message_id: number };
-			};
-			if (!data.ok) {
-				throw new Error(`Failed to send message: ${JSON.stringify(data)}`);
-			}
-
-			results.push({ messageId: data.result.message_id });
+			results.push({ messageId: msg.message_id });
 			this.recordSent();
 		}
 
@@ -340,18 +334,16 @@ export class TelegramChannel extends BaseChannel<
 				? toolHintToTelegramBlockquote(text)
 				: markdownToTelegramHtml(text);
 
-			await this.api.apiCallRaw("sendMessage", {
-				chat_id: chatId,
-				text: html,
+			await this.bot.telegram.sendMessage(String(chatId), html, {
 				parse_mode: "HTML",
 				reply_parameters: replyParams
-					? {
+					? ({
 							message_id: replyParams.messageId,
 							allow_sending_without_reply:
 								replyParams.allowSendingWithoutReply ?? true,
-						}
+						} as never)
 					: undefined,
-				...threadKwargs,
+				...(threadKwargs ?? {}),
 			});
 			this.recordSent();
 		} catch (error) {
@@ -361,18 +353,16 @@ export class TelegramChannel extends BaseChannel<
 				error,
 			);
 			try {
-				await this.api.apiCallRaw("sendMessage", {
-					chat_id: chatId,
-					text,
+				await this.bot.telegram.sendMessage(String(chatId), text, {
 					parse_mode: undefined,
 					reply_parameters: replyParams
-						? {
+						? ({
 								message_id: replyParams.messageId,
 								allow_sending_without_reply:
 									replyParams.allowSendingWithoutReply ?? true,
-							}
+							} as never)
 						: undefined,
-					...threadKwargs,
+					...(threadKwargs ?? {}),
 				});
 				this.recordSent();
 			} catch (fallbackError) {
@@ -491,29 +481,38 @@ export class TelegramChannel extends BaseChannel<
 		media: TelegramMedia,
 		options?: TelegramSendOptions,
 	): Promise<{ messageId: number } | null> {
-		const method = `send${media.type.charAt(0).toUpperCase() + media.type.slice(1)}`;
-		const body: Record<string, unknown> = {
-			chat_id: chatId,
-			[media.type]: media.media,
+		const chatIdStr = String(chatId);
+		const sendOpts: Record<string, unknown> = {
 			caption: media.caption,
 			parse_mode: media.parseMode,
 		};
-
 		if (options?.messageThreadId !== undefined) {
-			body.message_thread_id = options.messageThreadId;
+			sendOpts.message_thread_id = options.messageThreadId;
 		}
 
-		const response = await this.api.apiCallRaw(method, body);
-		const data = (await response.json()) as {
-			ok: boolean;
-			result?: { message_id: number };
-		};
-
-		if (!data.ok) {
-			throw new Error(`Failed to send ${media.type}: ${JSON.stringify(data)}`);
+		let msg: object | undefined;
+		if (media.type === "photo") {
+			msg = await this.bot.telegram.sendPhoto(
+				chatIdStr,
+				media.media,
+				sendOpts as never,
+			);
+		} else if (media.type === "document") {
+			msg = await this.bot.telegram.sendDocument(
+				chatIdStr,
+				media.media,
+				sendOpts as never,
+			);
+		} else {
+			// Fallback: send as document with the method name
+			msg = await this.bot.telegram.sendDocument(
+				chatIdStr,
+				media.media,
+				sendOpts as never,
+			);
 		}
 
-		return data.result ? { messageId: data.result.message_id } : null;
+		return { messageId: msg.message_id };
 	}
 
 	/** Send multiple media items as an album */
@@ -526,26 +525,21 @@ export class TelegramChannel extends BaseChannel<
 		}>,
 		options?: TelegramSendOptions,
 	): Promise<Array<{ messageId: number }> | null> {
-		const body: Record<string, unknown> = {
-			chat_id: chatId,
-			media: JSON.stringify(media),
-		};
+		const inputMedia = media.map((m) => ({
+			type: m.type as "photo" | "document",
+			media: m.media,
+			caption: m.caption,
+		})) as never;
 
-		if (options?.messageThreadId !== undefined) {
-			body.message_thread_id = options.messageThreadId;
-		}
+		const msgs = await this.bot.telegram.sendMediaGroup(
+			String(chatId),
+			inputMedia,
+			options?.messageThreadId !== undefined
+				? ({ message_thread_id: options.messageThreadId } as never)
+				: undefined,
+		);
 
-		const response = await this.api.apiCallRaw("sendMediaAlbum", body);
-		const data = (await response.json()) as {
-			ok: boolean;
-			result?: Array<{ message_id: number }>;
-		};
-
-		if (!data.ok) {
-			throw new Error(`Failed to send album: ${JSON.stringify(data)}`);
-		}
-
-		return data.result?.map((m) => ({ messageId: m.message_id })) || null;
+		return msgs.map((m) => ({ messageId: m.message_id }));
 	}
 
 	/** Send a file by URL or file path */
@@ -556,60 +550,113 @@ export class TelegramChannel extends BaseChannel<
 		caption?: string,
 		options?: TelegramSendOptions,
 	): Promise<{ messageId: number } | null> {
-		const method = `send${fileType.charAt(0).toUpperCase() + fileType.slice(1)}`;
-		const body: Record<string, unknown> = {
-			chat_id: chatId,
+		const chatIdStr = String(chatId);
+		const sendOpts: Record<string, unknown> = {
 			caption,
 			parse_mode: options?.parseMode,
 		};
-
 		if (options?.messageThreadId !== undefined) {
-			body.message_thread_id = options.messageThreadId;
+			sendOpts.message_thread_id = options.messageThreadId;
 		}
 
-		// If data is a Buffer, send as uploaded file
+		let msg: object | undefined;
 		if (Buffer.isBuffer(file.data)) {
-			// Use FormData for binary file uploads
-			const formData = new FormData();
-			formData.append("chat_id", String(chatId));
-			const blob = new Blob([file.data.buffer as ArrayBuffer], {
-				type: "application/octet-stream",
-			});
-			formData.append(fileType, blob, file.name);
-			if (caption) formData.append("caption", caption);
-			if (options?.parseMode) formData.append("parse_mode", options.parseMode);
-			if (options?.messageThreadId !== undefined) {
-				formData.append("message_thread_id", String(options.messageThreadId));
-			}
+			// Use telegraf's built-in file upload support via FormData
+			const { Readable } = await import("node:stream");
+			const stream = Readable.from(file.data) as never;
+			(stream as { filename: string }).filename = file.name;
 
-			const response = await fetch(this.api.getApiUrl(method), {
-				method: "POST",
-				body: formData,
-			});
-			const data = (await response.json()) as {
-				ok: boolean;
-				result?: { message_id: number };
-			};
-			if (!data.ok) {
-				throw new Error(`Failed to send ${fileType}: ${JSON.stringify(data)}`);
+			switch (fileType) {
+				case "photo":
+					msg = await this.bot.telegram.sendPhoto(
+						chatIdStr,
+						stream,
+						sendOpts as never,
+					);
+					break;
+				case "document":
+					msg = await this.bot.telegram.sendDocument(
+						chatIdStr,
+						stream,
+						sendOpts as never,
+					);
+					break;
+				case "audio":
+					msg = await this.bot.telegram.sendAudio(
+						chatIdStr,
+						stream as never,
+						sendOpts as never,
+					);
+					break;
+				case "video":
+					msg = await this.bot.telegram.sendVideo(
+						chatIdStr,
+						stream as never,
+						sendOpts as never,
+					);
+					break;
+				case "animation":
+					msg = await this.bot.telegram.sendAnimation(
+						chatIdStr,
+						stream as never,
+						sendOpts as never,
+					);
+					break;
+				default:
+					msg = await this.bot.telegram.sendDocument(
+						chatIdStr,
+						stream as never,
+						sendOpts as never,
+					);
 			}
-			return data.result ? { messageId: data.result.message_id } : null;
+		} else {
+			// For string URLs, use the standard telegraf API
+			switch (fileType) {
+				case "photo":
+					msg = await this.bot.telegram.sendPhoto(
+						chatIdStr,
+						file.data as string,
+						sendOpts as never,
+					);
+					break;
+				case "document":
+					msg = await this.bot.telegram.sendDocument(
+						chatIdStr,
+						file.data as string,
+						sendOpts as never,
+					);
+					break;
+				case "audio":
+					msg = await this.bot.telegram.sendAudio(
+						chatIdStr,
+						file.data as string,
+						sendOpts as never,
+					);
+					break;
+				case "video":
+					msg = await this.bot.telegram.sendVideo(
+						chatIdStr,
+						file.data as string,
+						sendOpts as never,
+					);
+					break;
+				case "animation":
+					msg = await this.bot.telegram.sendAnimation(
+						chatIdStr,
+						file.data as string,
+						sendOpts as never,
+					);
+					break;
+				default:
+					msg = await this.bot.telegram.sendDocument(
+						chatIdStr,
+						file.data as string,
+						sendOpts as never,
+					);
+			}
 		}
 
-		// For string URLs, use the standard JSON API
-		body[fileType] = file.data;
-
-		const response = await this.api.apiCallRaw(method, body);
-		const data = (await response.json()) as {
-			ok: boolean;
-			result?: { message_id: number };
-		};
-
-		if (!data.ok) {
-			throw new Error(`Failed to send ${fileType}: ${JSON.stringify(data)}`);
-		}
-
-		return data.result ? { messageId: data.result.message_id } : null;
+		return { messageId: msg.message_id };
 	}
 
 	// ─── Message Management ──────────────────────────────────────────────────
@@ -621,23 +668,23 @@ export class TelegramChannel extends BaseChannel<
 		text: string,
 		options?: TelegramSendOptions,
 	): Promise<{ messageId: number } | null> {
-		const response = await this.api.apiCallRaw("editMessageText", {
-			chat_id: chatId,
-			message_id: messageId,
+		const msg = await this.bot.telegram.editMessageText(
+			String(chatId),
+			messageId,
+			undefined,
 			text,
-			parse_mode: options?.parseMode,
-			disable_web_page_preview: options?.disablePreviewLinks,
-		});
+			{
+				parse_mode: options?.parseMode as "HTML" | "Markdown" | undefined,
+				link_preview_options: options?.disablePreviewLinks
+					? { is_disabled: true }
+					: undefined,
+			} as never,
+		);
 
-		const data = (await response.json()) as {
-			ok: boolean;
-			result?: { message_id: number };
-		};
-		if (!data.ok) {
-			throw new Error(`Failed to edit message: ${JSON.stringify(data)}`);
+		if (typeof msg === "object" && "message_id" in msg) {
+			return { messageId: msg.message_id };
 		}
-
-		return data.result ? { messageId: data.result.message_id } : null;
+		return null;
 	}
 
 	/** Edit a media caption */
@@ -647,22 +694,20 @@ export class TelegramChannel extends BaseChannel<
 		caption: string,
 		options?: TelegramSendOptions,
 	): Promise<{ messageId: number } | null> {
-		const response = await this.api.apiCallRaw("editMessageCaption", {
-			chat_id: chatId,
-			message_id: messageId,
-			caption,
-			parse_mode: options?.parseMode,
-		});
+		const msg = await this.bot.telegram.editMessageCaption(
+			String(chatId),
+			messageId,
+			undefined,
+			{
+				caption,
+				parse_mode: options?.parseMode as "HTML" | "Markdown" | undefined,
+			} as never,
+		);
 
-		const data = (await response.json()) as {
-			ok: boolean;
-			result?: { message_id: number };
-		};
-		if (!data.ok) {
-			throw new Error(`Failed to edit caption: ${JSON.stringify(data)}`);
+		if (typeof msg === "object" && "message_id" in msg) {
+			return { messageId: msg.message_id };
 		}
-
-		return data.result ? { messageId: data.result.message_id } : null;
+		return null;
 	}
 
 	/** Delete a message */
@@ -670,13 +715,12 @@ export class TelegramChannel extends BaseChannel<
 		chatId: number | string,
 		messageId: number,
 	): Promise<boolean> {
-		const response = await this.api.apiCallRaw("deleteMessage", {
-			chat_id: chatId,
-			message_id: messageId,
-		});
-
-		const data = (await response.json()) as { ok: boolean };
-		return data.ok;
+		try {
+			await this.bot.telegram.deleteMessage(String(chatId), messageId);
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	/** Pin a message */
@@ -732,18 +776,12 @@ export class TelegramChannel extends BaseChannel<
 		// Clear previous typing interval for this chat
 		this.stopTyping(chatId);
 
-		await this.api.apiCallRaw("sendChatAction", {
-			chat_id: chatId,
-			action,
-		});
+		await this.bot.telegram.sendChatAction(String(chatId), action as never);
 
 		// Set up auto-refresh interval
 		const interval = setInterval(async () => {
 			try {
-				await this.api.apiCallRaw("sendChatAction", {
-					chat_id: chatId,
-					action,
-				});
+				await this.bot.telegram.sendChatAction(String(chatId), action as never);
 			} catch {
 				// Ignore errors in typing refresh
 				this.stopTyping(chatId);
@@ -802,12 +840,13 @@ export class TelegramChannel extends BaseChannel<
 		if (now - buf.lastEdit >= STREAM_EDIT_INTERVAL_MS) {
 			try {
 				const html = markdownToTelegramHtml(buf.text);
-				await this.api.apiCallRaw("editMessageText", {
-					chat_id: chatId,
-					message_id: buf.messageId,
-					text: html,
-					parse_mode: "HTML",
-				});
+				await this.bot.telegram.editMessageText(
+					String(chatId),
+					buf.messageId ?? undefined,
+					undefined,
+					html,
+					{ parse_mode: "HTML" } as never,
+				);
 				buf.lastEdit = now;
 			} catch {
 				// Ignore edit errors during streaming
@@ -823,12 +862,13 @@ export class TelegramChannel extends BaseChannel<
 		// Final edit to ensure complete text is shown
 		try {
 			const html = markdownToTelegramHtml(buf.text);
-			await this.api.apiCallRaw("editMessageText", {
-				chat_id: chatId,
-				message_id: buf.messageId,
-				text: html,
-				parse_mode: "HTML",
-			});
+			await this.bot.telegram.editMessageText(
+				String(chatId),
+				buf.messageId ?? undefined,
+				undefined,
+				html,
+				{ parse_mode: "HTML" } as never,
+			);
 		} catch {
 			// Ignore final edit errors
 		}
@@ -852,14 +892,14 @@ export class TelegramChannel extends BaseChannel<
 		messageId: number,
 		emoji: string,
 	): Promise<boolean> {
-		const response = await this.api.apiCallRaw("setMessageReaction", {
-			chat_id: chatId,
-			message_id: messageId,
-			reaction: JSON.stringify([{ type: "emoji", emoji }]),
-		});
-
-		const data = (await response.json()) as { ok: boolean };
-		return data.ok;
+		try {
+			await this.bot.telegram.setMessageReaction(String(chatId), messageId, [
+				{ type: "emoji", emoji: emoji as never },
+			]);
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	/** Remove all reactions from a message */
@@ -867,14 +907,12 @@ export class TelegramChannel extends BaseChannel<
 		chatId: number | string,
 		messageId: number,
 	): Promise<boolean> {
-		const response = await this.api.apiCallRaw("setMessageReaction", {
-			chat_id: chatId,
-			message_id: messageId,
-			reaction: JSON.stringify([]),
-		});
-
-		const data = (await response.json()) as { ok: boolean };
-		return data.ok;
+		try {
+			await this.bot.telegram.setMessageReaction(String(chatId), messageId, []);
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	/** Get message reactions */
@@ -882,6 +920,7 @@ export class TelegramChannel extends BaseChannel<
 		chatId: number | string,
 		messageId: number,
 	): Promise<TelegramReaction[]> {
+		// telegraf doesn't have getMessageReactions - use api client for this
 		const response = await this.api.apiCallRaw("getMessageReactions", {
 			chat_id: chatId,
 			message_id: messageId,

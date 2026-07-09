@@ -834,10 +834,6 @@ function renderChat(el) {
     h = h.replace(/^---+$/gm, '<hr>');
     return h;
   }
-
-  function escapeHtml(str) {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
 }
 
 // ── Skills ────────────────────────────────────────────────────────────────
