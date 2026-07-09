@@ -206,5 +206,5 @@ Configuration is loaded from:
 2. Config file (`config.json` / `config.yaml`)
 3. CLI flags
 
-See `DOCKER.md` for environment variable reference.
+See `README.md` (Environment Variables section) for environment variable reference.
 See `src/config/loader.ts` for loading logic.

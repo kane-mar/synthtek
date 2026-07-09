@@ -21,10 +21,3 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "✅ All pre-commit checks passed!"
-
-if [ $? -ne 0 ]; then
-  echo "❌ Tests failed. Fix failures before committing."
-  exit 1
-fi
-
-echo "✅ All pre-commit checks passed!"
