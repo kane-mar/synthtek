@@ -374,6 +374,27 @@ export const OPENAPI_SPEC: Record<string, unknown> = {
 		},
 
 		// ── Health & Stats ────────────────────────────────────────────────────
+		"/api/version": {
+			get: {
+				summary: "App version",
+				tags: ["System"],
+				responses: {
+					"200": {
+						description: "Version string",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										version: { type: "string" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 		"/api/health": {
 			get: {
 				summary: "Health check",

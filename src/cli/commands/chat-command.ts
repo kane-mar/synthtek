@@ -21,7 +21,8 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { emitKeypressEvents } from "node:readline";
 import type { Command } from "commander";
 import { getSystemPrompt } from "../../config/agent-config.js";
@@ -30,6 +31,25 @@ import { ConversationStore } from "../../messaging/conversation-store.js";
 import type { ChatMessage, LLMProviderConfig } from "../../messaging/types.js";
 import type { ProviderType } from "../../providers/types.js";
 import { config, logger } from "../cli-context.js";
+
+// ── App version from package.json ─────────────────────────────────────────────
+
+let _appVersion = "";
+
+function getAppVersion(): string {
+	if (_appVersion) return _appVersion;
+	try {
+		const thisFile = fileURLToPath(import.meta.url);
+		const distDir = resolve(thisFile, "..");
+		const projectRoot = resolve(distDir, "..", "..");
+		const pkgPath = join(projectRoot, "package.json");
+		const raw = readFileSync(pkgPath, "utf-8");
+		_appVersion = JSON.parse(raw).version || "0.0.0";
+	} catch {
+		_appVersion = "0.0.0";
+	}
+	return _appVersion;
+}
 
 // ── Provider Loader ──────────────────────────────────────────────────────────
 
@@ -151,6 +171,7 @@ class ChatTUI {
 	private systemPrompt: string;
 	private providerName: string;
 	private modelName: string;
+	private version: string;
 	private store: ConversationStore;
 	private resolvePromise!: () => void;
 
@@ -159,12 +180,14 @@ class ChatTUI {
 		systemPrompt: string,
 		providerName: string,
 		modelName: string,
+		version: string,
 		store: ConversationStore,
 	) {
 		this.chat = chat;
 		this.systemPrompt = systemPrompt;
 		this.providerName = providerName;
 		this.modelName = modelName;
+		this.version = version;
 		this.store = store;
 		this.registerCommands();
 	}
@@ -274,7 +297,7 @@ class ChatTUI {
 		const spinner = this.isWaiting ? "⏳ " : "  ";
 		process.stdout.write(color(`${spinner}${this.statusText}`, C.grey));
 
-		// Row 3 of bar: secondary info — provider • model • msgs • convs
+		// Row 3 of bar: secondary info — provider • model • msgs • convs • version
 		cursorMove(barTop + 2, 1);
 		clearLine();
 		const providerInfo = this.providerName
@@ -286,11 +309,13 @@ class ChatTUI {
 				? `Msgs: ${Math.ceil(this.history.length / 2)}`
 				: "";
 		const convCount = this.store.list().length;
+		const versionInfo = `v${this.version}`;
 		const parts = [
 			providerInfo,
 			modelInfo,
 			msgCount,
 			`${convCount} conversations`,
+			versionInfo,
 		].filter(Boolean);
 		process.stdout.write(color(` ${parts.join("  •  ")}`, C.dim));
 
@@ -918,6 +943,7 @@ export function registerChatCommand(program: Command): void {
 							systemPrompt,
 							activeProvider.type,
 							activeProvider.defaultModel || opts.model || activeProvider.type,
+							getAppVersion(),
 							store,
 						);
 						await tui.start();

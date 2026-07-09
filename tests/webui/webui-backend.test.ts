@@ -229,6 +229,16 @@ describe("WebUIBackend", () => {
 			ok(handler, "handler returns response");
 			strictEqual(handler.status, 404);
 		});
+
+		it("returns version via GET /api/version", () => {
+			const handler = backend.handleRequest("GET", "/api/version", {});
+			ok(handler, "handler returns response");
+			strictEqual(handler.status, 200);
+			const body = handler.body as { version?: string };
+			ok(body.version, "version string is present");
+			ok(typeof body.version === "string", "version is a string");
+			ok(body.version.length > 0, "version is non-empty");
+		});
 	});
 
 	describe("OpenAPI specification", () => {

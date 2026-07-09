@@ -512,7 +512,7 @@ export class TelegramChannel extends BaseChannel<
 			);
 		}
 
-		return { messageId: msg.message_id };
+		return { messageId: (msg as any).message_id };
 	}
 
 	/** Send multiple media items as an album */
@@ -656,7 +656,7 @@ export class TelegramChannel extends BaseChannel<
 			}
 		}
 
-		return { messageId: msg.message_id };
+		return { messageId: (msg as any).message_id };
 	}
 
 	// ─── Message Management ──────────────────────────────────────────────────

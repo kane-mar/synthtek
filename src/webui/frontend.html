@@ -278,6 +278,9 @@ blockquote{border-left:3px solid var(--accent);padding:4px 12px;margin:8px 0;col
     <div class="status-row" id="status-health-row" style="font-size:10px;opacity:.6;display:none">
       <span id="status-health"></span>
     </div>
+    <div class="status-row" style="font-size:10px;opacity:.5;border-top:1px solid var(--border);padding-top:4px;margin-top:2px">
+      <span id="status-version">v1.0.0</span>
+    </div>
   </div>
 </div>
 
@@ -1501,6 +1504,13 @@ async function updateStatus() {
     // Check health first
     const health = await fetch(`${API}/health`);
     if (!health.ok) throw new Error();
+
+    // Fetch version
+    try {
+      const verData = await fetchJSONGet(`${API}/version`);
+      const verEl = document.getElementById('status-version');
+      if (verEl && verData?.version) verEl.textContent = `v${verData.version}`;
+    } catch {} // non-critical
 
     // Fetch providers
     let providers = [];

@@ -5,6 +5,9 @@
  * Handles sessions, messages, file uploads, authentication, and analytics.
  */
 
+import { readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	getAgentConfig as getSharedAgentConfig,
 	resetAgentConfig as resetSharedAgentConfig,
@@ -44,6 +47,25 @@ const AVAILABLE_THEMES: Array<{ id: string; name: string }> = [
 
 function generateId(): string {
 	return `_${Math.random().toString(36).slice(2, 11)}`;
+}
+
+let _cachedVersion: string | undefined;
+
+/** Read app version from package.json (cached after first read). */
+function getAppVersion(): string {
+	if (_cachedVersion) return _cachedVersion;
+	try {
+		const thisFile = fileURLToPath(import.meta.url);
+		const distDir = resolve(thisFile, "..");
+		const projectRoot = resolve(distDir, "..", "..");
+		const pkgPath = join(projectRoot, "package.json");
+		const raw = readFileSync(pkgPath, "utf-8");
+		const pkg = JSON.parse(raw);
+		_cachedVersion = pkg.version || "0.0.0";
+	} catch {
+		_cachedVersion = "0.0.0";
+	}
+	return _cachedVersion as string;
 }
 
 type RouteHandler = (body: unknown, params: RouteParams) => APIResponse;
@@ -239,6 +261,11 @@ export class WebUIBackend {
 		this.delete("/api/config/agent", (_body, _params) => ({
 			status: 200,
 			body: this.resetAgentConfig(),
+		}));
+
+		this.get("/api/version", (_body, _params) => ({
+			status: 200,
+			body: { version: getAppVersion() },
 		}));
 
 		this.get("/api/health", (_body, _params) => ({
