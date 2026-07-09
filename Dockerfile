@@ -1,7 +1,7 @@
 # ──────────────────────────────────────────────────────────────────────────────
 # Stage 1: Build TypeScript
 # ──────────────────────────────────────────────────────────────────────────────
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends unzip build-ess
 
 # Install ALL dependencies (including dev for build)
 COPY package.json package-lock.json ./
-RUN npm install -g npm@latest && npm ci
+RUN npm ci
 
 # Copy source and compile
 COPY tsconfig.json ./
@@ -20,7 +20,7 @@ RUN npm run build && echo "Build successful"
 # ──────────────────────────────────────────────────────────────────────────────
 # Stage 2: Production runtime (minimal)
 # ──────────────────────────────────────────────────────────────────────────────
-FROM node:20-slim AS runtime
+FROM node:22-slim AS runtime
 
 WORKDIR /app
 
