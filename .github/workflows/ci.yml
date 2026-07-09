@@ -93,7 +93,8 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        id: build
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
@@ -101,8 +102,23 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Debug build failure
+        if: failure()
+        run: |
+          echo "❌ Build failed. Checking Docker setup..."
+          docker version
+          docker buildx version
+          echo "--- docker info ---"
+          docker info --format '{{.OSType}} {{.Architecture}} {{.Driver}}'
+          echo "--- registry check ---"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin 2>&1 || echo "Login failed"
+          echo "--- attempt local build ---"
+          docker build --no-cache -t test-build . 2>&1 || echo "Local build failed"
 
       - name: Image digest
+        if: success()
         run: echo "Pushed ${{ steps.meta.outputs.tags }}"
 
   deploy:
