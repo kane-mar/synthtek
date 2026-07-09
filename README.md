@@ -1,6 +1,6 @@
 # Synthtek
 
-**v1.0.0** — A modular, plugin-based AI agent framework built with Node.js and TypeScript.
+**v1.0.1** — A modular, plugin-based AI agent framework built with Node.js and TypeScript.
 
 [![Tests](https://img.shields.io/badge/tests-1055%20passing-brightgreen)](https://github.com/kane-mar/synthtek)
 [![E2E](https://img.shields.io/badge/e2e-228%20suites%20passing-brightgreen)](https://github.com/kane-mar/synthtek)
