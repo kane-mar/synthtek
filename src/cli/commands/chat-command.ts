@@ -22,8 +22,8 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { emitKeypressEvents } from "node:readline";
+import { fileURLToPath } from "node:url";
 import type { Command } from "commander";
 import { getSystemPrompt } from "../../config/agent-config.js";
 import { ChatService } from "../../messaging/chat-service.js";

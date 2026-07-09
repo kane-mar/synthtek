@@ -57,7 +57,7 @@ function getAppVersion(): string {
 	try {
 		const thisFile = fileURLToPath(import.meta.url);
 		const distDir = resolve(thisFile, "..");
-		const projectRoot = resolve(distDir, "..", "..");
+		const projectRoot = resolve(distDir, "..", "..", "..");
 		const pkgPath = join(projectRoot, "package.json");
 		const raw = readFileSync(pkgPath, "utf-8");
 		const pkg = JSON.parse(raw);
